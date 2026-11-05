@@ -1,0 +1,15 @@
+{
+  "name": "faktur-beres",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Penjalan perintah Faktur Beres (npm run ...). Kode Python dikelola uv.",
+  "packageManager": "npm@11.19.1",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "lint": "uv run ruff check . && uv run ruff format --check .",
+    "test": "uv run python -m pytest",
+    "check": "npm run lint && npm test"
+  }
+}
