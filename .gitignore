@@ -1,0 +1,33 @@
+# Rahasia lokal: hanya .env.example yang di-commit
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# Node.js
+node_modules/
+
+# Hasil build
+dist/
+build/
+
+# Berkas runtime lokal dan hasil evaluasi
+var/
+eval/hasil/
+
+# Log
+*.log
+
+# Editor dan sistem operasi
+.DS_Store
+.idea/
+.vscode/
+*.swp
