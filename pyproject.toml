@@ -1,0 +1,36 @@
+[project]
+name = "faktur-beres"
+version = "0.1.0"
+description = "AI agent yang menuntaskan exception faktur pemasok di proses accounts payable."
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+    "httpx>=0.28.1",
+    "pydantic>=2.14.3",
+    "pydantic-settings>=2.16.2",
+    "pyyaml>=6.0.3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.2.0",
+    "ruff>=0.17.3",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.1,<0.14"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+src = ["src", "tests"]
+# Dokumen ditulis tangan; formatter hanya untuk kode Python.
+extend-exclude = ["*.md"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-ra"]
