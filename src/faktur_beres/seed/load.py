@@ -28,6 +28,8 @@ TZ = "Asia/Jakarta"
 ACTION_CONTEXT = {"lang": LANG, "tz": TZ}
 PO_STATE = {"dikonfirmasi": "purchase", "batal": "cancel", "rfq": "draft"}
 QTY_EPSILON = 1e-6
+# PO numbers up to P00056 come from the dataset; new POs made in the UI start at P00100.
+MIN_NEXT_PO_NUMBER = 100
 
 
 def planned_date(po: PurchaseOrder):
@@ -46,6 +48,7 @@ DEFAULT_STEPS = (
     "purchase_orders",
     "receipts",
     "history_bills",
+    "po_sequence",
 )
 
 
@@ -59,6 +62,7 @@ class Seeder:
         self.ids: dict[str, int] = {}  # dataset key -> Odoo id (vendors, banks, products)
         self.po_ids: dict[str, int] = {}  # PO key -> purchase.order id
         self.terms: dict[str, int] = {}  # vendor key -> account.payment.term id
+        self.notes: list[str] = []
 
     # -- helpers ------------------------------------------------------------------------------
 
@@ -480,6 +484,28 @@ class Seeder:
                 )
             self._count("tagihan riwayat", status)
 
+    # -- sequence -------------------------------------------------------------------------------
+
+    def seed_po_sequence(self) -> None:
+        def read() -> dict[str, Any]:
+            rows = self.c.search_read(
+                "ir.sequence",
+                [["code", "=", "purchase.order"]],
+                ["prefix", "padding", "number_next_actual"],
+            )
+            if len(rows) != 1:
+                raise SeedError("sequence purchase.order harus tepat satu")
+            return rows[0]
+
+        seq = read()
+        if seq["number_next_actual"] >= MIN_NEXT_PO_NUMBER:
+            status = "sudah sesuai"
+        else:
+            self.c.write("ir.sequence", [seq["id"]], {"number_next": MIN_NEXT_PO_NUMBER})
+            seq, status = read(), "dimajukan"
+        number = f"{seq['prefix'] or ''}{seq['number_next_actual']:0{seq['padding']}d}"
+        self.notes.append(f"sequence PO {status}: nomor PO baru berikutnya {number}")
+
     # -- run ------------------------------------------------------------------------------------
 
     def run(self, steps: Iterable[str] | None = None) -> None:
@@ -522,6 +548,8 @@ def main() -> int:
                     print(f"  - {line}")
             else:
                 print("\n== Perbedaan dengan dataset: tidak ada")
+            for note in seeder.notes:
+                print(f"\n== {note[0].upper()}{note[1:]}")
             print("\n== Ringkasan record seed di Odoo")
             print_table(("Jenis", "Jumlah"), summary_counts(client))
     except (SeedError, OdooError) as exc:
