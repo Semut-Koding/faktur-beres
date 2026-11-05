@@ -18,6 +18,16 @@
 - Hanya fitur compose yang didukung podman-compose dan Docker Compose v2. Bind mount diberi `:Z`; volume bernama tanpa label.
 - Perintah yang bisa menyentuh proyek lain dilarang (daftar di CLAUDE.md). Data Odoo dikembalikan lewat `npm run odoo:reset`, bukan dengan menghapus volume.
 
+## Catatan implementasi (M0, 5 November 2026)
+- podman-compose 1.6.0 membuat kontainer `fakturberes_<layanan>_1`, pod `pod_fakturberes` tanpa berbagi namespace (`--infra=false --share=`), jaringan `fakturberes_default`, dan volume `fakturberes_odoo-data`, `fakturberes_odoo-db-data`, `fakturberes_app-db-data`, `fakturberes_mailpit-data`. Port 28069, 25432, 21025, dan 28025 hanya di `127.0.0.1`; `odoo-db` tidak dibuka ke host.
+- Image Odoo mendeklarasikan `VOLUME /mnt/extra-addons`, dan Podman membuat volume anonim untuk VOLUME yang tidak di-mount. Folder kosong `infra/odoo/addons` di-bind ke sana (`:ro,Z`) agar tidak ada volume tanpa prefiks `fakturberes`.
+- Sandi PostgreSQL Odoo diteruskan lewat env `PGPASSWORD`. Entrypoint image resmi tidak menambahkan `--db_password` bila `PGPASSWORD` ada, dan host, port, serta user dibaca dari `infra/odoo/odoo.conf`, sehingga sandi tidak muncul di argumen proses Odoo. Subperintah `odoo db`, `odoo module`, dan `odoo shell` memakai `PGPASSWORD` lewat libpq, jadi konfigurasi lokal di `var/` tidak dibutuhkan.
+- podman-compose sendiri meneruskan nilai `environment` sebagai `-e NAME=nilai` ke `podman create`/`exec`/`run`; nilainya terlihat di daftar proses milik user yang sama selama perintah berjalan. Skrip tidak pernah memakai `--verbose` atau mencetak `podman compose config`.
+- Skrip di `infra/scripts/` selalu memakai `podman compose -p fakturberes`. Perintah `podman inspect` dan `podman healthcheck run` hanya dijalankan pada kontainer yang namanya berawalan `fakturberes_`.
+- Reset tanpa menghapus volume: `npm run odoo:reset` menghentikan hanya layanan `odoo`, menjalankan `odoo db duplicate --force fakturberes_seed fakturberes` di kontainer sekali jalan, lalu menyalakan Odoo lagi. Waktu terukur 10–17 detik.
+- Cron Odoo dimatikan (`max_cron_threads = 0`) karena thread cron memproses semua database milik user `odoo`, termasuk snapshot. Membatasi dengan `db_name` tidak dipakai karena server lalu membuat database kosong otomatis saat mulai.
+- Daftar kontainer non-`fakturberes` (ID, nama, waktu dibuat, status, port) diperiksa sebelum dan sesudah M0 dan sama persis.
+
 ## Konsekuensi
 - Kedua proyek bisa berjalan bersamaan tanpa bentrok port atau nama.
 - Aturan +20000 mudah diingat dan menjauhi port yang biasa dipakai alat lain (5433, 15432, 18000, 18080).
