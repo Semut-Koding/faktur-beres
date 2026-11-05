@@ -44,6 +44,8 @@
 | Penjalan perintah | **npm scripts** di `package.json` akar | Perintah sama dengan kebiasaan di DombaTek (`npm run setup`, `services:up`, dll.). |
 
 > Versi yang diperiksa 5 November 2026: image Odoo `19.0-20261102` (tag `latest` di Docker Hub sudah Odoo 20, jadi tidak dipakai), pgvector `0.8.7-pg18-trixie`, Mailpit `v1.32.0`. Versi minor PostgreSQL 17 dan versi alat di laptop (Podman, podman-compose, uv, Node.js) dikunci dan dicatat di M0. Pustaka Python dan npm dikunci di lockfile.
+>
+> **Dikunci di M0 (5 November 2026):** PostgreSQL untuk Odoo `17.11` (Debian trixie, `PG_VERSION=17.11-1.pgdg13+2`; tag `17` saat itu menunjuk image yang sama), PostgreSQL aplikasi 18.6 dari image pgvector. Alat di laptop pemilik: Podman 6.1.4, podman-compose 1.6.0, uv 0.13.1, Python 3.13.16 (dipasang uv), Node.js 24.22.0, npm 11.19.1, git 2.56.0. Pustaka Python yang dipakai M0 (lihat `uv.lock`): httpx 0.28.1, Pydantic 2.14.3, pydantic-settings 2.16.2, PyYAML 6.0.3; dev: pytest 9.2.0, Ruff 0.17.3, python-stdnum 2.2.
 
 ---
 
@@ -143,10 +145,19 @@ npm hanya menjadi penjalan perintah dan pengelola dependensi dashboard. Skrip Py
 
 | Layanan | Image | Port host → kontainer | Volume | Catatan |
 |---|---|---|---|---|
-| `odoo` | `docker.io/library/odoo:19.0-20261102` | `127.0.0.1:28069` → 8069 | `odoo-data` (`/var/lib/odoo`) | `infra/odoo/odoo.conf` di-bind `:ro,Z`. `workers = 0`, jadi websocket lewat port yang sama. |
-| `odoo-db` | `docker.io/library/postgres:17.x` (minor dikunci di M0) | tidak dibuka ke host | `odoo-db-data` | Superuser `odoo`, khusus untuk Odoo. |
-| `app-db` | `docker.io/pgvector/pgvector:0.8.7-pg18-trixie` | `127.0.0.1:25432` → 5432 | `app-db-data` | Database `fakturberes`. Ekstensi `vector` dibuat lewat migrasi (M4). |
-| `mailpit` | `docker.io/axllent/mailpit:v1.32.0` | `127.0.0.1:21025` → 1025 (SMTP), `127.0.0.1:28025` → 8025 (UI dan API) | `mailpit-data` | `MP_DATABASE=/data/mailpit.db`. SMTP lokal tanpa TLS; autentikasi apa pun diterima. |
+| `odoo` | `docker.io/library/odoo:19.0-20261102` | `127.0.0.1:28069` → 8069 | `odoo-data` (`/var/lib/odoo`) | `infra/odoo/odoo.conf` di-bind `:ro,Z`. `workers = 0`, jadi websocket lewat port yang sama. Folder kosong `infra/odoo/addons` di-bind ke `/mnt/extra-addons` (`:ro,Z`) agar Podman tidak membuat volume anonim. Sandi DB lewat env `PGPASSWORD`. Healthcheck `curl /web/health`. |
+| `odoo-db` | `docker.io/library/postgres:17.11` | tidak dibuka ke host | `odoo-db-data` (`/var/lib/postgresql/data`) | Superuser `odoo`, khusus untuk Odoo. Healthcheck `pg_isready`. |
+| `app-db` | `docker.io/pgvector/pgvector:0.8.7-pg18-trixie` | `127.0.0.1:25432` → 5432 | `app-db-data` (`/var/lib/postgresql`) | Database `fakturberes`. Ekstensi `vector` dibuat lewat migrasi (M4). PostgreSQL 18 menyimpan data di `/var/lib/postgresql/18/docker`, jadi volume di-mount ke `/var/lib/postgresql`. Healthcheck `pg_isready`. |
+| `mailpit` | `docker.io/axllent/mailpit:v1.32.0` | `127.0.0.1:21025` → 1025 (SMTP), `127.0.0.1:28025` → 8025 (UI dan API) | `mailpit-data` (`/data`) | `MP_DATABASE=/data/mailpit.db`. SMTP lokal tanpa TLS; autentikasi apa pun diterima (`MP_SMTP_AUTH_ACCEPT_ANY`, `MP_SMTP_AUTH_ALLOW_INSECURE`). Image tanpa shell; healthcheck `/mailpit readyz`. |
+
+Digest image yang ditarik di M0 (5 November 2026):
+
+| Image | Digest |
+|---|---|
+| `docker.io/library/odoo:19.0-20261102` | `sha256:08374de09bab5d80851c5709896aa49917e6c6a893b39025d6669db908e238b0` |
+| `docker.io/library/postgres:17.11` | `sha256:996e9dc583ba9f0265a2c75547a9c95fb22c251e394749cab205a0a00e1856a1` |
+| `docker.io/pgvector/pgvector:0.8.7-pg18-trixie` | `sha256:d624420861924efe8691ecb2060205a9c6bd949aace5cc754da0c907171ca742` |
+| `docker.io/axllent/mailpit:v1.32.0` | `sha256:938ce54b7b946ef3f45a03e119952cf7e67a7969d61f45a3ed055442a77e00f4` |
 
 Proses di host (bukan kontainer): API di `127.0.0.1:28000` (M4) dan Vite di `127.0.0.1:25173` (M5).
 
@@ -158,6 +169,7 @@ Aturan:
 - Bind mount diberi `:Z` (diabaikan di sistem tanpa SELinux). Volume bernama tanpa label.
 - Rahasia berasal dari `.env` di akar repo (dibaca compose untuk substitusi variabel). `.env.example` di-commit, `.env` tidak.
 - Perkiraan memori saat menyala: Odoo 0,4–0,8 GB, dua PostgreSQL 0,1–0,2 GB, Mailpit < 50 MB.
+- podman-compose 1.6 membungkus layanan dalam pod `pod_fakturberes` tanpa berbagi namespace (`--infra=false --share=`), sehingga `odoo-db` dan `app-db` sama-sama memakai port 5432 di kontainer masing-masing. `services:down` menghapus kontainer, pod, dan jaringan `fakturberes_default`, tetapi tidak volume.
 
 ### 4.4 Odoo
 - **Database** `fakturberes`, `dbfilter = ^fakturberes$`, `list_db = False` (manajer database di web nonaktif), `workers = 0`.
