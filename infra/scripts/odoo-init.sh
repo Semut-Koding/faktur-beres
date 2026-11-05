@@ -38,6 +38,12 @@ for module in "${MODULES[@]}"; do
   esac
 done
 if (( ${#missing[@]} > 0 )); then
+  # account memilih chart of accounts dari negara perusahaan saat dipasang; tanpa negara ID
+  # yang terpasang chart generik. Database seperti itu tidak diteruskan.
+  country="$(odoo_sql "$DB" "SELECT co.code FROM res_company c JOIN res_partner p ON p.id = c.partner_id LEFT JOIN res_country co ON co.id = p.country_id WHERE c.id = 1")"
+  if [[ "$(module_state account)" != "installed" && "$country" != "$COUNTRY" ]]; then
+    die "database $DB ada tetapi negara perusahaan bukan $COUNTRY (dibuat di luar odoo:init?). Hapus database itu dengan odoo db drop, lalu jalankan odoo:init lagi."
+  fi
   stop_odoo
   echo "  memasang: ${missing[*]}"
   odoo_cli module install -d "$DB" "${missing[@]}"
