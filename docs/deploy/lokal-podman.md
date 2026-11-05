@@ -19,7 +19,7 @@ npm run odoo:check     # bandingkan isi Odoo dengan dataset; semua baris harus O
 npm run odoo:snapshot  # simpan kondisi seed ke database fakturberes_seed
 ```
 
-Pada laptop pemilik (5 November 2026) urutan ini memakan waktu sekitar 2 menit setelah image tersedia: `odoo:init` dari database kosong ±50 detik, `odoo:seed` ±35 detik, `odoo:check` ±1 detik, dan `odoo:snapshot` ±12 detik. Menjalankan `odoo:init` atau `odoo:seed` lagi tidak mengubah apa pun; setiap langkah dilaporkan "sudah ada".
+Pada laptop pemilik (5 November 2026) urutan ini memakan waktu sekitar 2 menit setelah image tersedia: `odoo:init` dari database kosong ±1 menit, `odoo:seed` ±35 detik, `odoo:check` ±1 detik, dan `odoo:snapshot` ±12 detik. Menjalankan `odoo:init` atau `odoo:seed` lagi tidak mengubah apa pun; setiap langkah dilaporkan "sudah ada".
 
 Buka Odoo di http://localhost:28069 (login `admin`, sandi `ODOO_ADMIN_PASSWORD` di `.env`) dan Mailpit di http://localhost:28025.
 
