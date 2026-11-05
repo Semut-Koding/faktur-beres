@@ -9,6 +9,10 @@
   },
   "scripts": {
     "setup": "uv run python -m faktur_beres.devtools.setup",
+    "services:up": "bash infra/scripts/services-up.sh",
+    "services:down": "bash infra/scripts/services-down.sh",
+    "services:status": "bash infra/scripts/services-status.sh",
+    "services:logs": "bash infra/scripts/services-logs.sh",
     "lint": "uv run ruff check . && uv run ruff format --check .",
     "test": "uv run python -m pytest",
     "check": "npm run lint && npm test",
