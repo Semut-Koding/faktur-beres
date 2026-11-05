@@ -12,9 +12,9 @@ from collections import Counter, defaultdict
 from collections.abc import Iterable
 from typing import Any
 
-from faktur_beres.dataset import Dataset, get_dataset
+from faktur_beres.dataset import Dataset, PurchaseOrder, Receipt, get_dataset
 from faktur_beres.odoo import OdooClient, OdooError
-from faktur_beres.seed.common import SeedError, XmlIds, admin_client, m2o_id
+from faktur_beres.seed.common import SeedError, XmlIds, admin_client, m2o_id, odoo_datetime
 from faktur_beres.textui import print_table
 
 CREATED, EXISTS, ADOPTED = "dibuat", "sudah ada", "diadopsi"
@@ -22,6 +22,31 @@ UOM_XMLIDS = {"kg": "uom.product_uom_kgm", "Units": "uom.product_uom_unit"}
 PAYMENT_TERM_XMLIDS = {30: "account.account_payment_term_30days"}
 TAX_XMLID = "fb_seed.tax_ppn_masukan"
 LANG = "id_ID"
+TZ = "Asia/Jakarta"
+# JSON-2 runs a call with exactly the context it is given (empty when omitted), so actions get
+# the language and time zone explicitly.
+ACTION_CONTEXT = {"lang": LANG, "tz": TZ}
+PO_STATE = {"dikonfirmasi": "purchase", "batal": "cancel", "rfq": "draft"}
+QTY_EPSILON = 1e-6
+
+
+def planned_date(po: PurchaseOrder):
+    """Planned receipt date: the dataset value, else the actual receipt date, else the order."""
+    if po.planned_receipt_date:
+        return po.planned_receipt_date
+    if po.receipts:
+        return po.receipts[0].received_on
+    return po.order_date
+
+
+DEFAULT_STEPS = (
+    "banks",
+    "vendors",
+    "products",
+    "purchase_orders",
+    "receipts",
+    "history_bills",
+)
 
 
 class Seeder:
@@ -32,6 +57,8 @@ class Seeder:
         self.stats: dict[str, Counter[str]] = defaultdict(Counter)
         self.diffs: list[str] = []
         self.ids: dict[str, int] = {}  # dataset key -> Odoo id (vendors, banks, products)
+        self.po_ids: dict[str, int] = {}  # PO key -> purchase.order id
+        self.terms: dict[str, int] = {}  # vendor key -> account.payment.term id
 
     # -- helpers ------------------------------------------------------------------------------
 
@@ -131,6 +158,7 @@ class Seeder:
                 "supplier_rank": 1,
                 "property_supplier_payment_term_id": self.x.ref(term, "account.payment.term"),
             }
+            self.terms[v.key] = values["property_supplier_payment_term_id"]
             compare = {k: values[k] for k in ("name", "vat", "email", "street", "city", "zip")}
             compare["state_id"] = values["state_id"]
             vendor_id, _ = self._ensure(
@@ -233,11 +261,230 @@ class Seeder:
                     self.x.register(f"supplierinfo_{p.key}", "product.supplierinfo", sellers[0])
                 self._count("info pemasok", EXISTS)
 
+    # -- purchase orders ------------------------------------------------------------------------
+
+    def seed_purchase_orders(self) -> None:
+        for po in self.ds.purchase_orders:
+            vendor_id = self.ids[po.vendor]
+            planned = odoo_datetime(planned_date(po))
+            values = {
+                "name": po.number,
+                "partner_id": vendor_id,
+                # The UI fills this from the vendor through an onchange, which API calls skip.
+                "payment_term_id": self.terms[po.vendor],
+                "date_order": odoo_datetime(po.order_date),
+                "order_line": [
+                    (
+                        0,
+                        0,
+                        {
+                            "product_id": self.ids[line.product],
+                            "product_qty": float(line.qty),
+                            "price_unit": float(line.unit_price),
+                            "tax_ids": [(6, 0, [self.tax_id])],
+                            "date_planned": planned,
+                        },
+                    )
+                    for line in po.lines
+                ],
+            }
+            po_id, status = self._ensure(
+                "purchase order",
+                f"po_{po.key}",
+                "purchase.order",
+                [["name", "=", po.number]],
+                values,
+                {"partner_id": vendor_id, "payment_term_id": self.terms[po.vendor]},
+            )
+            self.po_ids[po.key] = po_id
+            if status != CREATED:
+                self._compare_po_lines(po, po_id)
+            self._apply_po_state(po, po_id)
+
+    def _po_lines(self, po_id: int) -> dict[int, dict[str, Any]]:
+        lines = self.c.search_read(
+            "purchase.order.line",
+            [["order_id", "=", po_id], ["display_type", "=", False]],
+            ["product_id", "product_qty", "price_unit", "qty_received", "qty_invoiced", "tax_ids"],
+        )
+        return {m2o_id(line["product_id"]): line for line in lines}
+
+    def _compare_po_lines(self, po: PurchaseOrder, po_id: int) -> None:
+        have = {
+            pid: (line["product_qty"], line["price_unit"])
+            for pid, line in self._po_lines(po_id).items()
+        }
+        want = {
+            self.ids[line.product]: (float(line.qty), float(line.unit_price)) for line in po.lines
+        }
+        if have != want:
+            self.diffs.append(f"{po.number}: baris PO di Odoo berbeda dari dataset")
+
+    def _apply_po_state(self, po: PurchaseOrder, po_id: int) -> None:
+        state = self.c.read("purchase.order", [po_id], ["state"])[0]["state"]
+        target = PO_STATE[po.status]
+        if state == target:
+            return
+        if state not in ("draft", "sent"):
+            self.diffs.append(f"{po.number}: status Odoo {state}, dataset {po.status}")
+            return
+        if po.status == "dikonfirmasi":
+            self.c.call("purchase.order", "button_confirm", ids=[po_id], context=ACTION_CONTEXT)
+            # Confirmation stamps date_approve with "now"; use the dataset order date instead.
+            self.c.write("purchase.order", [po_id], {"date_approve": odoo_datetime(po.order_date)})
+            self._count("PO dikonfirmasi", CREATED)
+        elif po.status == "batal":
+            self.c.call("purchase.order", "button_cancel", ids=[po_id], context=ACTION_CONTEXT)
+            self._count("PO dibatalkan", CREATED)
+        state = self.c.read("purchase.order", [po_id], ["state"])[0]["state"]
+        if state != target:
+            raise SeedError(f"{po.number}: status menjadi {state}, seharusnya {target}")
+
+    # -- receipts -------------------------------------------------------------------------------
+
+    def seed_receipts(self) -> None:
+        for po in self.ds.purchase_orders:
+            if not po.is_confirmed:
+                continue
+            po_id = self.po_ids[po.key]
+            lines = self._po_lines(po_id)
+            want = {self.ids[x.product]: float(po.received_qty(x.product)) for x in po.lines}
+            have = {pid: lines[pid]["qty_received"] for pid in want}
+            if all(abs(have[pid] - want[pid]) < QTY_EPSILON for pid in want):
+                self.stats["penerimaan"][EXISTS] += len(po.receipts)
+                continue
+            if any(have.values()):
+                self.diffs.append(f"{po.number}: qty diterima di Odoo {have}, dataset {want}")
+                continue
+            for receipt in po.receipts:
+                self._validate_receipt(po, po_id, receipt)
+                self._count("penerimaan", CREATED)
+                if receipt.remainder == "backorder":
+                    self._count("backorder", CREATED)
+
+    def _validate_receipt(self, po: PurchaseOrder, po_id: int, receipt: Receipt) -> None:
+        picking_ids = self.c.read("purchase.order", [po_id], ["picking_ids"])[0]["picking_ids"]
+        open_pickings = self.c.search(
+            "stock.picking", [["id", "in", picking_ids], ["state", "not in", ["done", "cancel"]]]
+        )
+        if len(open_pickings) != 1:
+            raise SeedError(f"{po.number}: harus ada tepat satu penerimaan terbuka")
+        picking_id = open_pickings[0]
+        key_of = {self.ids[key]: key for key in receipt.qty}
+        moves = self.c.search_read("stock.move", [["picking_id", "=", picking_id]], ["product_id"])
+        for move in moves:
+            qty = receipt.qty.get(key_of.get(m2o_id(move["product_id"]), ""), 0)
+            self.c.write("stock.move", [move["id"]], {"quantity": float(qty), "picked": qty > 0})
+        # skip_backorder: no wizard; the unreceived remainder becomes an open backorder.
+        result = self.c.call(
+            "stock.picking",
+            "button_validate",
+            ids=[picking_id],
+            context={**ACTION_CONTEXT, "skip_backorder": True},
+        )
+        if isinstance(result, dict) and result.get("res_model"):
+            raise SeedError(
+                f"{po.number}: validasi penerimaan membuka wizard {result['res_model']}"
+            )
+        state = self.c.read("stock.picking", [picking_id], ["state"])[0]["state"]
+        if state != "done":
+            raise SeedError(f"{po.number}: penerimaan berstatus {state}, bukan done")
+        # Validation stamps "now"; rewrite to the dataset receipt date.
+        when = odoo_datetime(receipt.received_on)
+        self.c.write("stock.picking", [picking_id], {"date_done": when})
+        done_moves = self.c.search(
+            "stock.move", [["picking_id", "=", picking_id], ["state", "=", "done"]]
+        )
+        self.c.write("stock.move", done_moves, {"date": when})
+        move_lines = self.c.search("stock.move.line", [["move_id", "in", done_moves]])
+        self.c.write("stock.move.line", move_lines, {"date": when})
+
+    # -- history bills --------------------------------------------------------------------------
+
+    def seed_history_bills(self) -> None:
+        for po, bill in self.ds.history_bills:
+            po_id = self.po_ids[po.key]
+            vendor_id = self.ids[po.vendor]
+            xmlid = f"bill_{po.key}"
+            move_id = self.x.get(xmlid, "account.move")
+            status = EXISTS
+            if not self._exists("account.move", move_id):
+                found = self.c.search(
+                    "account.move",
+                    [
+                        ["move_type", "=", "in_invoice"],
+                        ["partner_id", "=", vendor_id],
+                        ["ref", "=", bill.vendor_invoice_number],
+                    ],
+                )
+                if not found:
+                    # A draft left behind by an interrupted run.
+                    found = self.c.search(
+                        "account.move",
+                        [
+                            ["move_type", "=", "in_invoice"],
+                            ["partner_id", "=", vendor_id],
+                            ["invoice_origin", "=", po.number],
+                            ["state", "=", "draft"],
+                        ],
+                    )
+                if len(found) > 1:
+                    raise SeedError(f"{po.number}: lebih dari satu tagihan cocok")
+                if found:
+                    move_id, status = found[0], ADOPTED
+                else:
+                    action = self.c.call(
+                        "purchase.order",
+                        "action_create_invoice",
+                        ids=[po_id],
+                        context=ACTION_CONTEXT,
+                    )
+                    move_id = action.get("res_id") if isinstance(action, dict) else None
+                    if not move_id:
+                        raise SeedError(f"{po.number}: tagihan tidak terbentuk dari PO")
+                    status = CREATED
+                self.x.register(xmlid, "account.move", move_id)
+
+            fields = ["state", "ref", "invoice_date", "date", "amount_total"]
+            record = self.c.read("account.move", [move_id], fields)[0]
+            if record["state"] == "draft":
+                # Odoo books a bill entered in a later month on the last day of the invoice
+                # month; these history bills are booked on their invoice date instead.
+                self.c.write(
+                    "account.move",
+                    [move_id],
+                    {
+                        "ref": bill.vendor_invoice_number,
+                        "invoice_date": bill.invoice_date,
+                        "date": bill.invoice_date,
+                    },
+                    context=ACTION_CONTEXT,
+                )
+                self.c.call("account.move", "action_post", ids=[move_id], context=ACTION_CONTEXT)
+                record = self.c.read("account.move", [move_id], fields)[0]
+            elif status != CREATED:
+                self._compare(
+                    f"{self.x.module}.{xmlid}",
+                    record,
+                    {
+                        "ref": bill.vendor_invoice_number,
+                        "invoice_date": str(bill.invoice_date),
+                        "date": str(bill.invoice_date),
+                    },
+                )
+            if record["state"] != "posted":
+                raise SeedError(f"{po.number}: tagihan berstatus {record['state']}")
+            if round(record["amount_total"]) != po.total():
+                self.diffs.append(
+                    f"{xmlid}: total Odoo {record['amount_total']}, dataset {po.total()}"
+                )
+            self._count("tagihan riwayat", status)
+
     # -- run ------------------------------------------------------------------------------------
 
     def run(self, steps: Iterable[str] | None = None) -> None:
         self.load_refs()
-        for step in steps or ("banks", "vendors", "products"):
+        for step in steps or DEFAULT_STEPS:
             getattr(self, f"seed_{step}")()
 
 
@@ -247,6 +494,8 @@ SUMMARY_MODELS = (
     ("Rekening vendor", "res.partner.bank"),
     ("Produk", "product.product"),
     ("Info pemasok", "product.supplierinfo"),
+    ("Purchase order", "purchase.order"),
+    ("Tagihan riwayat", "account.move"),
 )
 
 
