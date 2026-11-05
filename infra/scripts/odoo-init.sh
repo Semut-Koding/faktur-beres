@@ -107,3 +107,5 @@ echo "== Data demo: tidak ada"
 
 start_odoo
 echo "== Layanan odoo sehat"
+
+uv run python -m faktur_beres.seed.init
