@@ -1,0 +1,254 @@
+# Faktur Beres: Rencana Teknis
+
+| | |
+|---|---|
+| Status | **Disetujui 5 November 2026.** Ringkasan keputusan di §8, alasan lengkap di [ADR](adr/README.md). |
+| Tanggal | 5 November 2026 |
+| Acuan | [`SPEC.md`](SPEC.md) · [`lomba/gtnic-2026.md`](lomba/gtnic-2026.md) |
+
+---
+
+## 1. Kebutuhan teknis yang menentukan pilihan
+
+1. **70% nilai lomba ada di perilaku agent:** otonomi, penalaran, penggunaan alat, dan arsitektur ([lomba](lomba/gtnic-2026.md#kriteria-penilaian)). Butuh graph eksplisit dengan *tool calling*, interrupt, checkpointer, dan jejak audit yang bisa ditampilkan.
+2. **Angka keuangan harus benar.** Semua hitungan deterministik di Python dengan rupiah bulat atau `Decimal`, tanpa `float`.
+3. **Alur bisa berhenti berhari-hari lalu dilanjutkan** tanpa mengulang aksi. Butuh state persisten dan kunci idempoten.
+4. **ERP sungguhan.** Odoo 19 Community berjalan lokal dan diakses lewat API resminya.
+5. **UI wajib di-deploy publik** dan repo wajib publik saat pengumpulan.
+6. **Tiga minggu, satu pengembang dibantu AI.** Satu bahasa backend, sedikit layanan, dan perintah yang konsisten.
+7. **Mesin dipakai bersama DombaTek** yang sering berjalan bersamaan. Nama proyek, port, dan volume harus terpisah.
+8. **Data sintetis dan LLM tier gratis.**
+
+---
+
+## 2. Stack
+
+| Lapisan | Pilihan | Alasan |
+|---|---|---|
+| Bahasa backend | **Python 3.13** | Ekosistem LangGraph, Gemini, PDF, dan gambar paling matang. Satu bahasa untuk agent, alat, seed, generator, dan evaluasi. |
+| Pengelola paket Python | **uv** (`pyproject.toml` + `uv.lock`, `.python-version`) | Cepat, lockfile deterministik, dan memasang versi Python sendiri ([ADR-0002](adr/0002-monorepo-uv-npm.md)). |
+| Orkestrasi agent | **LangGraph** + checkpointer PostgreSQL | Graph eksplisit, interrupt untuk persetujuan, dan resume dari titik terakhir ([ADR-0001](adr/0001-stack-inti.md)). |
+| LLM | **Gemini** keluarga Flash dan Flash-Lite lewat SDK `google-genai` | Multimodal, keluaran terstruktur, dan punya tier gratis. Model persis dikunci di konfigurasi saat M3. |
+| Skema dan validasi | **Pydantic v2** | Skema ekstraksi, parameter alat, dan konfigurasi. |
+| API | **FastAPI** + SSE (Uvicorn) | REST dan status langsung untuk dashboard. |
+| ERP | **Odoo 19 Community**, image resmi, dengan **PostgreSQL 17** sendiri | PO, penerimaan, dan tagihan vendor yang nyata ([ADR-0004](adr/0004-odoo-19-json2-api.md)). |
+| Integrasi ERP | **External JSON-2 API** dengan **httpx** | API resmi Odoo 19. XML-RPC dan JSON-RPC sudah usang. |
+| Basis data aplikasi | **PostgreSQL 18 + pgvector 0.8.7** | Checkpoint, audit, dan vektor RAG dalam satu basis data. |
+| Akses DB dan migrasi | **SQLAlchemy 2** + **psycopg 3** + **Alembic** (mulai M2–M4) | Migrasi berversi. psycopg 3 juga dipakai checkpointer LangGraph. |
+| Email | **Mailpit** (SMTP sandbox dan API) | Email klarifikasi nyata yang bisa dilihat juri tanpa terkirim ke luar. Inbox AP juga dibaca dari sini. |
+| Faktur terstruktur | Parser **UBL 2.1** (EN 16931) dengan lxml | Jalur e-invoice. |
+| Generator faktur (M1) | **ReportLab** (PDF), **Pillow** + **pypdfium2** (gambar dan efek foto), lxml (UBL) | Semua dipasang lewat pip, tanpa pustaka sistem tambahan. |
+| Dashboard | **React + Vite + TypeScript** | Dashboard publik yang ringan. Deploy di M6. |
+| Kualitas | **Ruff** (lint dan format), **pytest**, **mypy** (mulai M2) | |
+| Kontainer | **Podman rootless** + `compose.yaml` | Tanpa daemon root, berdampingan dengan DombaTek ([ADR-0003](adr/0003-podman-proyek-terpisah.md)). |
+| Penjalan perintah | **npm scripts** di `package.json` akar | Perintah sama dengan kebiasaan di DombaTek (`npm run setup`, `services:up`, dll.). |
+
+> Versi yang diperiksa 5 November 2026: image Odoo `19.0-20261102` (tag `latest` di Docker Hub sudah Odoo 20, jadi tidak dipakai), pgvector `0.8.7-pg18-trixie`, Mailpit `v1.32.0`. Versi minor PostgreSQL 17 dan versi alat di laptop (Podman, podman-compose, uv, Node.js) dikunci dan dicatat di M0. Pustaka Python dan npm dikunci di lockfile.
+
+---
+
+## 3. Arsitektur
+
+### 3.1 Gambaran
+
+```text
+ Vendor ──email──▶ Mailpit (SMTP + inbox) ◀──API── pemantau inbox ─┐
+ Staf AP / Approver ──▶ Dashboard React ──REST/SSE──▶ FastAPI ──────┤
+                                                                    ▼
+                                                  LangGraph runner (satu thread per faktur)
+                                                  │  checkpointer, audit, aksi
+                                                  ▼
+                                    PostgreSQL 18 + pgvector (basis data aplikasi)
+        alat:  extract_invoice ─▶ Gemini API
+               odoo_tools ──────▶ Odoo 19 (JSON-2) ─▶ PostgreSQL 17 (Odoo)
+               match_engine, tax_check (kode murni)
+               policy_rag ──────▶ pgvector
+               email_tool ──────▶ Mailpit SMTP
+```
+
+### 3.2 Modul Python
+
+| Modul | Isi | Milestone |
+|---|---|---|
+| `faktur_beres.config` | Pengaturan dari `.env` (pydantic-settings) | M0 |
+| `faktur_beres.odoo` | Klien JSON-2: header, error, retry; satu-satunya tempat kode bicara dengan Odoo | M0 |
+| `faktur_beres.dataset` | Model Pydantic dan pemuat `data/seed/dataset.yaml`, beserta pemeriksaan konsistensinya | M0 |
+| `faktur_beres.seed` | `init`, `seed`, `check`; dipakai lewat npm scripts | M0 |
+| `faktur_beres.generator` | Generator faktur PDF/gambar/UBL, label, dan balasan vendor | M1 |
+| `faktur_beres.domain` | Model faktur, normalisasi, aturan pencocokan dan pajak | M2 |
+| `faktur_beres.tools` | Enam alat agent dengan daftar operasi yang diizinkan | M2–M4 |
+| `faktur_beres.graph` | Node, state, dan routing LangGraph | M4 |
+| `faktur_beres.api` | FastAPI, SSE, dan pemantau inbox | M4 |
+| `faktur_beres.evals` | Harness evaluasi dan penilai state akhir | M5 |
+
+### 3.3 Penanganan kesalahan dan skala
+- Panggilan Odoo dan LLM memakai retry dengan backoff eksponensial dan batas waktu. Kesalahan JSON-2 dipetakan dari objek error Odoo (`name`, `message`) ke exception Python yang jelas.
+- Setiap panggilan JSON-2 adalah satu transaksi. Operasi yang harus atomik memakai satu metode Odoo (mis. `create` dengan baris sekaligus), dan kegagalan di tengah ditangani lewat kunci idempoten dan pemeriksaan ulang (SPEC BR-22).
+- Bila kuota LLM habis, agent beralih ke model cadangan. Hasil ekstraksi di-cache per hash berkas untuk demo; cache dimatikan saat evaluasi.
+- MVP memakai satu proses API yang menjalankan graph di latar. Karena state ada di PostgreSQL, worker bisa dipisah dan ditambah tanpa mengubah graph.
+
+---
+
+## 4. Repositori, alat, dan kontainer
+
+### 4.1 Struktur repositori
+
+```text
+faktur-beres/            # nama folder repo (lihat README)
+├─ src/faktur_beres/     # paket Python (§3.2)
+├─ tests/                # pytest
+├─ data/
+│  ├─ seed/dataset.yaml  # sumber tunggal data sintetis (SPEC §9.4)
+│  └─ kebijakan/         # SOP AP dan kontrak vendor sintetis untuk RAG (M4)
+├─ eval/
+│  ├─ skenario/          # label 40 skenario (M1)
+│  ├─ berkas/            # faktur uji dan balasan vendor hasil generator (M1)
+│  └─ hasil/             # hasil evaluasi (tidak di-commit)
+├─ web/                  # dashboard React + Vite (M5), workspace npm
+├─ infra/
+│  ├─ odoo/odoo.conf     # konfigurasi Odoo lokal (tanpa rahasia)
+│  └─ scripts/           # skrip shell untuk Podman: init, snapshot, reset, tunggu layanan
+├─ var/                  # berkas runtime lokal, mis. var/berkas/ (tidak di-commit)
+├─ docs/
+├─ compose.yaml
+├─ pyproject.toml, uv.lock, .python-version
+├─ package.json, package-lock.json
+├─ .env.example          # contoh variabel; .env dibuat `npm run setup`
+├─ CLAUDE.md
+└─ README.md
+```
+
+### 4.2 Perintah
+Semua dijalankan dari akar repo.
+
+| Tujuan | Perintah | Mulai |
+|---|---|---|
+| Siapkan mesin: cek versi alat, buat `.env` dengan rahasia acak (aman diulang, nilai yang sudah ada tidak diubah), pasang hook pre-commit `guard:secrets` | `npm run setup` | M0 |
+| Nyalakan, matikan, atau lihat status layanan | `npm run services:up` / `npm run services:down` / `npm run services:status` | M0 |
+| Log layanan | `npm run services:logs -- odoo` | M0 |
+| Inisialisasi Odoo: database, modul, bahasa, perusahaan, pajak, user agent, API key (aman diulang) | `npm run odoo:init` | M0 |
+| Isi data sintetis dari dataset (idempoten) | `npm run odoo:seed` | M0 |
+| Periksa isi Odoo sama dengan dataset dan kebutuhan skenario | `npm run odoo:check` | M0 |
+| Simpan kondisi seed / kembalikan Odoo ke kondisi itu | `npm run odoo:snapshot` / `npm run odoo:reset` | M0 |
+| Lint dan tes | `npm run check` (gabungan `npm run lint` dan `npm test`) | M0 |
+| Pastikan tidak ada nilai rahasia di berkas yang akan di-commit | `npm run guard:secrets` | M0 |
+| Buat faktur uji, label, dan balasan vendor | `npm run gen:faktur` | M1 |
+| Jalankan API dan dashboard untuk pengembangan | `npm run dev:api` / `npm run dev:web` | M4 / M5 |
+| Evaluasi 40 skenario × 3 | `npm run eval` | M5 |
+| Tambah dependensi Python | `uv add <paket>` atau `uv add --dev <paket>` | |
+
+npm hanya menjadi penjalan perintah dan pengelola dependensi dashboard. Skrip Python dipanggil lewat `uv run python -m ...`.
+
+### 4.3 Kontainer lokal dan port
+
+| Layanan | Image | Port host → kontainer | Volume | Catatan |
+|---|---|---|---|---|
+| `odoo` | `docker.io/library/odoo:19.0-20261102` | `127.0.0.1:28069` → 8069 | `odoo-data` (`/var/lib/odoo`) | `infra/odoo/odoo.conf` di-bind `:ro,Z`. `workers = 0`, jadi websocket lewat port yang sama. |
+| `odoo-db` | `docker.io/library/postgres:17.x` (minor dikunci di M0) | tidak dibuka ke host | `odoo-db-data` | Superuser `odoo`, khusus untuk Odoo. |
+| `app-db` | `docker.io/pgvector/pgvector:0.8.7-pg18-trixie` | `127.0.0.1:25432` → 5432 | `app-db-data` | Database `fakturberes`. Ekstensi `vector` dibuat lewat migrasi (M4). |
+| `mailpit` | `docker.io/axllent/mailpit:v1.32.0` | `127.0.0.1:21025` → 1025 (SMTP), `127.0.0.1:28025` → 8025 (UI dan API) | `mailpit-data` | `MP_DATABASE=/data/mailpit.db`. SMTP lokal tanpa TLS; autentikasi apa pun diterima. |
+
+Proses di host (bukan kontainer): API di `127.0.0.1:28000` (M4) dan Vite di `127.0.0.1:25173` (M5).
+
+Aturan:
+- **Proyek compose `fakturberes`**: `name: fakturberes` di `compose.yaml` dan `-p fakturberes` di semua skrip. Percobaan memakai `fakturberes-<nama>`.
+- **Port = port standar + 20000**, hanya di `127.0.0.1`. Port DombaTek yang dihindari: 3000, 3900–3903, 5432, 8081.
+- Hanya fitur compose yang didukung podman-compose dan Docker Compose v2: `services`, `image`, `command`, `environment`, `ports`, volume bernama, `healthcheck`, dan `depends_on` bentuk dasar. Menunggu kesiapan layanan dilakukan skrip, bukan `condition:`.
+- Image ditulis dengan nama lengkap (`docker.io/...`) agar Podman tidak menebak registri.
+- Bind mount diberi `:Z` (diabaikan di sistem tanpa SELinux). Volume bernama tanpa label.
+- Rahasia berasal dari `.env` di akar repo (dibaca compose untuk substitusi variabel). `.env.example` di-commit, `.env` tidak.
+- Perkiraan memori saat menyala: Odoo 0,4–0,8 GB, dua PostgreSQL 0,1–0,2 GB, Mailpit < 50 MB.
+
+### 4.4 Odoo
+- **Database** `fakturberes`, `dbfilter = ^fakturberes$`, `list_db = False` (manajer database di web nonaktif), `workers = 0`.
+- **Modul:** `purchase`, `stock`, `account`, ditambah lokalisasi Indonesia (`l10n_id`) bila tersedia. Bahasa `id_ID` dimuat. Data demo tidak dipasang (bawaan Odoo 19 adalah tanpa demo).
+- **Perusahaan** dari dataset: Indonesia, IDR, NPWP, dan alamat.
+- **Pajak pembelian** "PPN Masukan 12% (DPP Nilai Lain 11/12)", efektif 11% atas harga. Pajak dari lokalisasi dipakai bila hasil hitungnya sama; bila tidak, seed membuat pajak sendiri. Pilihan dicatat di M0.
+- **Kontrol tagihan** produk: kuantitas diterima.
+- **User:** `admin` (sandi dari `.env`, API key admin untuk skrip pengembang) dan `agen@arunika.test` (tanpa sandi, API key agent). Di M0, user agent memakai grup standar minimal yang cukup untuk membaca PO dan penerimaan serta membuat draft tagihan. Hak yang ikut terbawa (hapus, posting) dicatat dan diketatkan di M2 dengan grup khusus.
+- **API key** berlaku paling lama 3 bulan (batas Odoo) dan disimpan di `.env`. `npm run odoo:init` membuat key baru bila key lama tidak ada atau kedaluwarsa.
+- **Seed idempoten** dengan external ID modul `fb_seed` di `ir.model.data`. Nama external ID netral (`fb_seed.po_o11`, `fb_seed.vendor_v01`) dan tidak memuat ID skenario.
+- **Sequence PO** dimajukan ke paling sedikit P00100 setelah seed.
+- **Snapshot dan reset** memakai database `fakturberes_seed` beserta filestore-nya. Cara yang diutamakan: `odoo db duplicate` dan `odoo db drop` (tersedia sejak Odoo 16) saat server Odoo berhenti. Target reset kurang dari 1 menit.
+
+**Catatan field Odoo 19** (diisi M0 dari `fields_get`):
+
+| Kebutuhan | Model.field yang dipakai |
+|---|---|
+| NPWP vendor | (M0) |
+| Pajak di baris PO | (M0) |
+| Kuantitas diterima dan ditagih di baris PO | (M0) |
+| Tautan baris tagihan ke baris PO | (M0) |
+| Kontrol tagihan produk | (M0) |
+| Satuan beli produk | (M0) |
+
+### 4.5 Demo publik (M6)
+Dashboard di Vercel. API, Odoo, dan basis data di server yang ditentukan di M6, dengan data seed yang direset berkala dan akses dibatasi (kode akses atau batas laju). Keputusannya dicatat sebagai ADR baru.
+
+---
+
+## 5. Alternatif yang dipertimbangkan
+
+| Alternatif | Kelebihan | Alasan tidak dipilih |
+|---|---|---|
+| **ERPNext** | Open source, API REST lengkap | Lebih berat dijalankan dan disiapkan dalam tiga minggu; Odoo lebih dikenal di industri |
+| **XML-RPC / JSON-RPC Odoo** | Banyak contoh lama | Usang sejak Odoo 19 dan dijadwalkan dihapus ([ADR-0004](adr/0004-odoo-19-json2-api.md)) |
+| **n8n atau Flowise** | Cepat dibuat, didukung ketentuan lomba | Interrupt, idempotensi, dan tes otomatis lebih sulit dikendalikan; arsitektur kode lebih mudah dinilai |
+| **CrewAI atau AutoGen** (multi-agent) | Populer | Sulit dibuat deterministik; satu proses AP tidak butuh banyak agent |
+| **OpenAI atau Claude API** | Kualitas tinggi | Berbayar sejak awal; Gemini punya tier gratis multimodal |
+| **Satu PostgreSQL untuk Odoo dan aplikasi** | Hemat memori | Mencampur sistem pencatatan dengan aplikasi; Odoo butuh superuser untuk mengelola database |
+| **Docker Engine** | Paling umum | Tidak dipakai di laptop pemilik; `compose.yaml` tetap kompatibel |
+| **Next.js** seperti DombaTek | Satu framework web | Backend sudah Python; dashboard cukup SPA |
+
+---
+
+## 6. Milestone
+
+| Milestone | Isi | Kriteria selesai | Target |
+|---|---|---|---|
+| **M0 Fondasi dan data Odoo** | Kerangka repo, `compose.yaml`, init Odoo, klien JSON-2, pemuat dataset, seed, check, snapshot dan reset, `guard:secrets` | `odoo:check` lulus dari database kosong; reset < 1 menit; tes lulus; dokumen diperbarui | 6–7 Nov |
+| **M1 Generator faktur** | 40 skenario: berkas PDF/gambar/UBL, label, dan balasan vendor | Label lengkap sesuai SPEC §15.3–15.4; generator deterministik; tes | 8–9 Nov |
+| **M2 Lapisan alat** | `odoo_tools` dengan daftar operasi yang diizinkan, `match_engine`, `tax_check`, konfigurasi kebijakan, grup Odoo khusus agent | Tes unit untuk setiap aturan yang dihitung kode | 10–11 Nov |
+| **M3 Ekstraksi** | Skema Pydantic, ekstraksi Gemini, parser UBL, perbaikan maksimal 2 kali, cache | Akurasi per field pada 40 faktur dilaporkan | 11–12 Nov |
+| **M4 Graph lengkap** | Node LangGraph, routing, interrupt, checkpointer, `email_tool` dan pemantau inbox, RAG kebijakan, FastAPI + SSE, tabel aplikasi | Jalur A, B, dan C berjalan ujung ke ujung untuk satu skenario per kategori | 13–16 Nov |
+| **M5 Dashboard dan evaluasi** | Dashboard (SPEC §10), harness 40 × 3, laporan metrik | Metrik terisi; target tercapai atau selisihnya dijelaskan | 16–19 Nov |
+| **M6 Publik dan finalisasi** | Deploy publik, pengetatan guardrail, README demo, bahan video dan proposal | Tautan live dan repo publik; daftar periksa lomba lengkap | 20–26 Nov |
+| Cadangan | Perbaikan | | 27–28 Nov |
+| Pengumpulan | | | 29 Nov (batas 30 Nov) |
+
+---
+
+## 7. Risiko dan mitigasi
+
+| Risiko | Mitigasi |
+|---|---|
+| Kuota atau biaya Gemini habis | Cache ekstraksi per hash berkas, model cadangan, evaluasi tidak dijalankan paralel berlebihan |
+| Nama field Odoo 19 berbeda dari versi lama | Verifikasi `fields_get` di M0, satu modul klien, catatan field di §4.4 |
+| Image Odoo berubah diam-diam | Tag bertanggal, naik versi secara sengaja |
+| Bentrok dengan DombaTek (port, data, sumber daya) | Proyek compose dan port terpisah, aturan di CLAUDE.md, pemeriksaan awal di setiap tugas |
+| Path repo mengandung spasi | Semua path dikutip; diuji di M0 |
+| Folder repo di bawah `Drive` ikut tersinkron | `.venv`, `node_modules`, dan `var` dikecualikan dari sinkronisasi; mount jaringan atau FUSE dihindari (diperiksa M0) |
+| Hasil LLM tidak deterministik | Temperature rendah, skema ketat, metrik pass^3 |
+| Label evaluasi bocor ke agent | Aturan di CLAUDE.md dan ADR-0007, tes yang memastikan data Odoo dan berkas faktur tidak memuat ID skenario |
+| Demo publik disalahgunakan | Kode akses, batas laju, dan reset berkala (M6) |
+| Hak user agent di M0 masih terlalu luas | Sementara; diketatkan di M2, dan alat agent tetap hanya mengizinkan operasi tertentu |
+| Waktu tiga minggu | Milestone kecil, commit kecil, cadangan 27–28 November |
+
+---
+
+## 8. Keputusan
+
+### 8.1 Ringkasan (5 November 2026)
+
+| Keputusan | ADR |
+|---|---|
+| Stack inti: Python 3.13, LangGraph, FastAPI, Gemini, PostgreSQL + pgvector, React + Vite | [0001](adr/0001-stack-inti.md) |
+| Satu repo: uv untuk Python, npm sebagai penjalan perintah dan workspace dashboard | [0002](adr/0002-monorepo-uv-npm.md) |
+| Podman rootless dengan proyek compose `fakturberes` dan port +20000, berdampingan dengan DombaTek | [0003](adr/0003-podman-proyek-terpisah.md) |
+| Odoo 19 Community lewat External JSON-2 API dengan user bot dan dua API key | [0004](adr/0004-odoo-19-json2-api.md) |
+| LLM merencanakan dan memutuskan di dalam pagar; kode menghitung dan menjalankan aksi | [0005](adr/0005-llm-memutuskan-kode-menghitung.md) |
+| Persetujuan lewat interrupt, aksi di node terpisah, dan kunci idempoten | [0006](adr/0006-persetujuan-dan-idempotensi.md) |
+| Data sintetis, dataset tunggal, dan katalog 40 skenario berlabel | [0007](adr/0007-data-sintetis-dan-skenario.md) |
+
+### 8.2 Masih terbuka
+Model Gemini persis (M3), dimensi embedding (M4), hosting demo publik dan pembatasan aksesnya (M6), serta lisensi repo (M6). Rincian di [SPEC §14](SPEC.md#14-asumsi-dan-pertanyaan-terbuka).

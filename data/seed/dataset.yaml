@@ -1,0 +1,1227 @@
+# dataset.yaml — sumber tunggal data sintetis Faktur Beres (versi 1)
+#
+# Dipakai oleh: seed Odoo (M0), generator faktur (M1), dan harness evaluasi (M5).
+# Aturan:
+# - Semua data FIKTIF. Domain email .test, bank fiktif, NPWP berawalan 0990. Digit cek NPWP
+#   (digit ke-10) memenuhi Luhn agar lolos validasi format NPWP di Odoo/python-stdnum.
+# - Jangan menaruh ID skenario atau label jawaban di berkas ini atau di Odoo.
+#   Pemetaan skenario -> PO ada di docs/SPEC.md §15.3 dan eval/skenario/ (M1).
+# - vendor_luar_erp TIDAK di-seed ke Odoo.
+# - Nomor PO ditetapkan di sini (P00001 dst., urut tanggal pesan). Setelah seed,
+#   sequence PO Odoo dimajukan agar PO baru dari UI tidak bertabrakan.
+# - Setiap subtotal baris kelipatan Rp100 dan setiap subtotal dokumen kelipatan Rp300,
+#   sehingga DPP nilai lain (11/12) dan PPN bulat tanpa pembulatan.
+# - "catatan_riwayat" pada vendor hanya untuk tes konsistensi dataset. Seed tidak menyimpannya
+#   ke Odoo; agent harus menyimpulkan vendor baru dari data Odoo (tanpa tagihan terposting).
+# - Setiap perubahan wajib lolos tes dataset (kelipatan Rp100/Rp300, ambang, kepemilikan produk,
+#   nomor PO unik, kebutuhan skenario di SPEC §15.3).
+versi: 1
+keterangan: Data sintetis Faktur Beres. Semua nama, alamat, NPWP, rekening, dan email fiktif. Jangan menambah data
+  nyata.
+tanggal_acuan: '2026-11-06'
+ambang_persetujuan_rupiah: 50000000
+pajak_pembelian:
+  kunci: ppn_masukan
+  nama: PPN Masukan 12% (DPP Nilai Lain 11/12)
+  tarif_efektif_persen: 11
+  keterangan: 'PMK 131/2024 untuk barang nonmewah: PPN = 12% x (11/12 x harga jual) = 11% x harga jual.'
+perusahaan:
+  nama: PT Arunika Kemas Nusantara
+  npwp: '0990229163926000'
+  alamat: Jl. Industri Barat Blok C No. 18
+  kota: Kabupaten Karawang
+  provinsi: Jawa Barat
+  kode_pos: '41361'
+  negara: ID
+  mata_uang: IDR
+  email_ap: ap@arunika.test
+  email_finance: finance@arunika.test
+  email_approver: manajer.keuangan@arunika.test
+  situs: arunika.test
+bank:
+- kunci: bank_mandala
+  nama: Bank Mandala Raya
+- kunci: bank_kencana
+  nama: Bank Kencana Utama
+- kunci: bank_kirana
+  nama: Bank Kirana Digital
+pengguna:
+- kunci: agen
+  nama: Agen Faktur Beres
+  login: agen@arunika.test
+  keterangan: User bot untuk API key agent. Tanpa sandi (login hanya lewat API key).
+vendor:
+- kunci: v01
+  nama: PT Kertas Sagara Mandiri
+  npwp: '0990427957220000'
+  alamat: Jl. Soekarno-Hatta Kav. 210
+  kota: Kota Bandung
+  provinsi: Jawa Barat
+  kode_pos: '40286'
+  email_penagihan: tagihan@kertas-sagara.test
+  rekening:
+    bank: bank_mandala
+    nomor: '5450717927'
+    atas_nama: PT Kertas Sagara Mandiri
+  format_nomor_faktur: KSM/INV/{yyyy}/{mm}/{seq:04d}
+  kanal_faktur:
+  - pdf
+  - ubl
+  catatan_riwayat: mapan
+  termin_hari: 30
+- kunci: v02
+  nama: CV Tinta Warna Lestari
+  npwp: '0990286171486000'
+  alamat: Jl. Raya Narogong Km. 7 No. 3
+  kota: Kota Bekasi
+  provinsi: Jawa Barat
+  kode_pos: '17116'
+  email_penagihan: finance@tintawarna.test
+  rekening:
+    bank: bank_kencana
+    nomor: '1897077695'
+    atas_nama: CV Tinta Warna Lestari
+  format_nomor_faktur: TWL/INV/{yy}{mm}/{seq:04d}
+  kanal_faktur:
+  - pdf
+  - gambar
+  catatan_riwayat: mapan
+  termin_hari: 30
+- kunci: v03
+  nama: PT Perekat Andalan Sejati
+  npwp: '0990923138098000'
+  alamat: Jl. Industri Pasir Jaya No. 41
+  kota: Kota Tangerang
+  provinsi: Banten
+  kode_pos: '15134'
+  email_penagihan: ar@perekat-andalan.test
+  rekening:
+    bank: bank_mandala
+    nomor: '1381646027'
+    atas_nama: PT Perekat Andalan Sejati
+  format_nomor_faktur: PAS-{seq:05d}
+  kanal_faktur:
+  - gambar
+  catatan_riwayat: mapan
+  termin_hari: 30
+- kunci: v04
+  nama: PT Cakrawala Film Plastik
+  npwp: '0990848459946000'
+  alamat: Jl. Jababeka Raya Blok F No. 9
+  kota: Kabupaten Bekasi
+  provinsi: Jawa Barat
+  kode_pos: '17530'
+  email_penagihan: einvoice@cakrawala-film.test
+  rekening:
+    bank: bank_kirana
+    nomor: '5199311603'
+    atas_nama: PT Cakrawala Film Plastik
+  format_nomor_faktur: CFP-INV-{yy}-{seq:05d}
+  kanal_faktur:
+  - ubl
+  catatan_riwayat: mapan
+  termin_hari: 30
+- kunci: v05
+  nama: CV Rimba Palet Kayu
+  npwp: '0990219479526000'
+  alamat: Jl. Raya Pagaden No. 77
+  kota: Kabupaten Subang
+  provinsi: Jawa Barat
+  kode_pos: '41211'
+  email_penagihan: admin@rimbapalet.test
+  rekening:
+    bank: bank_kencana
+    nomor: '5012500605'
+    atas_nama: CV Rimba Palet Kayu
+  format_nomor_faktur: RPK/{mm}{yy}/{seq:03d}
+  kanal_faktur:
+  - gambar
+  catatan_riwayat: mapan
+  termin_hari: 30
+- kunci: v06
+  nama: PT Presisi Suku Cadang Mesin
+  npwp: '0990769515376000'
+  alamat: Jl. Gaya Motor Raya No. 15
+  kota: Kota Jakarta Utara
+  provinsi: DKI Jakarta
+  kode_pos: '14350'
+  email_penagihan: billing@presisi-sukucadang.test
+  rekening:
+    bank: bank_mandala
+    nomor: '2029942748'
+    atas_nama: PT Presisi Suku Cadang Mesin
+  format_nomor_faktur: INV-{yyyy}-{seq:04d}
+  kanal_faktur:
+  - pdf
+  catatan_riwayat: mapan
+  termin_hari: 30
+- kunci: v07
+  nama: PT Lapis Kimia Prima
+  npwp: '0990464570663000'
+  alamat: Jl. Kawasan Industri Timur No. 6
+  kota: Kabupaten Karawang
+  provinsi: Jawa Barat
+  kode_pos: '41371'
+  email_penagihan: tagihan@lapiskimia.test
+  rekening:
+    bank: bank_kirana
+    nomor: '6510082689'
+    atas_nama: PT Lapis Kimia Prima
+  format_nomor_faktur: LKP-{yy}{mm}-{seq:04d}
+  kanal_faktur:
+  - pdf
+  catatan_riwayat: mapan
+  termin_hari: 30
+- kunci: v08
+  nama: CV Gelombang Karton Sentosa
+  npwp: '0990849788875000'
+  alamat: Jl. Raya Sadang No. 112
+  kota: Kabupaten Purwakarta
+  provinsi: Jawa Barat
+  kode_pos: '41181'
+  email_penagihan: keuangan@gelombangkarton.test
+  rekening:
+    bank: bank_kencana
+    nomor: '1389584420'
+    atas_nama: CV Gelombang Karton Sentosa
+  format_nomor_faktur: INV-{yyyy}-{seq:04d}
+  kanal_faktur:
+  - pdf
+  catatan_riwayat: mapan
+  termin_hari: 30
+- kunci: v09
+  nama: PT Gemilang Label Cetak
+  npwp: '0990493595301000'
+  alamat: Jl. Raya Tajur No. 58
+  kota: Kabupaten Bogor
+  provinsi: Jawa Barat
+  kode_pos: '16134'
+  email_penagihan: invoice@gemilanglabel.test
+  rekening:
+    bank: bank_kirana
+    nomor: '7325060873'
+    atas_nama: PT Gemilang Label Cetak
+  format_nomor_faktur: GLC-INV-{seq:04d}
+  kanal_faktur:
+  - pdf
+  catatan_riwayat: baru
+  termin_hari: 30
+- kunci: v10
+  nama: UD Strapping Makmur Jaya
+  npwp: '0990255549574000'
+  alamat: Jl. Raya Cikampek Km. 2 No. 30
+  kota: Kabupaten Karawang
+  provinsi: Jawa Barat
+  kode_pos: '41373'
+  email_penagihan: penagihan@strappingmakmur.test
+  rekening:
+    bank: bank_mandala
+    nomor: '5671942499'
+    atas_nama: UD Strapping Makmur Jaya
+  format_nomor_faktur: SMJ.{yy}{mm}.{seq:03d}
+  kanal_faktur:
+  - gambar
+  catatan_riwayat: mapan
+  termin_hari: 30
+vendor_luar_erp:
+- kunci: x01
+  nama: PT Mitra Palet Baru
+  npwp: '0990487266919000'
+  alamat: Jl. Raya Cibadak No. 19
+  kota: Kabupaten Sukabumi
+  provinsi: Jawa Barat
+  kode_pos: '43351'
+  email_penagihan: tagihan@mitrapaletbaru.test
+  rekening:
+    bank: bank_kencana
+    nomor: '7825294777'
+    atas_nama: PT Mitra Palet Baru
+  format_nomor_faktur: MPB/{yy}{mm}/{seq:03d}
+  catatan: Tidak di-seed ke Odoo. Dipakai skenario vendor tidak terdaftar.
+produk:
+- kunci: p01
+  kode: KRT-DPX-350
+  nama: Duplex Board 350 gsm
+  satuan: kg
+  harga_beli: 14500
+  vendor: v01
+  kode_vendor: DB-350
+  jenis: barang
+  kontrol_tagihan: kuantitas_diterima
+- kunci: p02
+  kode: KRT-IVR-310
+  nama: Ivory Board 310 gsm
+  satuan: kg
+  harga_beli: 18750
+  vendor: v01
+  kode_vendor: IV-310
+  jenis: barang
+  kontrol_tagihan: kuantitas_diterima
+- kunci: p03
+  kode: KRT-KFT-200
+  nama: Kraft Liner 200 gsm
+  satuan: kg
+  harga_beli: 11200
+  vendor: v01
+  kode_vendor: KL-200
+  jenis: barang
+  kontrol_tagihan: kuantitas_diterima
+- kunci: p04
+  kode: TNT-OFS-CYN
+  nama: Tinta Offset Cyan
+  satuan: kg
+  harga_beli: 185000
+  vendor: v02
+  kode_vendor: TO-C
+  jenis: barang
+  kontrol_tagihan: kuantitas_diterima
+- kunci: p05
+  kode: TNT-OFS-MGT
+  nama: Tinta Offset Magenta
+  satuan: kg
+  harga_beli: 192000
+  vendor: v02
+  kode_vendor: TO-M
+  jenis: barang
+  kontrol_tagihan: kuantitas_diterima
+- kunci: p06
+  kode: TNT-OFS-HTM
+  nama: Tinta Offset Hitam
+  satuan: kg
+  harga_beli: 165000
+  vendor: v02
+  kode_vendor: TO-K
+  jenis: barang
+  kontrol_tagihan: kuantitas_diterima
+- kunci: p07
+  kode: LEM-PVA-LAM
+  nama: Lem PVAc Laminasi
+  satuan: kg
+  harga_beli: 32000
+  vendor: v03
+  kode_vendor: PVAC-L
+  jenis: barang
+  kontrol_tagihan: kuantitas_diterima
+- kunci: p08
+  kode: LEM-HMA-STD
+  nama: Hot Melt Adhesive
+  satuan: kg
+  harga_beli: 58500
+  vendor: v03
+  kode_vendor: HMA-01
+  jenis: barang
+  kontrol_tagihan: kuantitas_diterima
+- kunci: p09
+  kode: FLM-BPG-020
+  nama: Film BOPP Glossy 20 mikron
+  satuan: kg
+  harga_beli: 41000
+  vendor: v04
+  kode_vendor: BOPP-G20
+  jenis: barang
+  kontrol_tagihan: kuantitas_diterima
+- kunci: p10
+  kode: FLM-BPD-020
+  nama: Film BOPP Doff 20 mikron
+  satuan: kg
+  harga_beli: 44500
+  vendor: v04
+  kode_vendor: BOPP-D20
+  jenis: barang
+  kontrol_tagihan: kuantitas_diterima
+- kunci: p11
+  kode: PLT-KYU-120
+  nama: Palet Kayu 120 x 100 cm
+  satuan: Units
+  harga_beli: 165000
+  vendor: v05
+  kode_vendor: PK-1210
+  jenis: barang
+  kontrol_tagihan: kuantitas_diterima
+- kunci: p12
+  kode: SPM-BLK-103
+  nama: Blanket Offset 1030 x 790 mm
+  satuan: Units
+  harga_beli: 2450000
+  vendor: v06
+  kode_vendor: BLK-1030
+  jenis: barang
+  kontrol_tagihan: kuantitas_diterima
+- kunci: p13
+  kode: SPM-PSU-DCT
+  nama: Pisau Die-Cut Custom
+  satuan: Units
+  harga_beli: 1250000
+  vendor: v06
+  kode_vendor: DC-CST
+  jenis: barang
+  kontrol_tagihan: kuantitas_diterima
+- kunci: p14
+  kode: SPM-BRG-620
+  nama: Bearing 6205-2RS
+  satuan: Units
+  harga_beli: 95000
+  vendor: v06
+  kode_vendor: BRG-6205
+  jenis: barang
+  kontrol_tagihan: kuantitas_diterima
+- kunci: p15
+  kode: KMA-VRN-UVG
+  nama: Varnish UV Glossy
+  satuan: kg
+  harga_beli: 78000
+  vendor: v07
+  kode_vendor: UVG-01
+  jenis: barang
+  kontrol_tagihan: kuantitas_diterima
+- kunci: p16
+  kode: KMA-CTW-BSE
+  nama: Water-Based Coating
+  satuan: kg
+  harga_beli: 52000
+  vendor: v07
+  kode_vendor: WBC-02
+  jenis: barang
+  kontrol_tagihan: kuantitas_diterima
+- kunci: p17
+  kode: KTN-GLB-BFL
+  nama: Lembar Karton Gelombang B-Flute
+  satuan: Units
+  harga_beli: 4850
+  vendor: v08
+  kode_vendor: BF-SHT
+  jenis: barang
+  kontrol_tagihan: kuantitas_diterima
+- kunci: p18
+  kode: LBL-BRC-105
+  nama: Label Stiker Barcode 100 x 50 mm (roll)
+  satuan: Units
+  harga_beli: 87500
+  vendor: v09
+  kode_vendor: LB-10050
+  jenis: barang
+  kontrol_tagihan: kuantitas_diterima
+- kunci: p19
+  kode: PKG-STR-015
+  nama: Strapping Band PP 15 mm (roll)
+  satuan: Units
+  harga_beli: 135000
+  vendor: v10
+  kode_vendor: SB-15
+  jenis: barang
+  kontrol_tagihan: kuantitas_diterima
+- kunci: p20
+  kode: PKG-STF-050
+  nama: Stretch Film 50 cm (roll)
+  satuan: Units
+  harga_beli: 98000
+  vendor: v10
+  kode_vendor: SF-50
+  jenis: barang
+  kontrol_tagihan: kuantitas_diterima
+purchase_order:
+- kunci: h01
+  nomor: P00001
+  vendor: v01
+  tanggal_pesan: '2026-08-04'
+  status: dikonfirmasi
+  baris:
+  - produk: p01
+    qty: 3000
+    harga_satuan: 14500
+  - produk: p03
+    qty: 1500
+    harga_satuan: 11200
+  penerimaan:
+  - tanggal: '2026-08-07'
+    qty:
+      p01: 3000
+      p03: 1500
+  tagihan_vendor:
+  - nomor_faktur_vendor: KSM/INV/2026/08/0412
+    tanggal_faktur: '2026-08-08'
+    status: diposting
+- kunci: h02
+  nomor: P00002
+  vendor: v02
+  tanggal_pesan: '2026-08-11'
+  status: dikonfirmasi
+  baris:
+  - produk: p04
+    qty: 60
+    harga_satuan: 185000
+  - produk: p06
+    qty: 80
+    harga_satuan: 165000
+  penerimaan:
+  - tanggal: '2026-08-13'
+    qty:
+      p04: 60
+      p06: 80
+  tagihan_vendor:
+  - nomor_faktur_vendor: TWL/INV/2608/0097
+    tanggal_faktur: '2026-08-14'
+    status: diposting
+- kunci: h03
+  nomor: P00003
+  vendor: v03
+  tanggal_pesan: '2026-08-18'
+  status: dikonfirmasi
+  baris:
+  - produk: p07
+    qty: 420
+    harga_satuan: 32000
+  penerimaan:
+  - tanggal: '2026-08-20'
+    qty:
+      p07: 420
+  tagihan_vendor:
+  - nomor_faktur_vendor: PAS-24311
+    tanggal_faktur: '2026-08-21'
+    status: diposting
+- kunci: h04
+  nomor: P00004
+  vendor: v04
+  tanggal_pesan: '2026-08-25'
+  status: dikonfirmasi
+  baris:
+  - produk: p09
+    qty: 1200
+    harga_satuan: 41000
+  penerimaan:
+  - tanggal: '2026-08-28'
+    qty:
+      p09: 1200
+  tagihan_vendor:
+  - nomor_faktur_vendor: CFP-INV-26-00318
+    tanggal_faktur: '2026-08-29'
+    status: diposting
+- kunci: h05
+  nomor: P00005
+  vendor: v06
+  tanggal_pesan: '2026-09-01'
+  status: dikonfirmasi
+  baris:
+  - produk: p12
+    qty: 4
+    harga_satuan: 2450000
+  - produk: p14
+    qty: 50
+    harga_satuan: 95000
+  penerimaan:
+  - tanggal: '2026-09-04'
+    qty:
+      p12: 4
+      p14: 50
+  tagihan_vendor:
+  - nomor_faktur_vendor: INV-2026-0388
+    tanggal_faktur: '2026-09-05'
+    status: diposting
+- kunci: h06
+  nomor: P00006
+  vendor: v07
+  tanggal_pesan: '2026-09-08'
+  status: dikonfirmasi
+  baris:
+  - produk: p15
+    qty: 200
+    harga_satuan: 78000
+  penerimaan:
+  - tanggal: '2026-09-10'
+    qty:
+      p15: 200
+  tagihan_vendor:
+  - nomor_faktur_vendor: LKP-2609-0061
+    tanggal_faktur: '2026-09-11'
+    status: diposting
+- kunci: h07
+  nomor: P00007
+  vendor: v08
+  tanggal_pesan: '2026-09-15'
+  status: dikonfirmasi
+  baris:
+  - produk: p17
+    qty: 6000
+    harga_satuan: 4850
+  penerimaan:
+  - tanggal: '2026-09-17'
+    qty:
+      p17: 6000
+  tagihan_vendor:
+  - nomor_faktur_vendor: INV-2026-0291
+    tanggal_faktur: '2026-09-18'
+    status: diposting
+- kunci: h08
+  nomor: P00008
+  vendor: v10
+  tanggal_pesan: '2026-09-22'
+  status: dikonfirmasi
+  baris:
+  - produk: p19
+    qty: 60
+    harga_satuan: 135000
+  penerimaan:
+  - tanggal: '2026-09-24'
+    qty:
+      p19: 60
+  tagihan_vendor:
+  - nomor_faktur_vendor: SMJ.2609.045
+    tanggal_faktur: '2026-09-25'
+    status: diposting
+- kunci: h09
+  nomor: P00009
+  vendor: v05
+  tanggal_pesan: '2026-09-29'
+  status: dikonfirmasi
+  baris:
+  - produk: p11
+    qty: 120
+    harga_satuan: 165000
+  penerimaan:
+  - tanggal: '2026-10-01'
+    qty:
+      p11: 120
+  tagihan_vendor:
+  - nomor_faktur_vendor: RPK/0926/027
+    tanggal_faktur: '2026-10-02'
+    status: diposting
+- kunci: h10
+  nomor: P00010
+  vendor: v02
+  tanggal_pesan: '2026-10-13'
+  status: dikonfirmasi
+  baris:
+  - produk: p05
+    qty: 50
+    harga_satuan: 192000
+  - produk: p04
+    qty: 45
+    harga_satuan: 185000
+  penerimaan:
+  - tanggal: '2026-10-15'
+    qty:
+      p05: 50
+      p04: 45
+  tagihan_vendor:
+  - nomor_faktur_vendor: TWL/INV/2610/0153
+    tanggal_faktur: '2026-10-16'
+    status: diposting
+- kunci: h11
+  nomor: P00011
+  vendor: v07
+  tanggal_pesan: '2026-10-14'
+  status: dikonfirmasi
+  baris:
+  - produk: p16
+    qty: 300
+    harga_satuan: 52000
+  penerimaan:
+  - tanggal: '2026-10-16'
+    qty:
+      p16: 300
+  tagihan_vendor:
+  - nomor_faktur_vendor: LKP-2610-0088
+    tanggal_faktur: '2026-10-17'
+    status: diposting
+- kunci: h12
+  nomor: P00012
+  vendor: v06
+  tanggal_pesan: '2026-10-19'
+  status: dikonfirmasi
+  baris:
+  - produk: p13
+    qty: 6
+    harga_satuan: 1250000
+  penerimaan:
+  - tanggal: '2026-10-21'
+    qty:
+      p13: 6
+  tagihan_vendor:
+  - nomor_faktur_vendor: INV-2026-0412
+    tanggal_faktur: '2026-10-22'
+    status: diposting
+- kunci: o21
+  nomor: P00013
+  vendor: v07
+  tanggal_pesan: '2026-10-19'
+  status: batal
+  baris:
+  - produk: p16
+    qty: 210
+    harga_satuan: 52000
+- kunci: h13
+  nomor: P00014
+  vendor: v05
+  tanggal_pesan: '2026-10-20'
+  status: dikonfirmasi
+  baris:
+  - produk: p11
+    qty: 150
+    harga_satuan: 165000
+  penerimaan:
+  - tanggal: '2026-10-22'
+    qty:
+      p11: 150
+  tagihan_vendor:
+  - nomor_faktur_vendor: RPK/1026/031
+    tanggal_faktur: '2026-10-23'
+    status: diposting
+- kunci: o01
+  nomor: P00015
+  vendor: v01
+  tanggal_pesan: '2026-10-21'
+  status: dikonfirmasi
+  baris:
+  - produk: p02
+    qty: 1200
+    harga_satuan: 18750
+  penerimaan:
+  - tanggal: '2026-10-24'
+    qty:
+      p02: 1200
+- kunci: o22
+  nomor: P00016
+  vendor: v07
+  tanggal_pesan: '2026-10-21'
+  status: dikonfirmasi
+  baris:
+  - produk: p16
+    qty: 210
+    harga_satuan: 52000
+  penerimaan:
+  - tanggal: '2026-10-26'
+    qty:
+      p16: 210
+- kunci: o02
+  nomor: P00017
+  vendor: v06
+  tanggal_pesan: '2026-10-22'
+  status: dikonfirmasi
+  baris:
+  - produk: p12
+    qty: 2
+    harga_satuan: 2450000
+  - produk: p14
+    qty: 22
+    harga_satuan: 95000
+  penerimaan:
+  - tanggal: '2026-10-26'
+    qty:
+      p12: 2
+      p14: 22
+- kunci: o03
+  nomor: P00018
+  vendor: v04
+  tanggal_pesan: '2026-10-22'
+  status: dikonfirmasi
+  baris:
+  - produk: p10
+    qty: 600
+    harga_satuan: 44500
+  penerimaan:
+  - tanggal: '2026-10-27'
+    qty:
+      p10: 600
+- kunci: o04
+  nomor: P00019
+  vendor: v09
+  tanggal_pesan: '2026-10-23'
+  status: dikonfirmasi
+  baris:
+  - produk: p18
+    qty: 120
+    harga_satuan: 87500
+  penerimaan:
+  - tanggal: '2026-10-28'
+    qty:
+      p18: 120
+- kunci: o05
+  nomor: P00020
+  vendor: v01
+  tanggal_pesan: '2026-10-23'
+  status: dikonfirmasi
+  baris:
+  - produk: p01
+    qty: 3900
+    harga_satuan: 14500
+  penerimaan:
+  - tanggal: '2026-10-28'
+    qty:
+      p01: 3900
+- kunci: h14
+  nomor: P00021
+  vendor: v03
+  tanggal_pesan: '2026-10-26'
+  status: dikonfirmasi
+  baris:
+  - produk: p08
+    qty: 252
+    harga_satuan: 58500
+  penerimaan:
+  - tanggal: '2026-10-27'
+    qty:
+      p08: 252
+  tagihan_vendor:
+  - nomor_faktur_vendor: PAS-24519
+    tanggal_faktur: '2026-10-28'
+    status: diposting
+- kunci: o06
+  nomor: P00022
+  vendor: v02
+  tanggal_pesan: '2026-10-26'
+  status: dikonfirmasi
+  baris:
+  - produk: p04
+    qty: 60
+    harga_satuan: 185000
+  penerimaan:
+  - tanggal: '2026-10-28'
+    qty:
+      p04: 60
+- kunci: o07
+  nomor: P00023
+  vendor: v07
+  tanggal_pesan: '2026-10-26'
+  status: dikonfirmasi
+  baris:
+  - produk: p15
+    qty: 150
+    harga_satuan: 78000
+  penerimaan:
+  - tanggal: '2026-10-29'
+    qty:
+      p15: 150
+- kunci: o08
+  nomor: P00024
+  vendor: v03
+  tanggal_pesan: '2026-10-27'
+  status: dikonfirmasi
+  baris:
+  - produk: p07
+    qty: 300
+    harga_satuan: 32000
+  - produk: p08
+    qty: 100
+    harga_satuan: 58500
+  penerimaan:
+  - tanggal: '2026-10-29'
+    qty:
+      p07: 300
+      p08: 100
+- kunci: o09
+  nomor: P00025
+  vendor: v08
+  tanggal_pesan: '2026-10-27'
+  status: dikonfirmasi
+  baris:
+  - produk: p17
+    qty: 4800
+    harga_satuan: 4850
+  penerimaan:
+  - tanggal: '2026-10-29'
+    qty:
+      p17: 4800
+- kunci: o10
+  nomor: P00026
+  vendor: v10
+  tanggal_pesan: '2026-10-27'
+  status: dikonfirmasi
+  baris:
+  - produk: p19
+    qty: 40
+    harga_satuan: 135000
+  - produk: p20
+    qty: 30
+    harga_satuan: 98000
+  penerimaan:
+  - tanggal: '2026-10-30'
+    qty:
+      p19: 40
+      p20: 30
+- kunci: o11
+  nomor: P00027
+  vendor: v01
+  tanggal_pesan: '2026-10-28'
+  status: dikonfirmasi
+  baris:
+  - produk: p03
+    qty: 2100
+    harga_satuan: 11200
+  penerimaan:
+  - tanggal: '2026-10-30'
+    qty:
+      p03: 1680
+    sisa: backorder
+- kunci: o12
+  nomor: P00028
+  vendor: v02
+  tanggal_pesan: '2026-10-28'
+  status: dikonfirmasi
+  baris:
+  - produk: p05
+    qty: 40
+    harga_satuan: 192000
+  - produk: p06
+    qty: 60
+    harga_satuan: 165000
+  penerimaan:
+  - tanggal: '2026-10-30'
+    qty:
+      p05: 40
+      p06: 30
+    sisa: backorder
+- kunci: o13
+  nomor: P00029
+  vendor: v04
+  tanggal_pesan: '2026-10-28'
+  status: dikonfirmasi
+  baris:
+  - produk: p09
+    qty: 1050
+    harga_satuan: 41000
+  penerimaan:
+  - tanggal: '2026-10-31'
+    qty:
+      p09: 840
+    sisa: backorder
+- kunci: o14
+  nomor: P00030
+  vendor: v06
+  tanggal_pesan: '2026-10-29'
+  status: dikonfirmasi
+  baris:
+  - produk: p13
+    qty: 3
+    harga_satuan: 1250000
+  penerimaan:
+  - tanggal: '2026-10-31'
+    qty:
+      p13: 3
+- kunci: o15
+  nomor: P00031
+  vendor: v08
+  tanggal_pesan: '2026-10-29'
+  status: dikonfirmasi
+  baris:
+  - produk: p17
+    qty: 3000
+    harga_satuan: 4850
+  penerimaan:
+  - tanggal: '2026-10-31'
+    qty:
+      p17: 3000
+- kunci: o16
+  nomor: P00032
+  vendor: v08
+  tanggal_pesan: '2026-10-29'
+  status: dikonfirmasi
+  baris:
+  - produk: p17
+    qty: 1800
+    harga_satuan: 4850
+  penerimaan:
+  - tanggal: '2026-11-02'
+    qty:
+      p17: 1800
+- kunci: o17
+  nomor: P00033
+  vendor: v03
+  tanggal_pesan: '2026-10-30'
+  status: dikonfirmasi
+  baris:
+  - produk: p07
+    qty: 240
+    harga_satuan: 32000
+  penerimaan:
+  - tanggal: '2026-11-02'
+    qty:
+      p07: 240
+- kunci: o18
+  nomor: P00034
+  vendor: v03
+  tanggal_pesan: '2026-10-30'
+  status: dikonfirmasi
+  baris:
+  - produk: p08
+    qty: 150
+    harga_satuan: 58500
+  penerimaan:
+  - tanggal: '2026-11-02'
+    qty:
+      p08: 150
+- kunci: o19
+  nomor: P00035
+  vendor: v10
+  tanggal_pesan: '2026-10-30'
+  status: dikonfirmasi
+  baris:
+  - produk: p20
+    qty: 45
+    harga_satuan: 98000
+  penerimaan:
+  - tanggal: '2026-11-02'
+    qty:
+      p20: 45
+- kunci: o20
+  nomor: P00036
+  vendor: v10
+  tanggal_pesan: '2026-10-30'
+  status: dikonfirmasi
+  baris:
+  - produk: p20
+    qty: 45
+    harga_satuan: 98000
+  penerimaan:
+  - tanggal: '2026-11-02'
+    qty:
+      p20: 45
+- kunci: o23
+  nomor: P00037
+  vendor: v01
+  tanggal_pesan: '2026-10-31'
+  status: dikonfirmasi
+  baris:
+  - produk: p02
+    qty: 400
+    harga_satuan: 18750
+  penerimaan:
+  - tanggal: '2026-11-03'
+    qty:
+      p02: 400
+- kunci: o24
+  nomor: P00038
+  vendor: v01
+  tanggal_pesan: '2026-10-31'
+  status: dikonfirmasi
+  baris:
+  - produk: p03
+    qty: 1200
+    harga_satuan: 11200
+  penerimaan:
+  - tanggal: '2026-11-03'
+    qty:
+      p03: 1200
+- kunci: o25
+  nomor: P00039
+  vendor: v06
+  tanggal_pesan: '2026-10-31'
+  status: dikonfirmasi
+  baris:
+  - produk: p14
+    qty: 60
+    harga_satuan: 95000
+  penerimaan:
+  - tanggal: '2026-11-03'
+    qty:
+      p14: 60
+- kunci: o26
+  nomor: P00040
+  vendor: v07
+  tanggal_pesan: '2026-11-02'
+  status: dikonfirmasi
+  baris:
+  - produk: p15
+    qty: 100
+    harga_satuan: 78000
+  penerimaan:
+  - tanggal: '2026-11-04'
+    qty:
+      p15: 100
+- kunci: o27
+  nomor: P00041
+  vendor: v02
+  tanggal_pesan: '2026-11-02'
+  status: dikonfirmasi
+  baris:
+  - produk: p06
+    qty: 50
+    harga_satuan: 165000
+  penerimaan:
+  - tanggal: '2026-11-04'
+    qty:
+      p06: 50
+- kunci: o28
+  nomor: P00042
+  vendor: v08
+  tanggal_pesan: '2026-11-02'
+  status: dikonfirmasi
+  baris:
+  - produk: p17
+    qty: 2400
+    harga_satuan: 4850
+  penerimaan:
+  - tanggal: '2026-11-04'
+    qty:
+      p17: 2400
+- kunci: o29
+  nomor: P00043
+  vendor: v06
+  tanggal_pesan: '2026-11-02'
+  status: dikonfirmasi
+  baris:
+  - produk: p12
+    qty: 3
+    harga_satuan: 2450000
+  penerimaan:
+  - tanggal: '2026-11-04'
+    qty:
+      p12: 3
+- kunci: o30
+  nomor: P00044
+  vendor: v01
+  tanggal_pesan: '2026-11-02'
+  status: dikonfirmasi
+  baris:
+  - produk: p02
+    qty: 800
+    harga_satuan: 18750
+  penerimaan:
+  - tanggal: '2026-11-04'
+    qty:
+      p02: 800
+- kunci: o31
+  nomor: P00045
+  vendor: v03
+  tanggal_pesan: '2026-11-03'
+  status: dikonfirmasi
+  baris:
+  - produk: p07
+    qty: 210
+    harga_satuan: 32000
+  penerimaan:
+  - tanggal: '2026-11-05'
+    qty:
+      p07: 210
+- kunci: o32
+  nomor: P00046
+  vendor: v07
+  tanggal_pesan: '2026-11-03'
+  status: dikonfirmasi
+  baris:
+  - produk: p16
+    qty: 240
+    harga_satuan: 52000
+  penerimaan:
+  - tanggal: '2026-11-05'
+    qty:
+      p16: 240
+- kunci: o33
+  nomor: P00047
+  vendor: v10
+  tanggal_pesan: '2026-11-03'
+  status: dikonfirmasi
+  baris:
+  - produk: p19
+    qty: 50
+    harga_satuan: 135000
+  penerimaan:
+  - tanggal: '2026-11-05'
+    qty:
+      p19: 50
+- kunci: o34
+  nomor: P00048
+  vendor: v08
+  tanggal_pesan: '2026-11-03'
+  status: dikonfirmasi
+  baris:
+  - produk: p17
+    qty: 4200
+    harga_satuan: 4850
+  penerimaan:
+  - tanggal: '2026-11-05'
+    qty:
+      p17: 4200
+- kunci: o35
+  nomor: P00049
+  vendor: v02
+  tanggal_pesan: '2026-11-03'
+  status: dikonfirmasi
+  baris:
+  - produk: p04
+    qty: 30
+    harga_satuan: 185000
+  - produk: p05
+    qty: 30
+    harga_satuan: 192000
+  penerimaan:
+  - tanggal: '2026-11-05'
+    qty:
+      p04: 30
+      p05: 30
+- kunci: o36
+  nomor: P00050
+  vendor: v06
+  tanggal_pesan: '2026-11-03'
+  status: dikonfirmasi
+  baris:
+  - produk: p14
+    qty: 120
+    harga_satuan: 95000
+  penerimaan:
+  - tanggal: '2026-11-05'
+    qty:
+      p14: 120
+- kunci: o37
+  nomor: P00051
+  vendor: v04
+  tanggal_pesan: '2026-11-03'
+  status: dikonfirmasi
+  baris:
+  - produk: p09
+    qty: 600
+    harga_satuan: 41000
+  penerimaan:
+  - tanggal: '2026-11-05'
+    qty:
+      p09: 600
+- kunci: o38
+  nomor: P00052
+  vendor: v05
+  tanggal_pesan: '2026-11-03'
+  status: dikonfirmasi
+  baris:
+  - produk: p11
+    qty: 80
+    harga_satuan: 165000
+  penerimaan:
+  - tanggal: '2026-11-05'
+    qty:
+      p11: 80
+- kunci: n01
+  nomor: P00053
+  vendor: v01
+  tanggal_pesan: '2026-11-04'
+  status: rfq
+  baris:
+  - produk: p01
+    qty: 2400
+    harga_satuan: 14500
+- kunci: n02
+  nomor: P00054
+  vendor: v04
+  tanggal_pesan: '2026-11-04'
+  status: rfq
+  baris:
+  - produk: p10
+    qty: 900
+    harga_satuan: 44500
+- kunci: n03
+  nomor: P00055
+  vendor: v02
+  tanggal_pesan: '2026-11-04'
+  status: dikonfirmasi
+  baris:
+  - produk: p06
+    qty: 42
+    harga_satuan: 165000
+  tanggal_rencana_terima: '2026-11-12'
+- kunci: n04
+  nomor: P00056
+  vendor: v06
+  tanggal_pesan: '2026-11-04'
+  status: dikonfirmasi
+  baris:
+  - produk: p12
+    qty: 3
+    harga_satuan: 2450000
+  tanggal_rencana_terima: '2026-11-16'
