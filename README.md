@@ -4,7 +4,7 @@ AI agent yang menuntaskan *exception* faktur pemasok di proses *accounts payable
 
 Karya Tim **Daftar H-2 Jam** (Politeknik Negeri Subang) untuk **GTNIC 2026, kategori AI Agent**.
 
-**Status:** M0 (stack lokal dan data Odoo) belum dimulai. Perintah di bawah tersedia setelah M0 selesai. Rencana lengkap ada di [RENCANA-TEKNIS §6](docs/RENCANA-TEKNIS.md#6-milestone).
+**Status:** M0 selesai (5 November 2026): stack lokal, inisialisasi dan seed Odoo, pemeriksaan, serta snapshot dan reset sudah bisa dipakai. Berikutnya M1 (generator faktur). Rencana lengkap ada di [RENCANA-TEKNIS §6](docs/RENCANA-TEKNIS.md#6-milestone).
 
 ## Prasyarat
 - Linux dengan **Podman 6 rootless** dan **podman-compose ≥ 1.6** sebagai penyedia `podman compose`. Docker Compose v2 juga bisa dipakai.
