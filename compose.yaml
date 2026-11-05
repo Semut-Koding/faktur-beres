@@ -1,0 +1,84 @@
+# Layanan lokal Faktur Beres (RENCANA-TEKNIS §4.3, ADR-0003).
+# Jalankan hanya lewat `npm run services:up` / `npm run services:down` (proyek compose
+# `fakturberes`). Hanya fitur yang didukung podman-compose dan Docker Compose v2: tanpa
+# `condition:`, tanpa `restart:`, tanpa ekstensi khusus. Kesiapan layanan ditunggu skrip.
+# Rahasia dibaca dari .env di akar repo (dibuat `npm run setup`).
+name: fakturberes
+
+services:
+  odoo:
+    image: docker.io/library/odoo:19.0-20261102
+    depends_on:
+      - odoo-db
+    environment:
+      # Entrypoint image resmi tidak menaruh --db_password di argumen proses bila PGPASSWORD
+      # ada; host, port, dan user PostgreSQL dibaca dari infra/odoo/odoo.conf.
+      PGPASSWORD: ${ODOO_DB_PASSWORD:?ODOO_DB_PASSWORD kosong, jalankan npm run setup}
+    ports:
+      - "127.0.0.1:28069:8069"
+    volumes:
+      - odoo-data:/var/lib/odoo
+      - ./infra/odoo/odoo.conf:/etc/odoo/odoo.conf:ro,Z
+      # Folder kosong agar Podman tidak membuat volume anonim untuk VOLUME image ini.
+      - ./infra/odoo/addons:/mnt/extra-addons:ro,Z
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8069/web/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+
+  odoo-db:
+    image: docker.io/library/postgres:17.11
+    environment:
+      POSTGRES_USER: odoo
+      POSTGRES_PASSWORD: ${ODOO_DB_PASSWORD:?ODOO_DB_PASSWORD kosong, jalankan npm run setup}
+      POSTGRES_DB: postgres
+    volumes:
+      - odoo-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-q", "-U", "odoo", "-d", "postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  app-db:
+    image: docker.io/pgvector/pgvector:0.8.7-pg18-trixie
+    environment:
+      POSTGRES_USER: fakturberes
+      POSTGRES_PASSWORD: ${APP_DB_PASSWORD:?APP_DB_PASSWORD kosong, jalankan npm run setup}
+      POSTGRES_DB: fakturberes
+    ports:
+      - "127.0.0.1:25432:5432"
+    volumes:
+      # PostgreSQL 18: PGDATA=/var/lib/postgresql/18/docker, volume di /var/lib/postgresql.
+      - app-db-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD", "pg_isready", "-q", "-U", "fakturberes", "-d", "fakturberes"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  mailpit:
+    image: docker.io/axllent/mailpit:v1.32.0
+    environment:
+      MP_DATABASE: /data/mailpit.db
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+    ports:
+      - "127.0.0.1:21025:1025"
+      - "127.0.0.1:28025:8025"
+    volumes:
+      - mailpit-data:/data
+    healthcheck:
+      # Image tanpa shell: healthcheck memakai perintah bawaan `mailpit readyz`.
+      test: ["CMD", "/mailpit", "readyz"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  odoo-data:
+  odoo-db-data:
+  app-db-data:
+  mailpit-data:
