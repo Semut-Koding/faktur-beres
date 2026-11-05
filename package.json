@@ -13,6 +13,7 @@
     "services:down": "bash infra/scripts/services-down.sh",
     "services:status": "bash infra/scripts/services-status.sh",
     "services:logs": "bash infra/scripts/services-logs.sh",
+    "odoo:init": "bash infra/scripts/odoo-init.sh",
     "lint": "uv run ruff check . && uv run ruff format --check .",
     "test": "uv run python -m pytest",
     "check": "npm run lint && npm test",
