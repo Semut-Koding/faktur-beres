@@ -183,16 +183,34 @@ Aturan:
 - **Sequence PO** dimajukan ke paling sedikit P00100 setelah seed.
 - **Snapshot dan reset** memakai database `fakturberes_seed` beserta filestore-nya. Cara yang diutamakan: `odoo db duplicate` dan `odoo db drop` (tersedia sejak Odoo 16) saat server Odoo berhenti. Target reset kurang dari 1 menit.
 
-**Catatan field Odoo 19** (diisi M0 dari `fields_get`):
+**Catatan field Odoo 19** (diisi M0 dari `fields_get`, 5 November 2026):
 
 | Kebutuhan | Model.field yang dipakai |
 |---|---|
-| NPWP vendor | (M0) |
-| Pajak di baris PO | (M0) |
-| Kuantitas diterima dan ditagih di baris PO | (M0) |
-| Tautan baris tagihan ke baris PO | (M0) |
-| Kontrol tagihan produk | (M0) |
-| Satuan beli produk | (M0) |
+| NPWP vendor | `res.partner.vat` (divalidasi `base_vat` untuk negara ID) |
+| Pajak di baris PO | `purchase.order.line.tax_ids` (Odoo 19; `taxes_id` sudah tidak ada) |
+| Kuantitas diterima dan ditagih di baris PO | `purchase.order.line.qty_received` (dari `stock.move`, `qty_received_method = stock_moves`) dan `purchase.order.line.qty_invoiced` |
+| Tautan baris tagihan ke baris PO | `account.move.line.purchase_line_id` (ada juga `purchase_order_id`, readonly) |
+| Kontrol tagihan produk | `product.template.purchase_method = 'receive'` |
+| Satuan beli produk | `product.template.uom_id` (Odoo 19 tidak punya `uom_po_id`); di baris PO `purchase.order.line.product_uom_id`, di info pemasok `product.supplierinfo.product_uom_id` |
+| Barang yang stoknya dilacak | `product.template.type = 'consu'` dengan `is_storable = True` |
+| Pajak pembelian produk | `product.template.supplier_taxes_id` |
+| Status penerimaan PO | `purchase.order.receipt_status` (`pending`, `partial`, `full`) |
+| Tanggal konfirmasi PO | `purchase.order.date_approve` (readonly di UI, bisa ditulis lewat API) |
+| Termin PO | `purchase.order.payment_term_id`; UI mengisinya lewat onchange dari `res.partner.property_supplier_payment_term_id`, panggilan API harus mengisinya sendiri |
+| Penerimaan | `stock.picking.date_done`, `backorder_id`; `stock.move.quantity` dan `picked`; validasi `stock.picking.button_validate` |
+| Grup user | `res.users.group_ids` (Odoo 19; dulu `groups_id`) dan `all_group_ids` |
+| Pemeriksaan hak akses | `has_access(operation)` pada recordset (Odoo 18+); `check_access` privat, `check_access_rights` usang |
+
+**Catatan implementasi M0 (5 November 2026)**
+- `infra/odoo/odoo.conf` memuat `max_cron_threads = 0`. Thread cron Odoo memproses setiap database milik user `odoo`, termasuk `fakturberes_seed`, sehingga snapshot bisa berubah diam-diam. `db_name` tidak dipakai untuk membatasinya karena perintah `odoo server` membuat database kosong otomatis bila `db_name` diisi. Faktur Beres tidak bergantung pada cron Odoo; efek sampingnya, antrean email Odoo tidak diproses.
+- JSON-2 ada di modul `rpc` (terpasang otomatis). Panggilan tanpa `context` berjalan dengan konteks kosong (tanpa `lang` dan `tz`), jadi skrip mengirim `{"lang": "id_ID", "tz": "Asia/Jakarta"}` untuk aksi. Galat dipetakan dari status 401, 403, 404, 409, 422, dan 500. Membaca `account.move.needed_terms` lewat JSON-2 menghasilkan galat 500 (nilai tidak bisa diserialisasi), jadi field itu tidak dibaca.
+- Database dibuat dengan `odoo db init fakturberes --language id_ID --country ID` lalu `odoo module install` saat layanan `odoo` dihentikan. Karena negara perusahaan sudah ID sebelum `account` dipasang, `l10n_id` memasang chart `id` dan jurnal tagihan `TAGIH`. Terpasang juga modul otomatis, antara lain `l10n_id_efaktur_coretax`, `purchase_stock`, dan `stock_account`.
+- Pajak pembelian memakai pajak lokalisasi `account.1_tax_PT4` "12% (Non-Luxury Good)": 11% atas harga (= 12% × DPP nilai lain 11/12), PPN Rp110.000 untuk harga Rp1.000.000, tidak termasuk harga, dan sudah menjadi pajak pembelian bawaan perusahaan. Seed dan check merujuknya lewat external ID `fb_seed.tax_ppn_masukan`. Nama Odoo-nya tidak diubah.
+- User agent `agen@arunika.test` tanpa sandi, dengan grup `purchase.group_purchase_user`, `stock.group_stock_user`, `account.group_account_invoice`, dan `mail.group_mail_notification_type_inbox` (cara Odoo 19 menyimpan notifikasi "inbox", agar bot tidak dikirimi email). Hak yang terbawa (dari `has_access`): `account.move` baca, buat, ubah, hapus; `purchase.order` dan `stock.picking` ubah dan hapus; `res.partner.bank` baca saja. Grup `account.group_account_invoice` juga mengizinkan posting tagihan. Semua ini diketatkan di M2.
+- API key dibuat lewat `odoo shell` dengan `res.users.apikeys._generate("rpc", nama, sekarang + 90 hari)` dalam `sudo()` (tanpa `sudo`, durasi user agent dibatasi `api_key_duration` grup). Key ditulis langsung ke `.env`. Key baru hanya dibuat bila key di `.env` kosong atau tidak valid; key lama buatan alat ini untuk user yang sama dihapus.
+- Seed memakai tanggal dataset pukul 10.00 WIB (03.00 UTC) dan menulis ulang `purchase.order.date_approve`, `stock.picking.date_done`, `stock.move.date`, dan `stock.move.line.date`. Tagihan riwayat diberi `date` (tanggal akuntansi) sama dengan `invoice_date`, karena aturan bawaan Odoo memindahkan tagihan bulan lalu ke akhir bulan. Yang tetap bertanggal saat seed: `create_date`/`write_date` semua record dan tanggal pesan chatter (`mail.message.date`).
+- `odoo:snapshot` menjalankan `odoo:check` dulu dan hanya membuat snapshot bila lulus. Snapshot dan reset memakai `odoo db duplicate --force` (database dan filestore target dihapus lalu disalin). Duplikasi membuat ulang beberapa parameter sistem di salinan, termasuk `web.base.url` (kembali ke port 8069), sehingga reset memulihkannya lewat JSON-2. Waktu reset terukur 10–17 detik.
 
 ### 4.5 Demo publik (M6)
 Dashboard di Vercel. API, Odoo, dan basis data di server yang ditentukan di M6, dengan data seed yang direset berkala dan akses dibatasi (kode akses atau batas laju). Keputusannya dicatat sebagai ADR baru.
