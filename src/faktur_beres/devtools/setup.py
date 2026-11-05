@@ -14,6 +14,7 @@ from pathlib import Path
 
 from faktur_beres.config import REPO_ROOT
 from faktur_beres.devtools.envfile import parse_env, read_env, set_env_values, write_text_private
+from faktur_beres.textui import print_table
 
 ENV_EXAMPLE = REPO_ROOT / ".env.example"
 ENV_FILE = REPO_ROOT / ".env"
@@ -123,18 +124,6 @@ def check_tools() -> list[ToolCheck]:
         ToolCheck("Python (uv)", f"{py.major}.{py.minor}.{py.micro}", "3.13.x", py[:2] == (3, 13))
     )
     return checks
-
-
-def print_table(headers: tuple[str, ...], rows: list[tuple[str, ...]]) -> None:
-    widths = [max(len(str(r[i])) for r in [headers, *rows]) for i in range(len(headers))]
-
-    def fmt(cells: tuple[str, ...]) -> str:
-        return "  ".join(str(c).ljust(w) for c, w in zip(cells, widths, strict=True)).rstrip()
-
-    print(fmt(headers))
-    print("  ".join("-" * w for w in widths))
-    for row in rows:
-        print(fmt(row))
 
 
 def ensure_env(example: Path = ENV_EXAMPLE, target: Path = ENV_FILE) -> list[tuple[str, str]]:
