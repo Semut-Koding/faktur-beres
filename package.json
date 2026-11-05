@@ -15,6 +15,7 @@
     "services:logs": "bash infra/scripts/services-logs.sh",
     "odoo:init": "bash infra/scripts/odoo-init.sh",
     "odoo:seed": "uv run python -m faktur_beres.seed.load",
+    "odoo:check": "uv run python -m faktur_beres.seed.check",
     "lint": "uv run ruff check . && uv run ruff format --check .",
     "test": "uv run python -m pytest",
     "check": "npm run lint && npm test",
