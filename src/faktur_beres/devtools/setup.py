@@ -1,7 +1,7 @@
-"""``npm run setup``: check local tools and create ``.env`` with random secrets.
+"""``npm run setup``: check local tools, create ``.env`` with random secrets, install the hook.
 
-Safe to run again: values already present in ``.env`` are never overwritten, and secret values
-are never printed.
+Safe to run again: values already present in ``.env`` are never overwritten, secret values are
+never printed, and a pre-commit hook that was not installed by setup is left alone.
 """
 
 import re
@@ -28,6 +28,13 @@ EMPTY_HINTS = {
 }
 
 VERSION = re.compile(r"(\d+(?:\.\d+)+)")
+
+HOOK_MARKER = "# faktur-beres: dipasang oleh npm run setup"
+HOOK_SCRIPT = f"""#!/bin/sh
+{HOOK_MARKER}
+# Menolak commit yang memuat berkas .env atau nilai rahasia (npm run guard:secrets).
+exec npm run --silent guard:secrets
+"""
 
 
 @dataclass(frozen=True)
@@ -172,6 +179,36 @@ def ensure_env(example: Path = ENV_EXAMPLE, target: Path = ENV_FILE) -> list[tup
     return result
 
 
+def install_pre_commit_hook(repo: Path = REPO_ROOT) -> str:
+    """Install the guard:secrets pre-commit hook. Returns a short status message."""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--git-path", "hooks"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return "dilewati: bukan repo git"
+    hooks_dir = (repo / result.stdout.strip()).resolve()
+    hook = hooks_dir / "pre-commit"
+    action = "dipasang"
+    if hook.exists():
+        current = hook.read_text(encoding="utf-8", errors="replace")
+        if current == HOOK_SCRIPT and hook.stat().st_mode & 0o111:
+            return "sudah terpasang"
+        if HOOK_MARKER not in current:
+            return (
+                f"dilewati: {hook.name} lain sudah ada, tambahkan `npm run guard:secrets` sendiri"
+            )
+        action = "diperbarui"
+    hooks_dir.mkdir(parents=True, exist_ok=True)
+    hook.write_text(HOOK_SCRIPT, encoding="utf-8")
+    hook.chmod(0o755)
+    return action
+
+
 def main() -> int:
     print("== Alat lokal")
     checks = check_tools()
@@ -183,6 +220,8 @@ def main() -> int:
     print("\n== Berkas .env (nilai tidak ditampilkan)")
     env_status = ensure_env()
     print_table(("Variabel", "Status"), env_status)
+
+    print(f"\n== Hook pre-commit guard:secrets: {install_pre_commit_hook()}")
 
     failed = [c.name for c in checks if not c.ok]
     if failed:
