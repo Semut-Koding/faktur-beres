@@ -46,6 +46,8 @@
 > Versi yang diperiksa 5 November 2026: image Odoo `19.0-20261102` (tag `latest` di Docker Hub sudah Odoo 20, jadi tidak dipakai), pgvector `0.8.7-pg18-trixie`, Mailpit `v1.32.0`. Versi minor PostgreSQL 17 dan versi alat di laptop (Podman, podman-compose, uv, Node.js) dikunci dan dicatat di M0. Pustaka Python dan npm dikunci di lockfile.
 >
 > **Dikunci di M0 (5 November 2026):** PostgreSQL untuk Odoo `17.11` (Debian trixie, `PG_VERSION=17.11-1.pgdg13+2`; tag `17` saat itu menunjuk image yang sama), PostgreSQL aplikasi 18.6 dari image pgvector. Alat di laptop pemilik: Podman 6.1.4, podman-compose 1.6.0, uv 0.13.1, Python 3.13.16 (dipasang uv), Node.js 24.22.0, npm 11.19.1, git 2.56.0. Pustaka Python yang dipakai M0 (lihat `uv.lock`): httpx 0.28.1, Pydantic 2.14.3, pydantic-settings 2.16.2, PyYAML 6.0.3; dev: pytest 9.2.0, Ruff 0.17.3, python-stdnum 2.2.
+>
+> **Generator faktur (M1, 6 November 2026):** lxml 6.1.3 (dependensi utama, juga untuk parser UBL M3); dev: ReportLab 5.1.0, Pillow 13.0.0, pypdfium2 5.14.0 (PDFium 156.0.8076.0). Keluaran `gen:faktur` identik byte per byte untuk versi di `uv.lock` pada platform yang sama (diperiksa `gen:periksa`).
 
 ---
 
