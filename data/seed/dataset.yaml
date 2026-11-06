@@ -20,6 +20,9 @@ keterangan: Data sintetis Faktur Beres. Semua nama, alamat, NPWP, rekening, dan 
   nyata.
 tanggal_acuan: '2026-11-06'
 ambang_persetujuan_rupiah: 50000000
+# Di Odoo, pajak ini adalah pajak lokalisasi l10n_id "12% (Non-Luxury Good)" (11% atas harga),
+# dirujuk lewat external ID fb_seed.tax_ppn_masukan. Nama di bawah adalah nama di dataset; kode
+# tidak pernah mencocokkan pajak Odoo lewat nama (dikonfirmasi pemilik, 6 November 2026).
 pajak_pembelian:
   kunci: ppn_masukan
   nama: PPN Masukan 12% (DPP Nilai Lain 11/12)
