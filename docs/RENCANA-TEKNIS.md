@@ -245,7 +245,7 @@ Dashboard di Vercel. API, Odoo, dan basis data di server yang ditentukan di M6, 
 | Milestone | Isi | Kriteria selesai | Target |
 |---|---|---|---|
 | **M0 Fondasi dan data Odoo** ✅ selesai 5 Nov 2026 | Kerangka repo, `compose.yaml`, init Odoo, klien JSON-2, pemuat dataset, seed, check, snapshot dan reset, `guard:secrets` | `odoo:check` lulus dari database kosong; reset < 1 menit; tes lulus; dokumen diperbarui | 6–7 Nov |
-| **M1 Generator faktur** | 40 skenario: berkas PDF/gambar/UBL, label, dan balasan vendor | Label lengkap sesuai SPEC §15.3–15.4; generator deterministik; tes | 8–9 Nov |
+| **M1 Generator faktur** ✅ selesai 6 Nov 2026 | 40 skenario: berkas PDF/gambar/UBL, label, dan balasan vendor | Label lengkap sesuai SPEC §15.3–15.4; generator deterministik; tes | 8–9 Nov |
 | **M2 Lapisan alat** | `odoo_tools` dengan daftar operasi yang diizinkan, `match_engine`, `tax_check`, konfigurasi kebijakan, grup Odoo khusus agent | Tes unit untuk setiap aturan yang dihitung kode | 10–11 Nov |
 | **M3 Ekstraksi** | Skema Pydantic, ekstraksi Gemini, parser UBL, perbaikan maksimal 2 kali, cache | Akurasi per field pada 40 faktur dilaporkan | 11–12 Nov |
 | **M4 Graph lengkap** | Node LangGraph, routing, interrupt, checkpointer, `email_tool` dan pemantau inbox, RAG kebijakan, FastAPI + SSE, tabel aplikasi | Jalur A, B, dan C berjalan ujung ke ujung untuk satu skenario per kategori | 13–16 Nov |
