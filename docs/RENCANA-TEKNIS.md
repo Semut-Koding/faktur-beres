@@ -247,6 +247,18 @@ Dashboard di Vercel. API, Odoo, dan basis data di server yang ditentukan di M6, 
 | Cadangan | Perbaikan | | 27–28 Nov |
 | Pengumpulan | | | 29 Nov (batas 30 Nov) |
 
+### Masukan dari tinjauan M0 untuk M2 (6 November 2026)
+- **Grup Odoo khusus agent** lewat modul kecil di `infra/odoo/addons/faktur_beres_agent`:
+  - hak baca PO, penerimaan, vendor, rekening, produk, dan pajak;
+  - buat dan ubah draft tagihan, lampiran, dan catatan chatter;
+  - tanpa hak hapus;
+  - tanpa `account.group_account_invoice`, sehingga posting ditolak Odoo sendiri (wajib diuji);
+  - `api_key_duration` 90 hari, sehingga key agent dibuat tanpa `sudo()`.
+- **Alat agent** selalu mengirim context `lang` dan `tz`, selalu menyebut field secara eksplisit (jangan membaca `needed_terms`), dan mengisi sendiri field yang di UI diisi onchange (mis. termin pembayaran).
+- **Pajak** dirujuk lewat external ID (`fb_seed.tax_ppn_masukan`), bukan nama.
+- **e-Faktur:** periksa field tambahan `l10n_id_efaktur_coretax` di tagihan vendor (mis. nomor faktur pajak) dan isi bila ada.
+- **Dependensi:** `python-stdnum` dipindah ke dependensi utama bila `tax_check` memakainya saat runtime.
+
 ---
 
 ## 7. Risiko dan mitigasi
