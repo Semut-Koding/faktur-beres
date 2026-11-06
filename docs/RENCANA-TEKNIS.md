@@ -105,12 +105,16 @@ faktur-beres/            # nama folder repo (lihat README)
 │  ├─ seed/dataset.yaml  # sumber tunggal data sintetis (SPEC §9.4)
 │  └─ kebijakan/         # SOP AP dan kontrak vendor sintetis untuk RAG (M4)
 ├─ eval/
-│  ├─ skenario/          # label 40 skenario (M1)
-│  ├─ berkas/            # faktur uji dan balasan vendor hasil generator (M1)
+│  ├─ skenario/          # label 40 skenario (M1, hasil generator, di-commit)
+│  ├─ berkas/            # faktur uji dan balasan vendor (M1, hasil generator, di-commit)
+│  ├─ DAFTAR.md          # tabel ringkas 40 skenario (hasil generator)
+│  ├─ README.md          # penjelasan folder (ditulis tangan)
 │  └─ hasil/             # hasil evaluasi (tidak di-commit)
 ├─ web/                  # dashboard React + Vite (M5), workspace npm
 ├─ infra/
 │  ├─ odoo/odoo.conf     # konfigurasi Odoo lokal (tanpa rahasia)
+│  ├─ odoo/addons/       # folder addon Odoo (kosong sampai M2)
+│  ├─ odoo/shell/        # skrip ORM untuk `odoo shell` (bootstrap odoo:init)
 │  └─ scripts/           # skrip shell untuk Podman: init, snapshot, reset, tunggu layanan
 ├─ var/                  # berkas runtime lokal, mis. var/berkas/ (tidak di-commit)
 ├─ docs/
@@ -136,7 +140,8 @@ Semua dijalankan dari akar repo.
 | Simpan kondisi seed / kembalikan Odoo ke kondisi itu | `npm run odoo:snapshot` / `npm run odoo:reset` | M0 |
 | Lint dan tes | `npm run check` (gabungan `npm run lint` dan `npm test`) | M0 |
 | Pastikan tidak ada nilai rahasia di berkas yang akan di-commit | `npm run guard:secrets` | M0 |
-| Buat faktur uji, label, dan balasan vendor | `npm run gen:faktur` | M1 |
+| Buat faktur uji, label, dan balasan vendor (tulis ulang `eval/skenario/`, `eval/berkas/`, `eval/DAFTAR.md`) | `npm run gen:faktur` | M1 |
+| Pastikan berkas di `eval/` identik byte per byte dengan keluaran generator (SHA-256) | `npm run gen:periksa` | M1 |
 | Jalankan API dan dashboard untuk pengembangan | `npm run dev:api` / `npm run dev:web` | M4 / M5 |
 | Evaluasi 40 skenario × 3 | `npm run eval` | M5 |
 | Tambah dependensi Python | `uv add <paket>` atau `uv add --dev <paket>` | |
