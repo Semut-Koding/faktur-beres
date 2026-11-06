@@ -8,7 +8,7 @@ checked with the agent key and ``has_access``/``has_group`` only. Nothing is del
 import re
 import sys
 from collections import Counter
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from typing import Any
 
 from faktur_beres.config import Settings
@@ -16,6 +16,12 @@ from faktur_beres.dataset import Dataset, get_dataset
 from faktur_beres.odoo import OdooClient, OdooError
 from faktur_beres.seed.common import SeedError, XmlIds, admin_client, m2o_id
 from faktur_beres.seed.load import MIN_NEXT_PO_NUMBER, PO_STATE, TAX_XMLID
+from faktur_beres.seed.runtime import (
+    FORBIDDEN_CONTAINER_ENV,
+    container_env_names,
+    forbidden_env,
+    odoo_conf_option,
+)
 from faktur_beres.textui import print_table
 
 OK, FAIL, INFO = "OK", "GAGAL", "INFO"
@@ -61,12 +67,22 @@ AGENT_RIGHTS = {
 
 
 class Checker:
-    def __init__(self, admin: OdooClient, agent: OdooClient | None, ds: Dataset) -> None:
+    def __init__(
+        self,
+        admin: OdooClient,
+        agent: OdooClient | None,
+        ds: Dataset,
+        *,
+        env_names: Callable[[], dict[str, list[str]]] = container_env_names,
+        conf_option: Callable[[str], str | None] = odoo_conf_option,
+    ) -> None:
         self.c = admin
         self.agent = agent
         self.ds = ds
         self.x = XmlIds(admin)
         self.rows: list[tuple[str, str, str]] = []
+        self.env_names = env_names
+        self.conf_option = conf_option
 
     # -- helpers ------------------------------------------------------------------------------
 
@@ -590,6 +606,32 @@ class Checker:
             None,
         )
 
+    # -- local runtime (ADR-0003, tinjauan M0) -------------------------------------------------
+
+    def check_runtime(self) -> None:
+        cron = self.conf_option("max_cron_threads")
+        self.row(
+            "Cron Odoo mati (infra/odoo/odoo.conf)",
+            f"max_cron_threads = {cron}" if cron is not None else "max_cron_threads tidak diatur",
+            cron is not None and cron.strip() == "0",
+        )
+        title = "Env kontainer tanpa rahasia aplikasi (nama saja)"
+        try:
+            names = self.env_names()
+        except (RuntimeError, OSError) as exc:
+            self.row(title, f"tidak bisa membaca env kontainer: {exc}", False)
+            return
+        bad = forbidden_env(names)
+        if bad:
+            result = "; ".join(f"{c}: {', '.join(v)}" for c, v in bad.items())
+        elif not names:
+            result = "tidak ada kontainer fakturberes yang berjalan"
+        else:
+            result = f"{len(names)} kontainer, tanpa {len(FORBIDDEN_CONTAINER_ENV)} nama terlarang"
+        self.row(title, result, bool(names) and not bad)
+        for container, env in names.items():
+            self.row(f"Nama env {container}", ", ".join(env), None)
+
     # -- run ------------------------------------------------------------------------------------
 
     def run(self) -> None:
@@ -605,6 +647,7 @@ class Checker:
         self.check_scenario_needs()
         self.check_label_leak()
         self.check_agent()
+        self.check_runtime()
 
 
 def main() -> int:
