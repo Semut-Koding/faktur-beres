@@ -680,6 +680,24 @@ Disimpan di berkas konfigurasi kebijakan (dibuat M2) dan dibaca kode (BR-28).
 | Tunggu balasan vendor | 5 hari kerja, 1 pengingat | BR-19 |
 | Domain email internal | `arunika.test` | BR-25 |
 
+### 15.6 Pemetaan UBL
+E-invoice uji memakai UBL 2.1 Invoice (`urn:oasis:names:specification:ubl:schema:xsd:Invoice-2`) dengan `cbc:CustomizationID` `urn:cen.eu:en16931:2017#extended#urn:fakturberes:id-ppn:1.0`, `cbc:InvoiceTypeCode` 380, dan `cbc:DocumentCurrencyCode` IDR. Semua nilai uang memakai `currencyID="IDR"` dan dua desimal (`24975000.00`). Tabel ini menjadi kontrak parser UBL (M3); generator (M1) menulis berkas sesuai tabel ini dan teruji dengan pembacaan balik XPath.
+
+| Data | Elemen |
+|---|---|
+| Nomor, tanggal, jatuh tempo | `cbc:ID`, `cbc:IssueDate`, `cbc:DueDate` |
+| Catatan | `cbc:Note` (boleh lebih dari satu; tetap diperiksa indikasi injeksi, F-03) |
+| Nomor PO | `cac:OrderReference/cbc:ID` |
+| NSFP | `cac:AdditionalDocumentReference` dengan `cbc:ID` = NSFP dan `cbc:DocumentDescription` = "Faktur Pajak" |
+| Tanggal faktur pajak | `cbc:IssueDate` di dalam `cac:AdditionalDocumentReference` yang sama |
+| Penjual dan pembeli | `cac:AccountingSupplierParty` dan `cac:AccountingCustomerParty`: `cac:PartyLegalEntity/cbc:RegistrationName`, `cac:PostalAddress` (`cbc:StreetName`, `cbc:CityName`, `cbc:PostalZone`, `cbc:CountrySubentity`, `cac:Country/cbc:IdentificationCode`), `cac:PartyTaxScheme/cbc:CompanyID` (NPWP) dengan `cac:TaxScheme/cbc:ID` = VAT, `cac:Contact/cbc:ElectronicMail`. NPWP yang tidak dicantumkan berarti `cac:PartyTaxScheme` tidak ada. |
+| Rekening | `cac:PaymentMeans`: `cbc:PaymentMeansCode` 30, `cac:PayeeFinancialAccount/cbc:ID` (nomor), `cbc:Name` (atas nama), `cac:FinancialInstitutionBranch/cbc:Name` (bank) |
+| Baris | `cac:InvoiceLine`: `cbc:ID`, `cbc:InvoicedQuantity@unitCode` (KGM untuk kg, H87 untuk satuan unit), `cbc:LineExtensionAmount`, `cac:Item/cbc:Name`, `cac:Item/cac:SellersItemIdentification/cbc:ID`, `cac:Item/cac:ClassifiedTaxCategory` (S, 12, VAT), `cac:Price/cbc:PriceAmount` |
+| Pajak | `cac:TaxTotal/cbc:TaxAmount` = PPN; `cac:TaxSubtotal`: `cbc:TaxableAmount` = DPP nilai lain, `cbc:TaxAmount` = PPN, `cac:TaxCategory` (S, 12, VAT) |
+| Total | `cac:LegalMonetaryTotal`: `cbc:LineExtensionAmount` dan `cbc:TaxExclusiveAmount` = harga jual, `cbc:TaxInclusiveAmount` dan `cbc:PayableAmount` = total |
+
+**Penyimpangan dari EN 16931 (disengaja).** Aturan BR-S-08 meminta `cbc:TaxableAmount` kategori S sama dengan jumlah `cbc:LineExtensionAmount` baris. Untuk PPN Indonesia (PMK 131/2024), Faktur Beres menulis **DPP nilai lain** (11/12 × harga jual) di `cbc:TaxableAmount` dengan `cbc:Percent` 12, sehingga `cbc:TaxAmount` = 12% × DPP nilai lain = 11% × harga jual. Parser M3 membaca harga jual dari `cac:LegalMonetaryTotal/cbc:LineExtensionAmount` dan DPP nilai lain dari `cbc:TaxableAmount`; validator EN 16931 umum akan menandai berkas ini melanggar BR-S-08 (lihat §14).
+
 ---
 
 ## 16. Riwayat versi
