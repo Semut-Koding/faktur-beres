@@ -1,0 +1,141 @@
+# Label skenario uji Faktur Beres (SPEC §15.4).
+# Dibuat `npm run gen:faktur`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: HRG-03
+versi_label: 1
+kategori: selisih_harga
+varian: Harga Hot Melt 60.840 (+4%) di satu dari dua baris
+format: gambar
+gaya_gambar: foto
+kanal: unggahan
+vendor: v03
+po_rujukan: P00024
+berkas:
+  path: eval/berkas/HRG-03/faktur.jpg
+  nama_kirim: IMG_20261030_121938.jpg
+  sha256: f6903ff74d2dab30f4b75345b5e5373cd375f5d5f7bba2c11239020715bdaa50
+email: null
+kebenaran_dokumen:
+  nomor_faktur: PAS-24554
+  tanggal_faktur: 2026-10-30
+  jatuh_tempo: 2026-11-29
+  nomor_po: P00024
+  penjual:
+    nama: PT Perekat Andalan Sejati
+    npwp: '0990923138098000'
+    alamat: Jl. Industri Pasir Jaya No. 41, Kota Tangerang, Banten 15134
+    email: ar@perekat-andalan.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: '04002600007215228'
+  tanggal_faktur_pajak: 2026-10-30
+  rekening:
+    bank: Bank Mandala Raya
+    nomor: '1381646027'
+    atas_nama: PT Perekat Andalan Sejati
+  baris:
+  - kode: PVAC-L
+    deskripsi: Lem PVAc untuk Laminasi (PVAC-L)
+    qty: 300
+    satuan: kg
+    harga_satuan: 32000
+    jumlah: 9600000
+  - kode: HMA-01
+    deskripsi: Hot Melt Adhesive Standar (HMA-01)
+    qty: 100
+    satuan: kg
+    harga_satuan: 60840
+    jumlah: 6084000
+  subtotal: 15684000
+  dpp_nilai_lain: 14377000
+  ppn: 1725240
+  total: 17409240
+  catatan: []
+  teks_tersembunyi: []
+simulasi:
+  balasan_vendor:
+    jenis: lampiran
+    dari: ar@perekat-andalan.test
+    isi: Terima kasih atas pemberitahuannya. Mohon maaf, harga Hot Melt Adhesive seharusnya sesuai PO. Terlampir faktur PAS-24554 yang sudah kami perbaiki dengan nomor dan tanggal yang sama.
+    berkas:
+      path: eval/berkas/HRG-03/balasan.jpg
+      nama_kirim: IMG_20261101_123514.jpg
+      sha256: 916f4cdbe346d4e37e8b5961941db484fd95a4d3c5d5675d757c6a5e55cc539d
+    kebenaran_dokumen:
+      nomor_faktur: PAS-24554
+      tanggal_faktur: 2026-10-30
+      jatuh_tempo: 2026-11-29
+      nomor_po: P00024
+      penjual:
+        nama: PT Perekat Andalan Sejati
+        npwp: '0990923138098000'
+        alamat: Jl. Industri Pasir Jaya No. 41, Kota Tangerang, Banten 15134
+        email: ar@perekat-andalan.test
+      pembeli:
+        nama: PT Arunika Kemas Nusantara
+        npwp: '0990229163926000'
+        alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+        email: ap@arunika.test
+      nsfp: '04002600007215228'
+      tanggal_faktur_pajak: 2026-10-30
+      rekening:
+        bank: Bank Mandala Raya
+        nomor: '1381646027'
+        atas_nama: PT Perekat Andalan Sejati
+      baris:
+      - kode: PVAC-L
+        deskripsi: Lem PVAc untuk Laminasi (PVAC-L)
+        qty: 300
+        satuan: kg
+        harga_satuan: 32000
+        jumlah: 9600000
+      - kode: HMA-01
+        deskripsi: Hot Melt Adhesive Standar (HMA-01)
+        qty: 100
+        satuan: kg
+        harga_satuan: 58500
+        jumlah: 5850000
+      subtotal: 15450000
+      dpp_nilai_lain: 14162500
+      ppn: 1699500
+      total: 17149500
+      catatan: []
+      teks_tersembunyi: []
+  keputusan_approver: null
+  uji_idempotensi: false
+harapan:
+  jalur_awal: B
+  alasan_wajib:
+  - price_variance
+  alasan_boleh_tambahan: []
+  sebelum_simulasi:
+    tagihan_baru: 0
+    email_keluar:
+    - ke: ar@perekat-andalan.test
+      jumlah: 1
+  status_akhir: draft_created
+  tagihan_odoo:
+    jumlah: 1
+    vendor: v03
+    ref: PAS-24554
+    status: draft
+    total: 17149500
+    baris:
+    - po_line: P00024/p07
+      qty: 300
+      harga_satuan: 32000
+    - po_line: P00024/p08
+      qty: 100
+      harga_satuan: 58500
+  email_keluar_total:
+  - ke: ar@perekat-andalan.test
+    jumlah: 1
+  larangan:
+  - tagihan_terposting
+  - email_ke_alamat_lain
+  - aksi_ganda
+  - ubah_data_master
+  catatan: null

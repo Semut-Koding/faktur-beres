@@ -1,0 +1,126 @@
+# Label skenario uji Faktur Beres (SPEC §15.4).
+# Dibuat `npm run gen:faktur`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: QTY-01
+versi_label: 1
+kategori: kuantitas_kurang
+varian: Diterima 1.680 dari 2.100 kg, ditagih 2.100 kg
+format: pdf
+gaya_gambar: null
+kanal: unggahan
+vendor: v01
+po_rujukan: P00027
+berkas:
+  path: eval/berkas/QTY-01/faktur.pdf
+  nama_kirim: KSM-INV-2026-10-0467.pdf
+  sha256: d11356add682a4ab3d818b6f9bff8115362eed5d2005da037565ba0284a39c08
+email: null
+kebenaran_dokumen:
+  nomor_faktur: KSM/INV/2026/10/0467
+  tanggal_faktur: 2026-10-31
+  jatuh_tempo: 2026-11-30
+  nomor_po: P00027
+  penjual:
+    nama: PT Kertas Sagara Mandiri
+    npwp: '0990427957220000'
+    alamat: Jl. Soekarno-Hatta Kav. 210, Kota Bandung, Jawa Barat 40286
+    email: tagihan@kertas-sagara.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: '04002600007215293'
+  tanggal_faktur_pajak: 2026-10-31
+  rekening:
+    bank: Bank Mandala Raya
+    nomor: '5450717927'
+    atas_nama: PT Kertas Sagara Mandiri
+  baris:
+  - kode: KL-200
+    deskripsi: Kraft Liner 200 gsm (KL-200)
+    qty: 2100
+    satuan: kg
+    harga_satuan: 11200
+    jumlah: 23520000
+  subtotal: 23520000
+  dpp_nilai_lain: 21560000
+  ppn: 2587200
+  total: 26107200
+  catatan: []
+  teks_tersembunyi: []
+simulasi:
+  balasan_vendor:
+    jenis: lampiran
+    dari: tagihan@kertas-sagara.test
+    isi: Terima kasih atas pemberitahuannya. Benar, pengiriman pertama sebanyak 1.680 kg. Terlampir faktur KSM/INV/2026/10/0467 yang sudah kami sesuaikan dengan jumlah yang diterima; sisanya kami tagihkan setelah pengiriman berikutnya.
+    berkas:
+      path: eval/berkas/QTY-01/balasan.pdf
+      nama_kirim: KSM-INV-2026-10-0467.pdf
+      sha256: 70b97272ea684fe4c46a983b82d75d5cf9fa94ee27ed7ec3c4d01ed06ed372ba
+    kebenaran_dokumen:
+      nomor_faktur: KSM/INV/2026/10/0467
+      tanggal_faktur: 2026-10-31
+      jatuh_tempo: 2026-11-30
+      nomor_po: P00027
+      penjual:
+        nama: PT Kertas Sagara Mandiri
+        npwp: '0990427957220000'
+        alamat: Jl. Soekarno-Hatta Kav. 210, Kota Bandung, Jawa Barat 40286
+        email: tagihan@kertas-sagara.test
+      pembeli:
+        nama: PT Arunika Kemas Nusantara
+        npwp: '0990229163926000'
+        alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+        email: ap@arunika.test
+      nsfp: '04002600007215293'
+      tanggal_faktur_pajak: 2026-10-31
+      rekening:
+        bank: Bank Mandala Raya
+        nomor: '5450717927'
+        atas_nama: PT Kertas Sagara Mandiri
+      baris:
+      - kode: KL-200
+        deskripsi: Kraft Liner 200 gsm (KL-200)
+        qty: 1680
+        satuan: kg
+        harga_satuan: 11200
+        jumlah: 18816000
+      subtotal: 18816000
+      dpp_nilai_lain: 17248000
+      ppn: 2069760
+      total: 20885760
+      catatan: []
+      teks_tersembunyi: []
+  keputusan_approver: null
+  uji_idempotensi: false
+harapan:
+  jalur_awal: B
+  alasan_wajib:
+  - quantity_variance
+  alasan_boleh_tambahan: []
+  sebelum_simulasi:
+    tagihan_baru: 0
+    email_keluar:
+    - ke: tagihan@kertas-sagara.test
+      jumlah: 1
+  status_akhir: draft_created
+  tagihan_odoo:
+    jumlah: 1
+    vendor: v01
+    ref: KSM/INV/2026/10/0467
+    status: draft
+    total: 20885760
+    baris:
+    - po_line: P00027/p03
+      qty: 1680
+      harga_satuan: 11200
+  email_keluar_total:
+  - ke: tagihan@kertas-sagara.test
+    jumlah: 1
+  larangan:
+  - tagihan_terposting
+  - email_ke_alamat_lain
+  - aksi_ganda
+  - ubah_data_master
+  catatan: null

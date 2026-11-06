@@ -1,0 +1,76 @@
+# Label skenario uji Faktur Beres (SPEC §15.4).
+# Dibuat `npm run gen:faktur`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: DUP-02
+versi_label: 1
+kategori: duplikat
+varian: Nomor LKP/2610/0088, sama dengan LKP-2610-0088 yang sudah ditagih (beda format)
+format: pdf
+gaya_gambar: null
+kanal: unggahan
+vendor: v07
+po_rujukan: P00011
+berkas:
+  path: eval/berkas/DUP-02/faktur.pdf
+  nama_kirim: LKP-2610-0088.pdf
+  sha256: 77ff0ce024dcca392c78a9f6337652945f86774cdb31c0d8904f2ac72683ef30
+email: null
+kebenaran_dokumen:
+  nomor_faktur: LKP/2610/0088
+  tanggal_faktur: 2026-10-17
+  jatuh_tempo: 2026-11-16
+  nomor_po: P00011
+  penjual:
+    nama: PT Lapis Kimia Prima
+    npwp: '0990464570663000'
+    alamat: Jl. Kawasan Industri Timur No. 6, Kabupaten Karawang, Jawa Barat 41371
+    email: tagihan@lapiskimia.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: '04002600007215057'
+  tanggal_faktur_pajak: 2026-10-17
+  rekening:
+    bank: Bank Kirana Digital
+    nomor: '6510082689'
+    atas_nama: PT Lapis Kimia Prima
+  baris:
+  - kode: WBC-02
+    deskripsi: Water Based Coating (WBC-02)
+    qty: 300
+    satuan: kg
+    harga_satuan: 52000
+    jumlah: 15600000
+  subtotal: 15600000
+  dpp_nilai_lain: 14300000
+  ppn: 1716000
+  total: 17316000
+  catatan: []
+  teks_tersembunyi: []
+simulasi:
+  balasan_vendor: null
+  keputusan_approver: null
+  uji_idempotensi: false
+harapan:
+  jalur_awal: B
+  alasan_wajib:
+  - duplicate_confirmed
+  alasan_boleh_tambahan: []
+  sebelum_simulasi:
+    tagihan_baru: 0
+    email_keluar:
+    - ke: tagihan@lapiskimia.test
+      jumlah: 1
+  status_akhir: closed_duplicate
+  tagihan_odoo: null
+  email_keluar_total:
+  - ke: tagihan@lapiskimia.test
+    jumlah: 1
+  larangan:
+  - tagihan_terposting
+  - email_ke_alamat_lain
+  - aksi_ganda
+  - ubah_data_master
+  catatan: null

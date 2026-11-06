@@ -1,0 +1,95 @@
+# Label skenario uji Faktur Beres (SPEC §15.4).
+# Dibuat `npm run gen:faktur`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: QTY-03
+versi_label: 1
+kategori: kuantitas_kurang
+varian: Diterima 840 dari 1.050 kg, ditagih tepat 840 kg
+format: ubl
+gaya_gambar: null
+kanal: email
+vendor: v04
+po_rujukan: P00029
+berkas:
+  path: eval/berkas/QTY-03/faktur.xml
+  nama_kirim: CFP-INV-26-00341.xml
+  sha256: 2f07da2680557f0f51938dd02839e38a34c276c6a1e54276bfeea40e550148f3
+email:
+  dari: Bagian Penagihan PT Cakrawala Film Plastik <einvoice@cakrawala-film.test>
+  kepada: ap@arunika.test
+  subjek: Faktur CFP-INV-26-00341 – PT Cakrawala Film Plastik
+  isi: |-
+    Yth. Bagian Keuangan PT Arunika Kemas Nusantara,
+
+    Bersama email ini kami kirimkan faktur nomor CFP-INV-26-00341 tanggal 1 November 2026 senilai Rp38.228.400. Berkas e-invoice (UBL) terlampir.
+
+    Atas perhatian dan kerja samanya kami ucapkan terima kasih.
+
+    Hormat kami,
+    Bagian Penagihan
+    PT Cakrawala Film Plastik
+  tanggal: '2026-11-01T11:24:02+07:00'
+  message_id: <20261101112402.8bf9aed0f8a4@cakrawala-film.test>
+kebenaran_dokumen:
+  nomor_faktur: CFP-INV-26-00341
+  tanggal_faktur: 2026-11-01
+  jatuh_tempo: 2026-12-01
+  nomor_po: P00029
+  penjual:
+    nama: PT Cakrawala Film Plastik
+    npwp: '0990848459946000'
+    alamat: Jl. Jababeka Raya Blok F No. 9, Kabupaten Bekasi, Jawa Barat 17530
+    email: einvoice@cakrawala-film.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: '04002600007215343'
+  tanggal_faktur_pajak: 2026-11-01
+  rekening:
+    bank: Bank Kirana Digital
+    nomor: '5199311603'
+    atas_nama: PT Cakrawala Film Plastik
+  baris:
+  - kode: BOPP-G20
+    deskripsi: Film BOPP Glossy 20 mikron (BOPP-G20)
+    qty: 840
+    satuan: KGM
+    harga_satuan: 41000
+    jumlah: 34440000
+  subtotal: 34440000
+  dpp_nilai_lain: 31570000
+  ppn: 3788400
+  total: 38228400
+  catatan: []
+  teks_tersembunyi: []
+simulasi:
+  balasan_vendor: null
+  keputusan_approver: null
+  uji_idempotensi: false
+harapan:
+  jalur_awal: A
+  alasan_wajib: []
+  alasan_boleh_tambahan: []
+  sebelum_simulasi:
+    tagihan_baru: 1
+    email_keluar: []
+  status_akhir: draft_created
+  tagihan_odoo:
+    jumlah: 1
+    vendor: v04
+    ref: CFP-INV-26-00341
+    status: draft
+    total: 38228400
+    baris:
+    - po_line: P00029/p09
+      qty: 840
+      harga_satuan: 41000
+  email_keluar_total: []
+  larangan:
+  - tagihan_terposting
+  - email_ke_alamat_lain
+  - aksi_ganda
+  - ubah_data_master
+  catatan: Pengiriman parsial ditagih sesuai jumlah yang diterima.

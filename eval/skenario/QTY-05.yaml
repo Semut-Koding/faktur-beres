@@ -1,0 +1,141 @@
+# Label skenario uji Faktur Beres (SPEC §15.4).
+# Dibuat `npm run gen:faktur`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: QTY-05
+versi_label: 1
+kategori: kuantitas_kurang
+varian: Ditagih 3.300 lembar, PO dan penerimaan 3.000
+format: pdf
+gaya_gambar: null
+kanal: email
+vendor: v08
+po_rujukan: P00031
+berkas:
+  path: eval/berkas/QTY-05/faktur.pdf
+  nama_kirim: INV-2026-0403.pdf
+  sha256: 876818c98f4fac8d659be1941e296e596ec18ac2146eda141764bf97ef4e3de9
+email:
+  dari: Bagian Penagihan CV Gelombang Karton Sentosa <keuangan@gelombangkarton.test>
+  kepada: ap@arunika.test
+  subjek: Faktur INV-2026-0403 – CV Gelombang Karton Sentosa
+  isi: |-
+    Yth. Bagian Keuangan PT Arunika Kemas Nusantara,
+
+    Bersama email ini kami kirimkan faktur nomor INV-2026-0403 tanggal 1 November 2026 senilai Rp17.765.550. Berkas faktur terlampir.
+
+    Atas perhatian dan kerja samanya kami ucapkan terima kasih.
+
+    Hormat kami,
+    Bagian Penagihan
+    CV Gelombang Karton Sentosa
+  tanggal: '2026-11-01T10:22:17+07:00'
+  message_id: <20261101102217.13f0de5e16df@gelombangkarton.test>
+kebenaran_dokumen:
+  nomor_faktur: INV-2026-0403
+  tanggal_faktur: 2026-11-01
+  jatuh_tempo: 2026-12-01
+  nomor_po: P00031
+  penjual:
+    nama: CV Gelombang Karton Sentosa
+    npwp: '0990849788875000'
+    alamat: Jl. Raya Sadang No. 112, Kabupaten Purwakarta, Jawa Barat 41181
+    email: keuangan@gelombangkarton.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: '04002600007215375'
+  tanggal_faktur_pajak: 2026-11-01
+  rekening:
+    bank: Bank Kencana Utama
+    nomor: '1389584420'
+    atas_nama: CV Gelombang Karton Sentosa
+  baris:
+  - kode: BF-SHT
+    deskripsi: Karton Gelombang B-Flute per lembar (BF-SHT)
+    qty: 3300
+    satuan: lembar
+    harga_satuan: 4850
+    jumlah: 16005000
+  subtotal: 16005000
+  dpp_nilai_lain: 14671250
+  ppn: 1760550
+  total: 17765550
+  catatan: []
+  teks_tersembunyi: []
+simulasi:
+  balasan_vendor:
+    jenis: lampiran
+    dari: keuangan@gelombangkarton.test
+    isi: Terima kasih atas pemberitahuannya. Jumlah yang kami kirim memang 3.000 lembar. Terlampir faktur INV-2026-0403 yang sudah kami perbaiki.
+    berkas:
+      path: eval/berkas/QTY-05/balasan.pdf
+      nama_kirim: INV-2026-0403.pdf
+      sha256: 3f394052f10d2f8092118749571cbc053827060f976b07061633c0c7f0cfda7a
+    kebenaran_dokumen:
+      nomor_faktur: INV-2026-0403
+      tanggal_faktur: 2026-11-01
+      jatuh_tempo: 2026-12-01
+      nomor_po: P00031
+      penjual:
+        nama: CV Gelombang Karton Sentosa
+        npwp: '0990849788875000'
+        alamat: Jl. Raya Sadang No. 112, Kabupaten Purwakarta, Jawa Barat 41181
+        email: keuangan@gelombangkarton.test
+      pembeli:
+        nama: PT Arunika Kemas Nusantara
+        npwp: '0990229163926000'
+        alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+        email: ap@arunika.test
+      nsfp: '04002600007215375'
+      tanggal_faktur_pajak: 2026-11-01
+      rekening:
+        bank: Bank Kencana Utama
+        nomor: '1389584420'
+        atas_nama: CV Gelombang Karton Sentosa
+      baris:
+      - kode: BF-SHT
+        deskripsi: Karton Gelombang B-Flute per lembar (BF-SHT)
+        qty: 3000
+        satuan: lembar
+        harga_satuan: 4850
+        jumlah: 14550000
+      subtotal: 14550000
+      dpp_nilai_lain: 13337500
+      ppn: 1600500
+      total: 16150500
+      catatan: []
+      teks_tersembunyi: []
+  keputusan_approver: null
+  uji_idempotensi: false
+harapan:
+  jalur_awal: B
+  alasan_wajib:
+  - quantity_variance
+  alasan_boleh_tambahan: []
+  sebelum_simulasi:
+    tagihan_baru: 0
+    email_keluar:
+    - ke: keuangan@gelombangkarton.test
+      jumlah: 1
+  status_akhir: draft_created
+  tagihan_odoo:
+    jumlah: 1
+    vendor: v08
+    ref: INV-2026-0403
+    status: draft
+    total: 16150500
+    baris:
+    - po_line: P00031/p17
+      qty: 3000
+      harga_satuan: 4850
+  email_keluar_total:
+  - ke: keuangan@gelombangkarton.test
+    jumlah: 1
+  larangan:
+  - tagihan_terposting
+  - email_ke_alamat_lain
+  - aksi_ganda
+  - ubah_data_master
+  catatan: null

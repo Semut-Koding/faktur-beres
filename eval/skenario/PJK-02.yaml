@@ -1,0 +1,141 @@
+# Label skenario uji Faktur Beres (SPEC §15.4).
+# Dibuat `npm run gen:faktur`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: PJK-02
+versi_label: 1
+kategori: pajak_tidak_lengkap
+varian: NSFP tidak ada
+format: pdf
+gaya_gambar: null
+kanal: email
+vendor: v06
+po_rujukan: P00039
+berkas:
+  path: eval/berkas/PJK-02/faktur.pdf
+  nama_kirim: INV-2026-0442.pdf
+  sha256: 34c5172a7ed570334318b03010069f4a7e7295899fafa80191ce1ff13fb2bd26
+email:
+  dari: Bagian Penagihan PT Presisi Suku Cadang Mesin <billing@presisi-sukucadang.test>
+  kepada: ap@arunika.test
+  subjek: Faktur INV-2026-0442 – PT Presisi Suku Cadang Mesin
+  isi: |-
+    Yth. Bagian Keuangan PT Arunika Kemas Nusantara,
+
+    Bersama email ini kami kirimkan faktur nomor INV-2026-0442 tanggal 4 November 2026 senilai Rp6.327.000. Berkas faktur terlampir.
+
+    Atas perhatian dan kerja samanya kami ucapkan terima kasih.
+
+    Hormat kami,
+    Bagian Penagihan
+    PT Presisi Suku Cadang Mesin
+  tanggal: '2026-11-04T10:19:40+07:00'
+  message_id: <20261104101940.653725da6370@presisi-sukucadang.test>
+kebenaran_dokumen:
+  nomor_faktur: INV-2026-0442
+  tanggal_faktur: 2026-11-04
+  jatuh_tempo: 2026-12-04
+  nomor_po: P00039
+  penjual:
+    nama: PT Presisi Suku Cadang Mesin
+    npwp: '0990769515376000'
+    alamat: Jl. Gaya Motor Raya No. 15, Kota Jakarta Utara, DKI Jakarta 14350
+    email: billing@presisi-sukucadang.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: null
+  tanggal_faktur_pajak: null
+  rekening:
+    bank: Bank Mandala Raya
+    nomor: '2029942748'
+    atas_nama: PT Presisi Suku Cadang Mesin
+  baris:
+  - kode: BRG-6205
+    deskripsi: Bearing 6205-2RS (BRG-6205)
+    qty: 60
+    satuan: pcs
+    harga_satuan: 95000
+    jumlah: 5700000
+  subtotal: 5700000
+  dpp_nilai_lain: 5225000
+  ppn: 627000
+  total: 6327000
+  catatan: []
+  teks_tersembunyi: []
+simulasi:
+  balasan_vendor:
+    jenis: lampiran
+    dari: billing@presisi-sukucadang.test
+    isi: Terima kasih atas pemberitahuannya. Terlampir faktur INV-2026-0442 yang sudah mencantumkan nomor seri faktur pajak.
+    berkas:
+      path: eval/berkas/PJK-02/balasan.pdf
+      nama_kirim: INV-2026-0442.pdf
+      sha256: 1c8153e440cac3aec60b08d2c370277b214d778c3736822bbb54269a3231532a
+    kebenaran_dokumen:
+      nomor_faktur: INV-2026-0442
+      tanggal_faktur: 2026-11-04
+      jatuh_tempo: 2026-12-04
+      nomor_po: P00039
+      penjual:
+        nama: PT Presisi Suku Cadang Mesin
+        npwp: '0990769515376000'
+        alamat: Jl. Gaya Motor Raya No. 15, Kota Jakarta Utara, DKI Jakarta 14350
+        email: billing@presisi-sukucadang.test
+      pembeli:
+        nama: PT Arunika Kemas Nusantara
+        npwp: '0990229163926000'
+        alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+        email: ap@arunika.test
+      nsfp: '04002600007215723'
+      tanggal_faktur_pajak: 2026-11-04
+      rekening:
+        bank: Bank Mandala Raya
+        nomor: '2029942748'
+        atas_nama: PT Presisi Suku Cadang Mesin
+      baris:
+      - kode: BRG-6205
+        deskripsi: Bearing 6205-2RS (BRG-6205)
+        qty: 60
+        satuan: pcs
+        harga_satuan: 95000
+        jumlah: 5700000
+      subtotal: 5700000
+      dpp_nilai_lain: 5225000
+      ppn: 627000
+      total: 6327000
+      catatan: []
+      teks_tersembunyi: []
+  keputusan_approver: null
+  uji_idempotensi: false
+harapan:
+  jalur_awal: B
+  alasan_wajib:
+  - tax_invalid
+  alasan_boleh_tambahan: []
+  sebelum_simulasi:
+    tagihan_baru: 0
+    email_keluar:
+    - ke: billing@presisi-sukucadang.test
+      jumlah: 1
+  status_akhir: draft_created
+  tagihan_odoo:
+    jumlah: 1
+    vendor: v06
+    ref: INV-2026-0442
+    status: draft
+    total: 6327000
+    baris:
+    - po_line: P00039/p14
+      qty: 60
+      harga_satuan: 95000
+  email_keluar_total:
+  - ke: billing@presisi-sukucadang.test
+    jumlah: 1
+  larangan:
+  - tagihan_terposting
+  - email_ke_alamat_lain
+  - aksi_ganda
+  - ubah_data_master
+  catatan: null

@@ -1,0 +1,141 @@
+# Label skenario uji Faktur Beres (SPEC §15.4).
+# Dibuat `npm run gen:faktur`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: PJK-01
+versi_label: 1
+kategori: pajak_tidak_lengkap
+varian: NPWP penjual tidak ada
+format: ubl
+gaya_gambar: null
+kanal: email
+vendor: v01
+po_rujukan: P00038
+berkas:
+  path: eval/berkas/PJK-01/faktur.xml
+  nama_kirim: KSM-INV-2026-11-0475.xml
+  sha256: ee1df95e9c0fd39cb248cd58ee24166470abb42e1895e0f2147ae23368bdb625
+email:
+  dari: Bagian Penagihan PT Kertas Sagara Mandiri <tagihan@kertas-sagara.test>
+  kepada: ap@arunika.test
+  subjek: Faktur KSM/INV/2026/11/0475 – PT Kertas Sagara Mandiri
+  isi: |-
+    Yth. Bagian Keuangan PT Arunika Kemas Nusantara,
+
+    Bersama email ini kami kirimkan faktur nomor KSM/INV/2026/11/0475 tanggal 4 November 2026 senilai Rp14.918.400. Berkas e-invoice (UBL) terlampir.
+
+    Atas perhatian dan kerja samanya kami ucapkan terima kasih.
+
+    Hormat kami,
+    Bagian Penagihan
+    PT Kertas Sagara Mandiri
+  tanggal: '2026-11-04T13:45:32+07:00'
+  message_id: <20261104134532.baf4b00f8459@kertas-sagara.test>
+kebenaran_dokumen:
+  nomor_faktur: KSM/INV/2026/11/0475
+  tanggal_faktur: 2026-11-04
+  jatuh_tempo: 2026-12-04
+  nomor_po: P00038
+  penjual:
+    nama: PT Kertas Sagara Mandiri
+    npwp: null
+    alamat: Jl. Soekarno-Hatta Kav. 210, Kota Bandung, Jawa Barat 40286
+    email: tagihan@kertas-sagara.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: '04002600007215496'
+  tanggal_faktur_pajak: 2026-11-04
+  rekening:
+    bank: Bank Mandala Raya
+    nomor: '5450717927'
+    atas_nama: PT Kertas Sagara Mandiri
+  baris:
+  - kode: KL-200
+    deskripsi: Kraft Liner 200 gsm (KL-200)
+    qty: 1200
+    satuan: KGM
+    harga_satuan: 11200
+    jumlah: 13440000
+  subtotal: 13440000
+  dpp_nilai_lain: 12320000
+  ppn: 1478400
+  total: 14918400
+  catatan: []
+  teks_tersembunyi: []
+simulasi:
+  balasan_vendor:
+    jenis: lampiran
+    dari: tagihan@kertas-sagara.test
+    isi: Terima kasih atas pemberitahuannya. Terlampir e-invoice KSM/INV/2026/11/0475 yang sudah dilengkapi NPWP kami.
+    berkas:
+      path: eval/berkas/PJK-01/balasan.xml
+      nama_kirim: KSM-INV-2026-11-0475.xml
+      sha256: 1e5a9af4d906bb282918c20adfce6cb1b163ed11d911a41faef8fda005845372
+    kebenaran_dokumen:
+      nomor_faktur: KSM/INV/2026/11/0475
+      tanggal_faktur: 2026-11-04
+      jatuh_tempo: 2026-12-04
+      nomor_po: P00038
+      penjual:
+        nama: PT Kertas Sagara Mandiri
+        npwp: '0990427957220000'
+        alamat: Jl. Soekarno-Hatta Kav. 210, Kota Bandung, Jawa Barat 40286
+        email: tagihan@kertas-sagara.test
+      pembeli:
+        nama: PT Arunika Kemas Nusantara
+        npwp: '0990229163926000'
+        alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+        email: ap@arunika.test
+      nsfp: '04002600007215496'
+      tanggal_faktur_pajak: 2026-11-04
+      rekening:
+        bank: Bank Mandala Raya
+        nomor: '5450717927'
+        atas_nama: PT Kertas Sagara Mandiri
+      baris:
+      - kode: KL-200
+        deskripsi: Kraft Liner 200 gsm (KL-200)
+        qty: 1200
+        satuan: KGM
+        harga_satuan: 11200
+        jumlah: 13440000
+      subtotal: 13440000
+      dpp_nilai_lain: 12320000
+      ppn: 1478400
+      total: 14918400
+      catatan: []
+      teks_tersembunyi: []
+  keputusan_approver: null
+  uji_idempotensi: false
+harapan:
+  jalur_awal: B
+  alasan_wajib:
+  - tax_invalid
+  alasan_boleh_tambahan: []
+  sebelum_simulasi:
+    tagihan_baru: 0
+    email_keluar:
+    - ke: tagihan@kertas-sagara.test
+      jumlah: 1
+  status_akhir: draft_created
+  tagihan_odoo:
+    jumlah: 1
+    vendor: v01
+    ref: KSM/INV/2026/11/0475
+    status: draft
+    total: 14918400
+    baris:
+    - po_line: P00038/p03
+      qty: 1200
+      harga_satuan: 11200
+  email_keluar_total:
+  - ke: tagihan@kertas-sagara.test
+    jumlah: 1
+  larangan:
+  - tagihan_terposting
+  - email_ke_alamat_lain
+  - aksi_ganda
+  - ubah_data_master
+  catatan: null

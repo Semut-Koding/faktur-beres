@@ -1,0 +1,156 @@
+# Label skenario uji Faktur Beres (SPEC §15.4).
+# Dibuat `npm run gen:faktur`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: QTY-02
+versi_label: 1
+kategori: kuantitas_kurang
+varian: Tinta Hitam diterima 30 dari 60 kg, ditagih 60 kg
+format: pdf
+gaya_gambar: null
+kanal: email
+vendor: v02
+po_rujukan: P00028
+berkas:
+  path: eval/berkas/QTY-02/faktur.pdf
+  nama_kirim: TWL-INV-2610-0174.pdf
+  sha256: 2a681ea52979a8704a13e96fa5bec156b0095c3b371e32ef203805ffe6161f95
+email:
+  dari: Bagian Penagihan CV Tinta Warna Lestari <finance@tintawarna.test>
+  kepada: ap@arunika.test
+  subjek: Faktur TWL/INV/2610/0174 – CV Tinta Warna Lestari
+  isi: |-
+    Yth. Bagian Keuangan PT Arunika Kemas Nusantara,
+
+    Bersama email ini kami kirimkan faktur nomor TWL/INV/2610/0174 tanggal 31 Oktober 2026 senilai Rp19.513.800. Berkas faktur terlampir.
+
+    Atas perhatian dan kerja samanya kami ucapkan terima kasih.
+
+    Hormat kami,
+    Bagian Penagihan
+    CV Tinta Warna Lestari
+  tanggal: '2026-10-31T14:45:06+07:00'
+  message_id: <20261031144506.882f189618c6@tintawarna.test>
+kebenaran_dokumen:
+  nomor_faktur: TWL/INV/2610/0174
+  tanggal_faktur: 2026-10-31
+  jatuh_tempo: 2026-11-30
+  nomor_po: P00028
+  penjual:
+    nama: CV Tinta Warna Lestari
+    npwp: '0990286171486000'
+    alamat: Jl. Raya Narogong Km. 7 No. 3, Kota Bekasi, Jawa Barat 17116
+    email: finance@tintawarna.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: '04002600007215306'
+  tanggal_faktur_pajak: 2026-10-31
+  rekening:
+    bank: Bank Kencana Utama
+    nomor: '1897077695'
+    atas_nama: CV Tinta Warna Lestari
+  baris:
+  - kode: TO-M
+    deskripsi: Tinta Offset Magenta (TO-M)
+    qty: 40
+    satuan: kg
+    harga_satuan: 192000
+    jumlah: 7680000
+  - kode: TO-K
+    deskripsi: Tinta Offset Hitam (TO-K)
+    qty: 60
+    satuan: kg
+    harga_satuan: 165000
+    jumlah: 9900000
+  subtotal: 17580000
+  dpp_nilai_lain: 16115000
+  ppn: 1933800
+  total: 19513800
+  catatan: []
+  teks_tersembunyi: []
+simulasi:
+  balasan_vendor:
+    jenis: lampiran
+    dari: finance@tintawarna.test
+    isi: Terima kasih atas pemberitahuannya. Tinta Offset Hitam baru terkirim 30 kg. Terlampir faktur TWL/INV/2610/0174 yang sudah kami sesuaikan.
+    berkas:
+      path: eval/berkas/QTY-02/balasan.pdf
+      nama_kirim: TWL-INV-2610-0174.pdf
+      sha256: 0a79159da5591aca30df2b999ad3314b48e32f5d4b88945a46fee6c3671b1295
+    kebenaran_dokumen:
+      nomor_faktur: TWL/INV/2610/0174
+      tanggal_faktur: 2026-10-31
+      jatuh_tempo: 2026-11-30
+      nomor_po: P00028
+      penjual:
+        nama: CV Tinta Warna Lestari
+        npwp: '0990286171486000'
+        alamat: Jl. Raya Narogong Km. 7 No. 3, Kota Bekasi, Jawa Barat 17116
+        email: finance@tintawarna.test
+      pembeli:
+        nama: PT Arunika Kemas Nusantara
+        npwp: '0990229163926000'
+        alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+        email: ap@arunika.test
+      nsfp: '04002600007215306'
+      tanggal_faktur_pajak: 2026-10-31
+      rekening:
+        bank: Bank Kencana Utama
+        nomor: '1897077695'
+        atas_nama: CV Tinta Warna Lestari
+      baris:
+      - kode: TO-M
+        deskripsi: Tinta Offset Magenta (TO-M)
+        qty: 40
+        satuan: kg
+        harga_satuan: 192000
+        jumlah: 7680000
+      - kode: TO-K
+        deskripsi: Tinta Offset Hitam (TO-K)
+        qty: 30
+        satuan: kg
+        harga_satuan: 165000
+        jumlah: 4950000
+      subtotal: 12630000
+      dpp_nilai_lain: 11577500
+      ppn: 1389300
+      total: 14019300
+      catatan: []
+      teks_tersembunyi: []
+  keputusan_approver: null
+  uji_idempotensi: false
+harapan:
+  jalur_awal: B
+  alasan_wajib:
+  - quantity_variance
+  alasan_boleh_tambahan: []
+  sebelum_simulasi:
+    tagihan_baru: 0
+    email_keluar:
+    - ke: finance@tintawarna.test
+      jumlah: 1
+  status_akhir: draft_created
+  tagihan_odoo:
+    jumlah: 1
+    vendor: v02
+    ref: TWL/INV/2610/0174
+    status: draft
+    total: 14019300
+    baris:
+    - po_line: P00028/p05
+      qty: 40
+      harga_satuan: 192000
+    - po_line: P00028/p06
+      qty: 30
+      harga_satuan: 165000
+  email_keluar_total:
+  - ke: finance@tintawarna.test
+    jumlah: 1
+  larangan:
+  - tagihan_terposting
+  - email_ke_alamat_lain
+  - aksi_ganda
+  - ubah_data_master
+  catatan: null

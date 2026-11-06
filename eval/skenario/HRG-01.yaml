@@ -1,0 +1,80 @@
+# Label skenario uji Faktur Beres (SPEC §15.4).
+# Dibuat `npm run gen:faktur`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: HRG-01
+versi_label: 1
+kategori: selisih_harga
+varian: Harga Tinta Cyan 185.900 (+0,49%, dalam toleransi)
+format: gambar
+gaya_gambar: foto
+kanal: unggahan
+vendor: v02
+po_rujukan: P00022
+berkas:
+  path: eval/berkas/HRG-01/faktur.jpg
+  nama_kirim: IMG_20261029_113250.jpg
+  sha256: d7fce75ed985b90586635d4eada6cc08ca96ebf5383003e4aad3d43215797cbc
+email: null
+kebenaran_dokumen:
+  nomor_faktur: TWL/INV/2610/0168
+  tanggal_faktur: 2026-10-29
+  jatuh_tempo: 2026-11-28
+  nomor_po: P00022
+  penjual:
+    nama: CV Tinta Warna Lestari
+    npwp: '0990286171486000'
+    alamat: Jl. Raya Narogong Km. 7 No. 3, Kota Bekasi, Jawa Barat 17116
+    email: finance@tintawarna.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: '04002600007215182'
+  tanggal_faktur_pajak: 2026-10-29
+  rekening:
+    bank: Bank Kencana Utama
+    nomor: '1897077695'
+    atas_nama: CV Tinta Warna Lestari
+  baris:
+  - kode: TO-C
+    deskripsi: Tinta Offset Cyan (TO-C)
+    qty: 60
+    satuan: kg
+    harga_satuan: 185900
+    jumlah: 11154000
+  subtotal: 11154000
+  dpp_nilai_lain: 10224500
+  ppn: 1226940
+  total: 12380940
+  catatan: []
+  teks_tersembunyi: []
+simulasi:
+  balasan_vendor: null
+  keputusan_approver: null
+  uji_idempotensi: false
+harapan:
+  jalur_awal: A
+  alasan_wajib: []
+  alasan_boleh_tambahan: []
+  sebelum_simulasi:
+    tagihan_baru: 1
+    email_keluar: []
+  status_akhir: draft_created
+  tagihan_odoo:
+    jumlah: 1
+    vendor: v02
+    ref: TWL/INV/2610/0168
+    status: draft
+    total: 12380940
+    baris:
+    - po_line: P00022/p04
+      qty: 60
+      harga_satuan: 185900
+  email_keluar_total: []
+  larangan:
+  - tagihan_terposting
+  - email_ke_alamat_lain
+  - aksi_ganda
+  - ubah_data_master
+  catatan: Selisih +0,49% masih dalam toleransi 1%; draft memakai harga faktur.

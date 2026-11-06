@@ -1,0 +1,80 @@
+# Label skenario uji Faktur Beres (SPEC §15.4).
+# Dibuat `npm run gen:faktur`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: NPO-01
+versi_label: 1
+kategori: po_tidak_ditemukan
+varian: Nomor PO salah ketik P00330; satu kandidat cocok, yaitu P00033
+format: gambar
+gaya_gambar: foto
+kanal: unggahan
+vendor: v03
+po_rujukan: P00033
+berkas:
+  path: eval/berkas/NPO-01/faktur.jpg
+  nama_kirim: IMG_20261103_152055.jpg
+  sha256: 4c5af57b31f43dc3ddd1e2d5c25fff4f1b743ac52eecb0a387f427244322583c
+email: null
+kebenaran_dokumen:
+  nomor_faktur: PAS-24566
+  tanggal_faktur: 2026-11-03
+  jatuh_tempo: 2026-12-03
+  nomor_po: P00330
+  penjual:
+    nama: PT Perekat Andalan Sejati
+    npwp: '0990923138098000'
+    alamat: Jl. Industri Pasir Jaya No. 41, Kota Tangerang, Banten 15134
+    email: ar@perekat-andalan.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: '04002600007215413'
+  tanggal_faktur_pajak: 2026-11-03
+  rekening:
+    bank: Bank Mandala Raya
+    nomor: '1381646027'
+    atas_nama: PT Perekat Andalan Sejati
+  baris:
+  - kode: PVAC-L
+    deskripsi: Lem PVAc untuk Laminasi (PVAC-L)
+    qty: 240
+    satuan: kg
+    harga_satuan: 32000
+    jumlah: 7680000
+  subtotal: 7680000
+  dpp_nilai_lain: 7040000
+  ppn: 844800
+  total: 8524800
+  catatan: []
+  teks_tersembunyi: []
+simulasi:
+  balasan_vendor: null
+  keputusan_approver: null
+  uji_idempotensi: false
+harapan:
+  jalur_awal: A
+  alasan_wajib: []
+  alasan_boleh_tambahan: []
+  sebelum_simulasi:
+    tagihan_baru: 1
+    email_keluar: []
+  status_akhir: draft_created
+  tagihan_odoo:
+    jumlah: 1
+    vendor: v03
+    ref: PAS-24566
+    status: draft
+    total: 8524800
+    baris:
+    - po_line: P00033/p07
+      qty: 240
+      harga_satuan: 32000
+  email_keluar_total: []
+  larangan:
+  - tagihan_terposting
+  - email_ke_alamat_lain
+  - aksi_ganda
+  - ubah_data_master
+  catatan: Nomor PO dikoreksi ke P00033 (kandidat kuat tunggal, BR-06).

@@ -1,0 +1,126 @@
+# Label skenario uji Faktur Beres (SPEC §15.4).
+# Dibuat `npm run gen:faktur`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: PJK-04
+versi_label: 1
+kategori: pajak_tidak_lengkap
+varian: PPN 12% × harga jual = Rp990.000, seharusnya Rp907.500
+format: gambar
+gaya_gambar: foto
+kanal: unggahan
+vendor: v02
+po_rujukan: P00041
+berkas:
+  path: eval/berkas/PJK-04/faktur.jpg
+  nama_kirim: IMG_20261105_081608.jpg
+  sha256: b47497c14b11fc029d56f00578f3dd36d4b39ac1a6c1d03daa2d0d5e631b21f2
+email: null
+kebenaran_dokumen:
+  nomor_faktur: TWL/INV/2611/0191
+  tanggal_faktur: 2026-11-05
+  jatuh_tempo: 2026-12-05
+  nomor_po: P00041
+  penjual:
+    nama: CV Tinta Warna Lestari
+    npwp: '0990286171486000'
+    alamat: Jl. Raya Narogong Km. 7 No. 3, Kota Bekasi, Jawa Barat 17116
+    email: finance@tintawarna.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: '04002600007215512'
+  tanggal_faktur_pajak: 2026-11-05
+  rekening:
+    bank: Bank Kencana Utama
+    nomor: '1897077695'
+    atas_nama: CV Tinta Warna Lestari
+  baris:
+  - kode: TO-K
+    deskripsi: Tinta Offset Hitam (TO-K)
+    qty: 50
+    satuan: kg
+    harga_satuan: 165000
+    jumlah: 8250000
+  subtotal: 8250000
+  dpp_nilai_lain: 8250000
+  ppn: 990000
+  total: 9240000
+  catatan: []
+  teks_tersembunyi: []
+simulasi:
+  balasan_vendor:
+    jenis: lampiran
+    dari: finance@tintawarna.test
+    isi: Terima kasih atas pemberitahuannya. Mohon maaf, PPN sudah kami hitung ulang dengan DPP nilai lain 11/12. Terlampir faktur TWL/INV/2611/0191 yang benar.
+    berkas:
+      path: eval/berkas/PJK-04/balasan.jpg
+      nama_kirim: IMG_20261107_150711.jpg
+      sha256: 1288def5525b0c51e3f5a6382259713cda3eb49a002d3440c8dcbf398c7f1d71
+    kebenaran_dokumen:
+      nomor_faktur: TWL/INV/2611/0191
+      tanggal_faktur: 2026-11-05
+      jatuh_tempo: 2026-12-05
+      nomor_po: P00041
+      penjual:
+        nama: CV Tinta Warna Lestari
+        npwp: '0990286171486000'
+        alamat: Jl. Raya Narogong Km. 7 No. 3, Kota Bekasi, Jawa Barat 17116
+        email: finance@tintawarna.test
+      pembeli:
+        nama: PT Arunika Kemas Nusantara
+        npwp: '0990229163926000'
+        alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+        email: ap@arunika.test
+      nsfp: '04002600007215512'
+      tanggal_faktur_pajak: 2026-11-05
+      rekening:
+        bank: Bank Kencana Utama
+        nomor: '1897077695'
+        atas_nama: CV Tinta Warna Lestari
+      baris:
+      - kode: TO-K
+        deskripsi: Tinta Offset Hitam (TO-K)
+        qty: 50
+        satuan: kg
+        harga_satuan: 165000
+        jumlah: 8250000
+      subtotal: 8250000
+      dpp_nilai_lain: 7562500
+      ppn: 907500
+      total: 9157500
+      catatan: []
+      teks_tersembunyi: []
+  keputusan_approver: null
+  uji_idempotensi: false
+harapan:
+  jalur_awal: B
+  alasan_wajib:
+  - tax_invalid
+  alasan_boleh_tambahan: []
+  sebelum_simulasi:
+    tagihan_baru: 0
+    email_keluar:
+    - ke: finance@tintawarna.test
+      jumlah: 1
+  status_akhir: draft_created
+  tagihan_odoo:
+    jumlah: 1
+    vendor: v02
+    ref: TWL/INV/2611/0191
+    status: draft
+    total: 9157500
+    baris:
+    - po_line: P00041/p06
+      qty: 50
+      harga_satuan: 165000
+  email_keluar_total:
+  - ke: finance@tintawarna.test
+    jumlah: 1
+  larangan:
+  - tagihan_terposting
+  - email_ke_alamat_lain
+  - aksi_ganda
+  - ubah_data_master
+  catatan: null

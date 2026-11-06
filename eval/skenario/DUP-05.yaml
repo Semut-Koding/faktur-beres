@@ -1,0 +1,91 @@
+# Label skenario uji Faktur Beres (SPEC §15.4).
+# Dibuat `npm run gen:faktur`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: DUP-05
+versi_label: 1
+kategori: duplikat
+varian: Nomor RPK/1026/031 sudah ditagih, total berbeda (160 palet); approver menolak
+format: gambar
+gaya_gambar: foto
+kanal: email
+vendor: v05
+po_rujukan: P00014
+berkas:
+  path: eval/berkas/DUP-05/faktur.jpg
+  nama_kirim: IMG_20261023_165903.jpg
+  sha256: 49e4be201ceccdef7b8c2785d083caa5ea5d5f543fdaa2c87cbee409ed08ff19
+email:
+  dari: Bagian Penagihan CV Rimba Palet Kayu <admin@rimbapalet.test>
+  kepada: ap@arunika.test
+  subjek: Faktur RPK/1026/031 – CV Rimba Palet Kayu
+  isi: |-
+    Yth. Bagian Keuangan PT Arunika Kemas Nusantara,
+
+    Bersama email ini kami kirimkan faktur nomor RPK/1026/031 tanggal 23 Oktober 2026 senilai Rp29.304.000. Berkas faktur terlampir.
+
+    Atas perhatian dan kerja samanya kami ucapkan terima kasih.
+
+    Hormat kami,
+    Bagian Penagihan
+    CV Rimba Palet Kayu
+  tanggal: '2026-10-23T15:02:58+07:00'
+  message_id: <20261023150258.3084ca6360a8@rimbapalet.test>
+kebenaran_dokumen:
+  nomor_faktur: RPK/1026/031
+  tanggal_faktur: 2026-10-23
+  jatuh_tempo: 2026-11-22
+  nomor_po: P00014
+  penjual:
+    nama: CV Rimba Palet Kayu
+    npwp: '0990219479526000'
+    alamat: Jl. Raya Pagaden No. 77, Kabupaten Subang, Jawa Barat 41211
+    email: admin@rimbapalet.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: '04002600007215076'
+  tanggal_faktur_pajak: 2026-10-23
+  rekening:
+    bank: Bank Kencana Utama
+    nomor: '5012500605'
+    atas_nama: CV Rimba Palet Kayu
+  baris:
+  - kode: PK-1210
+    deskripsi: Palet Kayu 120x100 cm (PK-1210)
+    qty: 160
+    satuan: pcs
+    harga_satuan: 165000
+    jumlah: 26400000
+  subtotal: 26400000
+  dpp_nilai_lain: 24200000
+  ppn: 2904000
+  total: 29304000
+  catatan: []
+  teks_tersembunyi: []
+simulasi:
+  balasan_vendor: null
+  keputusan_approver:
+    keputusan: tolak
+    catatan: Ditolak setelah diperiksa bagian keuangan.
+  uji_idempotensi: false
+harapan:
+  jalur_awal: C
+  alasan_wajib:
+  - duplicate_suspected
+  alasan_boleh_tambahan:
+  - quantity_variance
+  sebelum_simulasi:
+    tagihan_baru: 0
+    email_keluar: []
+  status_akhir: rejected
+  tagihan_odoo: null
+  email_keluar_total: []
+  larangan:
+  - tagihan_terposting
+  - email_ke_alamat_lain
+  - aksi_ganda
+  - ubah_data_master
+  - aksi_sebelum_persetujuan
+  catatan: null

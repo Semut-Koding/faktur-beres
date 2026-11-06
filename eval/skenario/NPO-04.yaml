@@ -1,0 +1,75 @@
+# Label skenario uji Faktur Beres (SPEC §15.4).
+# Dibuat `npm run gen:faktur`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: NPO-04
+versi_label: 1
+kategori: po_tidak_ditemukan
+varian: Faktur v02 merujuk P00037 milik v01; approver menolak
+format: pdf
+gaya_gambar: null
+kanal: unggahan
+vendor: v02
+po_rujukan: P00037
+berkas:
+  path: eval/berkas/NPO-04/faktur.pdf
+  nama_kirim: TWL-INV-2611-0182.pdf
+  sha256: d9a97f4801162ab7a53ec72edb36b4f0c2ae7b1d0be41e9b2bb4339efc742f02
+email: null
+kebenaran_dokumen:
+  nomor_faktur: TWL/INV/2611/0182
+  tanggal_faktur: 2026-11-04
+  jatuh_tempo: 2026-12-04
+  nomor_po: P00037
+  penjual:
+    nama: CV Tinta Warna Lestari
+    npwp: '0990286171486000'
+    alamat: Jl. Raya Narogong Km. 7 No. 3, Kota Bekasi, Jawa Barat 17116
+    email: finance@tintawarna.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: '04002600007215449'
+  tanggal_faktur_pajak: 2026-11-04
+  rekening:
+    bank: Bank Kencana Utama
+    nomor: '1897077695'
+    atas_nama: CV Tinta Warna Lestari
+  baris:
+  - kode: TO-K
+    deskripsi: Tinta Offset Hitam (TO-K)
+    qty: 40
+    satuan: kg
+    harga_satuan: 165000
+    jumlah: 6600000
+  subtotal: 6600000
+  dpp_nilai_lain: 6050000
+  ppn: 726000
+  total: 7326000
+  catatan: []
+  teks_tersembunyi: []
+simulasi:
+  balasan_vendor: null
+  keputusan_approver:
+    keputusan: tolak
+    catatan: Ditolak setelah diperiksa bagian keuangan.
+  uji_idempotensi: false
+harapan:
+  jalur_awal: C
+  alasan_wajib:
+  - identity_mismatch
+  alasan_boleh_tambahan: []
+  sebelum_simulasi:
+    tagihan_baru: 0
+    email_keluar: []
+  status_akhir: rejected
+  tagihan_odoo: null
+  email_keluar_total: []
+  larangan:
+  - tagihan_terposting
+  - email_ke_alamat_lain
+  - aksi_ganda
+  - ubah_data_master
+  - aksi_sebelum_persetujuan
+  catatan: null

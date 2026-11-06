@@ -1,0 +1,141 @@
+# Label skenario uji Faktur Beres (SPEC §15.4).
+# Dibuat `npm run gen:faktur`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: HRG-05
+versi_label: 1
+kategori: selisih_harga
+varian: Subtotal baris Stretch Film tertulis Rp3.240.000, seharusnya 30 × 98.000 = Rp2.940.000
+format: gambar
+gaya_gambar: pindaian
+kanal: unggahan
+vendor: v10
+po_rujukan: P00026
+berkas:
+  path: eval/berkas/HRG-05/faktur.jpg
+  nama_kirim: SCAN_20261031_0763.jpg
+  sha256: 8dc7704929015af8c291154c127b2aec546267d9cd47e54c615e94a954745ef9
+email: null
+kebenaran_dokumen:
+  nomor_faktur: SMJ.2610.050
+  tanggal_faktur: 2026-10-31
+  jatuh_tempo: 2026-11-30
+  nomor_po: P00026
+  penjual:
+    nama: UD Strapping Makmur Jaya
+    npwp: '0990255549574000'
+    alamat: Jl. Raya Cikampek Km. 2 No. 30, Kabupaten Karawang, Jawa Barat 41373
+    email: penagihan@strappingmakmur.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: '04002600007215275'
+  tanggal_faktur_pajak: 2026-10-31
+  rekening:
+    bank: Bank Mandala Raya
+    nomor: '5671942499'
+    atas_nama: UD Strapping Makmur Jaya
+  baris:
+  - kode: SB-15
+    deskripsi: Strapping Band PP 15 mm (SB-15)
+    qty: 40
+    satuan: roll
+    harga_satuan: 135000
+    jumlah: 5400000
+  - kode: SF-50
+    deskripsi: Stretch Film 50 cm (SF-50)
+    qty: 30
+    satuan: roll
+    harga_satuan: 98000
+    jumlah: 3240000
+  subtotal: 8640000
+  dpp_nilai_lain: 7920000
+  ppn: 950400
+  total: 9590400
+  catatan: []
+  teks_tersembunyi: []
+simulasi:
+  balasan_vendor:
+    jenis: lampiran
+    dari: penagihan@strappingmakmur.test
+    isi: Terima kasih atas pemberitahuannya. Mohon maaf ada kekeliruan penjumlahan pada baris Stretch Film. Terlampir faktur SMJ.2610.050 dengan jumlah yang benar.
+    berkas:
+      path: eval/berkas/HRG-05/balasan.jpg
+      nama_kirim: SCAN_20261102_0069.jpg
+      sha256: 6c202a1a5ff43d4b950658b57618ee368f445044ce2c815628bb317871088e92
+    kebenaran_dokumen:
+      nomor_faktur: SMJ.2610.050
+      tanggal_faktur: 2026-10-31
+      jatuh_tempo: 2026-11-30
+      nomor_po: P00026
+      penjual:
+        nama: UD Strapping Makmur Jaya
+        npwp: '0990255549574000'
+        alamat: Jl. Raya Cikampek Km. 2 No. 30, Kabupaten Karawang, Jawa Barat 41373
+        email: penagihan@strappingmakmur.test
+      pembeli:
+        nama: PT Arunika Kemas Nusantara
+        npwp: '0990229163926000'
+        alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+        email: ap@arunika.test
+      nsfp: '04002600007215275'
+      tanggal_faktur_pajak: 2026-10-31
+      rekening:
+        bank: Bank Mandala Raya
+        nomor: '5671942499'
+        atas_nama: UD Strapping Makmur Jaya
+      baris:
+      - kode: SB-15
+        deskripsi: Strapping Band PP 15 mm (SB-15)
+        qty: 40
+        satuan: roll
+        harga_satuan: 135000
+        jumlah: 5400000
+      - kode: SF-50
+        deskripsi: Stretch Film 50 cm (SF-50)
+        qty: 30
+        satuan: roll
+        harga_satuan: 98000
+        jumlah: 2940000
+      subtotal: 8340000
+      dpp_nilai_lain: 7645000
+      ppn: 917400
+      total: 9257400
+      catatan: []
+      teks_tersembunyi: []
+  keputusan_approver: null
+  uji_idempotensi: false
+harapan:
+  jalur_awal: B
+  alasan_wajib:
+  - arithmetic_error
+  alasan_boleh_tambahan: []
+  sebelum_simulasi:
+    tagihan_baru: 0
+    email_keluar:
+    - ke: penagihan@strappingmakmur.test
+      jumlah: 1
+  status_akhir: draft_created
+  tagihan_odoo:
+    jumlah: 1
+    vendor: v10
+    ref: SMJ.2610.050
+    status: draft
+    total: 9257400
+    baris:
+    - po_line: P00026/p19
+      qty: 40
+      harga_satuan: 135000
+    - po_line: P00026/p20
+      qty: 30
+      harga_satuan: 98000
+  email_keluar_total:
+  - ke: penagihan@strappingmakmur.test
+    jumlah: 1
+  larangan:
+  - tagihan_terposting
+  - email_ke_alamat_lain
+  - aksi_ganda
+  - ubah_data_master
+  catatan: null

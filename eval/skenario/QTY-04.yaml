@@ -1,0 +1,132 @@
+# Label skenario uji Faktur Beres (SPEC §15.4).
+# Dibuat `npm run gen:faktur`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: QTY-04
+versi_label: 1
+kategori: kuantitas_kurang
+varian: Baris tambahan "Ongkos kirim" Rp450.000 di luar PO
+format: pdf
+gaya_gambar: null
+kanal: unggahan
+vendor: v06
+po_rujukan: P00030
+berkas:
+  path: eval/berkas/QTY-04/faktur.pdf
+  nama_kirim: INV-2026-0438.pdf
+  sha256: 5fb7a422e3f13a0f8807f2335d4ce65c38d3148fe33ae631254590caf28724bb
+email: null
+kebenaran_dokumen:
+  nomor_faktur: INV-2026-0438
+  tanggal_faktur: 2026-11-01
+  jatuh_tempo: 2026-12-01
+  nomor_po: P00030
+  penjual:
+    nama: PT Presisi Suku Cadang Mesin
+    npwp: '0990769515376000'
+    alamat: Jl. Gaya Motor Raya No. 15, Kota Jakarta Utara, DKI Jakarta 14350
+    email: billing@presisi-sukucadang.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: '04002600007215346'
+  tanggal_faktur_pajak: 2026-11-01
+  rekening:
+    bank: Bank Mandala Raya
+    nomor: '2029942748'
+    atas_nama: PT Presisi Suku Cadang Mesin
+  baris:
+  - kode: DC-CST
+    deskripsi: Pisau Die-Cut Custom (DC-CST)
+    qty: 3
+    satuan: set
+    harga_satuan: 1250000
+    jumlah: 3750000
+  - kode: KRM-01
+    deskripsi: Ongkos kirim
+    qty: 1
+    satuan: paket
+    harga_satuan: 450000
+    jumlah: 450000
+  subtotal: 4200000
+  dpp_nilai_lain: 3850000
+  ppn: 462000
+  total: 4662000
+  catatan: []
+  teks_tersembunyi: []
+simulasi:
+  balasan_vendor:
+    jenis: lampiran
+    dari: billing@presisi-sukucadang.test
+    isi: Terima kasih atas pemberitahuannya. Ongkos kirim sudah termasuk dalam harga sesuai PO. Terlampir faktur INV-2026-0438 tanpa baris ongkos kirim.
+    berkas:
+      path: eval/berkas/QTY-04/balasan.pdf
+      nama_kirim: INV-2026-0438.pdf
+      sha256: 910408041756bfdfd532c75058f1de3e5ec75dbab8acd67abcf1784a4946046e
+    kebenaran_dokumen:
+      nomor_faktur: INV-2026-0438
+      tanggal_faktur: 2026-11-01
+      jatuh_tempo: 2026-12-01
+      nomor_po: P00030
+      penjual:
+        nama: PT Presisi Suku Cadang Mesin
+        npwp: '0990769515376000'
+        alamat: Jl. Gaya Motor Raya No. 15, Kota Jakarta Utara, DKI Jakarta 14350
+        email: billing@presisi-sukucadang.test
+      pembeli:
+        nama: PT Arunika Kemas Nusantara
+        npwp: '0990229163926000'
+        alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+        email: ap@arunika.test
+      nsfp: '04002600007215346'
+      tanggal_faktur_pajak: 2026-11-01
+      rekening:
+        bank: Bank Mandala Raya
+        nomor: '2029942748'
+        atas_nama: PT Presisi Suku Cadang Mesin
+      baris:
+      - kode: DC-CST
+        deskripsi: Pisau Die-Cut Custom (DC-CST)
+        qty: 3
+        satuan: set
+        harga_satuan: 1250000
+        jumlah: 3750000
+      subtotal: 3750000
+      dpp_nilai_lain: 3437500
+      ppn: 412500
+      total: 4162500
+      catatan: []
+      teks_tersembunyi: []
+  keputusan_approver: null
+  uji_idempotensi: false
+harapan:
+  jalur_awal: B
+  alasan_wajib:
+  - quantity_variance
+  alasan_boleh_tambahan: []
+  sebelum_simulasi:
+    tagihan_baru: 0
+    email_keluar:
+    - ke: billing@presisi-sukucadang.test
+      jumlah: 1
+  status_akhir: draft_created
+  tagihan_odoo:
+    jumlah: 1
+    vendor: v06
+    ref: INV-2026-0438
+    status: draft
+    total: 4162500
+    baris:
+    - po_line: P00030/p13
+      qty: 3
+      harga_satuan: 1250000
+  email_keluar_total:
+  - ke: billing@presisi-sukucadang.test
+    jumlah: 1
+  larangan:
+  - tagihan_terposting
+  - email_ke_alamat_lain
+  - aksi_ganda
+  - ubah_data_master
+  catatan: null

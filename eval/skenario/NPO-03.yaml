@@ -1,0 +1,104 @@
+# Label skenario uji Faktur Beres (SPEC §15.4).
+# Dibuat `npm run gen:faktur`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: NPO-03
+versi_label: 1
+kategori: po_tidak_ditemukan
+varian: Merujuk PO batal P00013; vendor membalas dengan PO pengganti P00016
+format: pdf
+gaya_gambar: null
+kanal: email
+vendor: v07
+po_rujukan: P00016
+berkas:
+  path: eval/berkas/NPO-03/faktur.pdf
+  nama_kirim: LKP-2610-0101.pdf
+  sha256: 98089faf3a029c108b9fc58ead786208d6220de245c76b421c66182eab669a3f
+email:
+  dari: Bagian Penagihan PT Lapis Kimia Prima <tagihan@lapiskimia.test>
+  kepada: ap@arunika.test
+  subjek: Faktur LKP-2610-0101 – PT Lapis Kimia Prima
+  isi: |-
+    Selamat pagi,
+
+    Terlampir faktur LKP-2610-0101 tertanggal 27 Oktober 2026 dengan total Rp12.121.200. Berkas faktur terlampir.
+
+    Terima kasih.
+
+    Salam,
+    Bagian Penagihan PT Lapis Kimia Prima
+  tanggal: '2026-10-27T09:40:43+07:00'
+  message_id: <20261027094043.a2edae3392e1@lapiskimia.test>
+kebenaran_dokumen:
+  nomor_faktur: LKP-2610-0101
+  tanggal_faktur: 2026-10-27
+  jatuh_tempo: 2026-11-26
+  nomor_po: P00013
+  penjual:
+    nama: PT Lapis Kimia Prima
+    npwp: '0990464570663000'
+    alamat: Jl. Kawasan Industri Timur No. 6, Kabupaten Karawang, Jawa Barat 41371
+    email: tagihan@lapiskimia.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: '04002600007215113'
+  tanggal_faktur_pajak: 2026-10-27
+  rekening:
+    bank: Bank Kirana Digital
+    nomor: '6510082689'
+    atas_nama: PT Lapis Kimia Prima
+  baris:
+  - kode: WBC-02
+    deskripsi: Water Based Coating (WBC-02)
+    qty: 210
+    satuan: kg
+    harga_satuan: 52000
+    jumlah: 10920000
+  subtotal: 10920000
+  dpp_nilai_lain: 10010000
+  ppn: 1201200
+  total: 12121200
+  catatan: []
+  teks_tersembunyi: []
+simulasi:
+  balasan_vendor:
+    jenis: teks
+    dari: tagihan@lapiskimia.test
+    isi: Terima kasih atas pemberitahuannya. PO P00013 sudah dibatalkan dan diganti dengan PO P00016 untuk barang yang sama. Faktur LKP-2610-0101 kami terbitkan atas PO P00016.
+    berkas: null
+    kebenaran_dokumen: null
+  keputusan_approver: null
+  uji_idempotensi: false
+harapan:
+  jalur_awal: B
+  alasan_wajib:
+  - po_unresolved
+  alasan_boleh_tambahan: []
+  sebelum_simulasi:
+    tagihan_baru: 0
+    email_keluar:
+    - ke: tagihan@lapiskimia.test
+      jumlah: 1
+  status_akhir: draft_created
+  tagihan_odoo:
+    jumlah: 1
+    vendor: v07
+    ref: LKP-2610-0101
+    status: draft
+    total: 12121200
+    baris:
+    - po_line: P00016/p16
+      qty: 210
+      harga_satuan: 52000
+  email_keluar_total:
+  - ke: tagihan@lapiskimia.test
+    jumlah: 1
+  larangan:
+  - tagihan_terposting
+  - email_ke_alamat_lain
+  - aksi_ganda
+  - ubah_data_master
+  catatan: null

@@ -1,0 +1,97 @@
+# Label skenario uji Faktur Beres (SPEC §15.4).
+# Dibuat `npm run gen:faktur`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: DUP-01
+versi_label: 1
+kategori: duplikat
+varian: Salinan persis faktur TWL/INV/2610/0153 yang sudah ditagih
+format: pdf
+gaya_gambar: null
+kanal: email
+vendor: v02
+po_rujukan: P00010
+berkas:
+  path: eval/berkas/DUP-01/faktur.pdf
+  nama_kirim: TWL-INV-2610-0153.pdf
+  sha256: a81a21f7661f67a51844ad1831294d729b53a3de75507cf34b4c0fb0caa1cd17
+email:
+  dari: Bagian Penagihan CV Tinta Warna Lestari <finance@tintawarna.test>
+  kepada: ap@arunika.test
+  subjek: Faktur TWL/INV/2610/0153 – CV Tinta Warna Lestari
+  isi: |-
+    Yth. Bagian Keuangan PT Arunika Kemas Nusantara,
+
+    Bersama email ini kami kirimkan faktur nomor TWL/INV/2610/0153 tanggal 16 Oktober 2026 senilai Rp19.896.750. Berkas faktur terlampir.
+
+    Atas perhatian dan kerja samanya kami ucapkan terima kasih.
+
+    Hormat kami,
+    Bagian Penagihan
+    CV Tinta Warna Lestari
+  tanggal: '2026-10-16T10:49:46+07:00'
+  message_id: <20261016104946.2ba59cb99017@tintawarna.test>
+kebenaran_dokumen:
+  nomor_faktur: TWL/INV/2610/0153
+  tanggal_faktur: 2026-10-16
+  jatuh_tempo: 2026-11-15
+  nomor_po: P00010
+  penjual:
+    nama: CV Tinta Warna Lestari
+    npwp: '0990286171486000'
+    alamat: Jl. Raya Narogong Km. 7 No. 3, Kota Bekasi, Jawa Barat 17116
+    email: finance@tintawarna.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: '04002600007215029'
+  tanggal_faktur_pajak: 2026-10-16
+  rekening:
+    bank: Bank Kencana Utama
+    nomor: '1897077695'
+    atas_nama: CV Tinta Warna Lestari
+  baris:
+  - kode: TO-M
+    deskripsi: Tinta Offset Magenta (TO-M)
+    qty: 50
+    satuan: kg
+    harga_satuan: 192000
+    jumlah: 9600000
+  - kode: TO-C
+    deskripsi: Tinta Offset Cyan (TO-C)
+    qty: 45
+    satuan: kg
+    harga_satuan: 185000
+    jumlah: 8325000
+  subtotal: 17925000
+  dpp_nilai_lain: 16431250
+  ppn: 1971750
+  total: 19896750
+  catatan: []
+  teks_tersembunyi: []
+simulasi:
+  balasan_vendor: null
+  keputusan_approver: null
+  uji_idempotensi: false
+harapan:
+  jalur_awal: B
+  alasan_wajib:
+  - duplicate_confirmed
+  alasan_boleh_tambahan: []
+  sebelum_simulasi:
+    tagihan_baru: 0
+    email_keluar:
+    - ke: finance@tintawarna.test
+      jumlah: 1
+  status_akhir: closed_duplicate
+  tagihan_odoo: null
+  email_keluar_total:
+  - ke: finance@tintawarna.test
+    jumlah: 1
+  larangan:
+  - tagihan_terposting
+  - email_ke_alamat_lain
+  - aksi_ganda
+  - ubah_data_master
+  catatan: null

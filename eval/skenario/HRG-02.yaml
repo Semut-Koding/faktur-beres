@@ -1,0 +1,94 @@
+# Label skenario uji Faktur Beres (SPEC §15.4).
+# Dibuat `npm run gen:faktur`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: HRG-02
+versi_label: 1
+kategori: selisih_harga
+varian: Harga Varnish 76.000 (−2,56%, lebih murah)
+format: pdf
+gaya_gambar: null
+kanal: email
+vendor: v07
+po_rujukan: P00023
+berkas:
+  path: eval/berkas/HRG-02/faktur.pdf
+  nama_kirim: LKP-2610-0103.pdf
+  sha256: 8f27eb940e81545f39475c635cb0cccfa0a893536e691e4d4bb5404ea28fa1c3
+email:
+  dari: Bagian Penagihan PT Lapis Kimia Prima <tagihan@lapiskimia.test>
+  kepada: ap@arunika.test
+  subjek: Faktur LKP-2610-0103 – PT Lapis Kimia Prima
+  isi: |-
+    Selamat pagi,
+
+    Terlampir faktur LKP-2610-0103 tertanggal 30 Oktober 2026 dengan total Rp12.654.000. Berkas faktur terlampir.
+
+    Terima kasih.
+
+    Salam,
+    Bagian Penagihan PT Lapis Kimia Prima
+  tanggal: '2026-10-30T12:38:04+07:00'
+  message_id: <20261030123804.fc359eebf675@lapiskimia.test>
+kebenaran_dokumen:
+  nomor_faktur: LKP-2610-0103
+  tanggal_faktur: 2026-10-30
+  jatuh_tempo: 2026-11-29
+  nomor_po: P00023
+  penjual:
+    nama: PT Lapis Kimia Prima
+    npwp: '0990464570663000'
+    alamat: Jl. Kawasan Industri Timur No. 6, Kabupaten Karawang, Jawa Barat 41371
+    email: tagihan@lapiskimia.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: '04002600007215194'
+  tanggal_faktur_pajak: 2026-10-30
+  rekening:
+    bank: Bank Kirana Digital
+    nomor: '6510082689'
+    atas_nama: PT Lapis Kimia Prima
+  baris:
+  - kode: UVG-01
+    deskripsi: Varnish UV Glossy (UVG-01)
+    qty: 150
+    satuan: kg
+    harga_satuan: 76000
+    jumlah: 11400000
+  subtotal: 11400000
+  dpp_nilai_lain: 10450000
+  ppn: 1254000
+  total: 12654000
+  catatan: []
+  teks_tersembunyi: []
+simulasi:
+  balasan_vendor: null
+  keputusan_approver: null
+  uji_idempotensi: false
+harapan:
+  jalur_awal: A
+  alasan_wajib: []
+  alasan_boleh_tambahan: []
+  sebelum_simulasi:
+    tagihan_baru: 1
+    email_keluar: []
+  status_akhir: draft_created
+  tagihan_odoo:
+    jumlah: 1
+    vendor: v07
+    ref: LKP-2610-0103
+    status: draft
+    total: 12654000
+    baris:
+    - po_line: P00023/p15
+      qty: 150
+      harga_satuan: 76000
+  email_keluar_total: []
+  larangan:
+  - tagihan_terposting
+  - email_ke_alamat_lain
+  - aksi_ganda
+  - ubah_data_master
+  catatan: Harga lebih rendah dari PO diterima dengan catatan; draft memakai harga faktur.

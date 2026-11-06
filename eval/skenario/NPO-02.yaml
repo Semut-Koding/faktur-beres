@@ -1,0 +1,90 @@
+# Label skenario uji Faktur Beres (SPEC §15.4).
+# Dibuat `npm run gen:faktur`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: NPO-02
+versi_label: 1
+kategori: po_tidak_ditemukan
+varian: Tanpa nomor PO; dua PO identik P00035 dan P00036; vendor membalas P00036
+format: gambar
+gaya_gambar: pindaian
+kanal: unggahan
+vendor: v10
+po_rujukan: P00036
+berkas:
+  path: eval/berkas/NPO-02/faktur.jpg
+  nama_kirim: SCAN_20261103_0276.jpg
+  sha256: e812b4b295198ac3babd3b2a90699aadfd6421ea05d1f7b6546246cead63a43c
+email: null
+kebenaran_dokumen:
+  nomor_faktur: SMJ.2611.054
+  tanggal_faktur: 2026-11-03
+  jatuh_tempo: 2026-12-03
+  nomor_po: null
+  penjual:
+    nama: UD Strapping Makmur Jaya
+    npwp: '0990255549574000'
+    alamat: Jl. Raya Cikampek Km. 2 No. 30, Kabupaten Karawang, Jawa Barat 41373
+    email: penagihan@strappingmakmur.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: '04002600007215427'
+  tanggal_faktur_pajak: 2026-11-03
+  rekening:
+    bank: Bank Mandala Raya
+    nomor: '5671942499'
+    atas_nama: UD Strapping Makmur Jaya
+  baris:
+  - kode: SF-50
+    deskripsi: Stretch Film 50 cm (SF-50)
+    qty: 45
+    satuan: roll
+    harga_satuan: 98000
+    jumlah: 4410000
+  subtotal: 4410000
+  dpp_nilai_lain: 4042500
+  ppn: 485100
+  total: 4895100
+  catatan: []
+  teks_tersembunyi: []
+simulasi:
+  balasan_vendor:
+    jenis: teks
+    dari: penagihan@strappingmakmur.test
+    isi: Terima kasih atas pemberitahuannya. Faktur SMJ.2611.054 tersebut untuk PO P00036.
+    berkas: null
+    kebenaran_dokumen: null
+  keputusan_approver: null
+  uji_idempotensi: false
+harapan:
+  jalur_awal: B
+  alasan_wajib:
+  - po_unresolved
+  alasan_boleh_tambahan: []
+  sebelum_simulasi:
+    tagihan_baru: 0
+    email_keluar:
+    - ke: penagihan@strappingmakmur.test
+      jumlah: 1
+  status_akhir: draft_created
+  tagihan_odoo:
+    jumlah: 1
+    vendor: v10
+    ref: SMJ.2611.054
+    status: draft
+    total: 4895100
+    baris:
+    - po_line: P00036/p20
+      qty: 45
+      harga_satuan: 98000
+  email_keluar_total:
+  - ke: penagihan@strappingmakmur.test
+    jumlah: 1
+  larangan:
+  - tagihan_terposting
+  - email_ke_alamat_lain
+  - aksi_ganda
+  - ubah_data_master
+  catatan: null
