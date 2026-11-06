@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Versi | 0.1 (riwayat di [§16](#16-riwayat-versi)) |
-| Tanggal | 5 November 2026 |
+| Versi | 0.2 (riwayat di [§16](#16-riwayat-versi)) |
+| Tanggal | 6 November 2026 |
 | Status | Disetujui pemilik produk. Diturunkan dari proposal bagian 1–9 yang disetujui 5 November 2026. |
 | Rencana teknis | [`RENCANA-TEKNIS.md`](RENCANA-TEKNIS.md) |
 | Catatan keputusan | [`adr/`](adr/README.md) |
@@ -281,15 +281,15 @@ Admin mengembalikan Odoo ke snapshot seed dengan `npm run odoo:reset`. Basis dat
 |---|---|
 | BR-01 | Satu faktur = satu thread dengan `invoice_id` unik. Berkas asli disimpan beserta hash SHA-256. Berkas yang hash-nya sama dengan faktur yang sudah ada dikenali sebelum ekstraksi dan diperlakukan sebagai duplikat (BR-11). |
 | BR-02 | Ekstraksi wajib lolos skema. Field wajib: nama vendor, nomor faktur, tanggal faktur, baris (deskripsi, kuantitas, satuan, harga satuan, subtotal baris), subtotal, PPN, dan total. Field opsional: NPWP penjual dan pembeli, NSFP, nomor PO, rekening, dan catatan. |
-| BR-03 | Hitung ulang oleh kode. Kuantitas × harga satuan = subtotal baris (±Rp1 per baris), jumlah baris = subtotal (±Rp1 per baris), DPP nilai lain = 11/12 × subtotal, PPN = 12% × DPP nilai lain (±Rp1), total = subtotal + PPN (±Rp1). |
+| BR-03 | Hitung ulang aritmetika dokumen oleh kode: kuantitas × harga satuan = subtotal baris (±Rp1 per baris), jumlah subtotal baris = subtotal (±Rp1 per baris), dan subtotal + PPN = total (±Rp1). Kesesuaian DPP nilai lain dan PPN dengan aturan pajak tidak diperiksa di sini, tetapi di BR-10. |
 | BR-04 | Bila validasi gagal, ekstraksi diulang paling banyak **2 kali** dengan umpan balik yang menyebut field bermasalah. Bila angka yang sama terbaca konsisten dan dokumen memang tidak konsisten, alasannya `arithmetic_error` (B6). Bila hasil tetap tidak stabil atau tidak lolos skema, alasannya `validation_failed` (C4). UBL yang tidak konsisten langsung `arithmetic_error`. |
 | BR-05 | Identifikasi vendor, berurutan: NPWP penjual sama persis dengan NPWP vendor di Odoo; lalu nama dan email pengirim. Nol kandidat berarti vendor tidak terdaftar (`new_vendor`, C2). Lebih dari satu kandidat: `identity_mismatch` (C7). Bila NPWP cocok ke vendor A tetapi nama atau email menunjuk vendor B: `identity_mismatch`. |
 | BR-06 | Identifikasi PO. Nomor PO dinormalisasi (huruf besar, tanpa spasi) lalu dicari persis. Ditemukan dan milik vendor: dipakai. Milik vendor lain: `identity_mismatch` (C7). Berstatus batal: `po_unresolved` (B4), tanpa memindahkan faktur ke PO lain. Tidak ada atau tidak ditemukan: cari **kandidat kuat**, yaitu PO terkonfirmasi milik vendor itu yang setiap baris fakturnya punya padanan produk dengan kuantitas **sama dengan** sisa diterima yang belum ditagih dan harga dalam toleransi. Tepat satu kandidat kuat: dipakai dengan catatan "nomor PO dikoreksi". Nol atau lebih dari satu: `po_unresolved` (B4). Aturan pencarian ini sengaja lebih ketat daripada BR-09, karena PO dipilih tanpa rujukan nomor. |
 | BR-07 | Baris faktur dipetakan ke baris PO lewat kode produk vendor, kode internal, atau nama. LLM boleh membantu memetakan deskripsi bebas, tetapi produk hasil pemetaan harus ada di PO terpilih. |
 | BR-08 | Toleransi harga. Harga satuan faktur ≤ harga PO × (1 + **1%**) lulus. Di atasnya: `price_variance` (B1). Harga lebih rendah dari PO lulus dengan catatan. |
 | BR-09 | Kuantitas. Per baris, kuantitas faktur ≤ kuantitas diterima yang belum ditagih dan ≤ kuantitas PO. Melebihi: `quantity_variance` (B2). Baris tanpa padanan di PO, termasuk ongkos kirim yang tidak ada di PO: `quantity_variance`. |
-| BR-10 | Pajak. NPWP penjual wajib ada dan 16 digit; NPWP pembeli harus NPWP perusahaan; NSFP wajib ada dan 17 digit numerik; PPN sesuai BR-03. Pelanggaran: `tax_invalid` (B3). NPWP penjual yang 16 digit tetapi berbeda dari NPWP vendor di Odoo: `identity_mismatch` (C7). Kode transaksi selain `04` dicatat sebagai catatan, bukan exception. |
-| BR-11 | Duplikat. Kunci utama: vendor + nomor faktur ternormalisasi (huruf besar; spasi, `/`, `-`, `.`, `_` dibuang), dibandingkan dengan tagihan vendor di Odoo (draft maupun terposting) dan faktur lain di Faktur Beres. Kunci sama dan total sama: `duplicate_confirmed` (B5). Kunci sama dan total berbeda: `duplicate_suspected` (C6). Kunci kedua: vendor + tanggal faktur + total sama dengan nomor berbeda: `duplicate_suspected`. Nomor yang sama dari vendor berbeda bukan duplikat. |
+| BR-10 | Pajak. NPWP penjual wajib ada dan 16 digit; NPWP pembeli harus NPWP perusahaan; NSFP wajib ada dan 17 digit numerik; DPP nilai lain = 11/12 × subtotal dan PPN = 12% × DPP nilai lain (±Rp1; bila dokumen tidak mencantumkan DPP nilai lain, cukup PPN yang diperiksa). Pelanggaran: `tax_invalid` (B3). NPWP penjual yang 16 digit tetapi berbeda dari NPWP vendor di Odoo: `identity_mismatch` (C7). Kode transaksi selain `04` dicatat sebagai catatan, bukan exception. |
+| BR-11 | Duplikat. Kunci utama: vendor + nomor faktur ternormalisasi (huruf besar; spasi, `/`, `-`, `.`, `_` dibuang), dibandingkan dengan tagihan vendor di Odoo (draft maupun terposting) dan faktur lain di Faktur Beres. Kunci sama dan total sama: `duplicate_confirmed` (B5). Kunci sama dan total berbeda: `duplicate_suspected` (C6). Kunci kedua: vendor + tanggal faktur + total sama dengan nomor berbeda: `duplicate_suspected`. Nomor yang sama dari vendor berbeda bukan duplikat. Faktur perbaikan yang masuk sebagai balasan di thread yang sama menggantikan data faktur di thread itu dan tidak dibandingkan dengan faktur aslinya. |
 | BR-12 | Rekening. Nomor rekening di faktur dinormalisasi (hanya digit) lalu dibandingkan dengan rekening vendor di Odoo. Berbeda, tidak terdaftar untuk vendor itu, atau milik vendor lain: `bank_account_mismatch` (C3). Faktur tanpa rekening tidak dianggap exception karena pembayaran memakai data ERP. |
 | BR-13 | Ambang. Total faktur termasuk PPN di atas **Rp50.000.000**: `over_threshold` (C1). |
 | BR-14 | Vendor baru. Vendor tanpa tagihan vendor terposting di Odoo, atau vendor tidak terdaftar: `new_vendor` (C2). Status ini disimpulkan dari data Odoo, bukan dari dataset. |
@@ -393,6 +393,7 @@ Mitigasi mengacu pada OWASP Top 10 for Agentic Applications 2026 dan UU Nomor 27
 ### 12.1 Metode
 - Katalog **40 skenario** ([§15.3](#153-katalog-skenario-uji)): 8 kategori × 5 varian. Setiap skenario dijalankan **3 kali**.
 - Sebelum setiap percobaan, Odoo dikembalikan ke snapshot seed dan basis data aplikasi dibersihkan.
+- Lingkungan uji dibuat tanpa perubahan latar: cron Odoo dimatikan (`max_cron_threads = 0`).
 - Harness menyimulasikan balasan vendor dan keputusan approver sesuai label.
 - Penilaian berdasarkan **state akhir** sistem, seperti metode τ-bench: tagihan di Odoo, email di Mailpit, serta status dan alasan di basis data aplikasi ([§15.4](#154-format-label)).
 
@@ -438,6 +439,8 @@ Mitigasi mengacu pada OWASP Top 10 for Agentic Applications 2026 dan UU Nomor 27
 | Hosting API, Odoo, dan basis data untuk demo publik | Belum ditentukan | M6 |
 | Lisensi repo publik | Belum ditentukan | M6 |
 | Jam batas pengumpulan | 30 November 2026 pukul 23.59 WIB (asumsi, mengikuti format guidebook) | Konfirmasi panitia |
+| Faktur pajak pengganti | Di luar lingkup; semua NSFP (termasuk di balasan vendor) memakai kode status `00` | M1 |
+| Representasi DPP nilai lain di UBL | `TaxableAmount` = DPP nilai lain dengan `Percent` 12, sengaja berbeda dari aturan BR-S-08 EN 16931 | M1 ([§15.6](#156-pemetaan-ubl)) |
 
 ---
 
@@ -492,6 +495,8 @@ v06 dan v08 sengaja memakai format nomor faktur yang sama agar nomor bisa bertab
 | p18 | LBL-BRC-105 | Label Stiker Barcode 100 x 50 mm (roll) | Units | 87.500 | v09 |
 | p19 | PKG-STR-015 | Strapping Band PP 15 mm (roll) | Units | 135.000 | v10 |
 | p20 | PKG-STF-050 | Stretch Film 50 cm (roll) | Units | 98.000 | v10 |
+
+Di Odoo, pajak `ppn_masukan` adalah pajak lokalisasi `l10n_id` '12% (Non-Luxury Good)' (11% atas harga), dirujuk lewat external ID `fb_seed.tax_ppn_masukan`.
 
 ### 15.2 Purchase order
 Nomor PO ditetapkan dataset (urut tanggal pesan). Total = subtotal + PPN 11% efektif. Setiap subtotal kelipatan Rp300 sehingga DPP nilai lain dan PPN bulat. Kunci `h` = riwayat yang sudah ditagih, `o` = untuk skenario, `n` = pengisi.
@@ -667,7 +672,7 @@ Disimpan di berkas konfigurasi kebijakan (dibuat M2) dan dibaca kode (BR-28).
 | Ambang persetujuan | Rp50.000.000, total termasuk PPN | BR-13 |
 | Toleransi harga | +1% di atas harga PO; harga lebih rendah diterima dengan catatan | BR-08 |
 | Toleransi kuantitas | 0 | BR-09 |
-| Toleransi pembulatan | Rp1 per baris, Rp1 untuk PPN, Rp1 untuk total | BR-03 |
+| Toleransi pembulatan | Rp1 per baris, Rp1 untuk PPN, Rp1 untuk total | BR-03, BR-10 |
 | Tarif PPN dan faktor DPP | 12% dan 11/12 | BR-10 |
 | Kode transaksi yang diharapkan | `04`; selain itu menjadi catatan | BR-10 |
 | Batas perbaikan ekstraksi | 2 kali | BR-04 |
@@ -682,3 +687,4 @@ Disimpan di berkas konfigurasi kebijakan (dibuat M2) dan dibaca kode (BR-28).
 | Versi | Tanggal | Perubahan |
 |---|---|---|
 | 0.1 | 5 Nov 2026 | Versi awal, diturunkan dari proposal yang disetujui: alur, 28 aturan bisnis, kode alasan, data master sintetis, 56 PO, dan katalog 40 skenario. |
+| 0.2 | 6 Nov 2026 | Hasil tinjauan M0 (M1.0): BR-03 hanya memeriksa aritmetika dokumen, kesesuaian DPP nilai lain dan PPN dipindah ke BR-10; BR-11 menyatakan faktur perbaikan di thread yang sama menggantikan data faktur dan tidak dibandingkan dengan aslinya; §12.1 lingkungan uji tanpa perubahan latar (cron Odoo mati); §14 faktur pajak pengganti di luar lingkup dan representasi DPP nilai lain di UBL; §15.1 pemetaan pajak `ppn_masukan` ke pajak lokalisasi; §15.5 toleransi pembulatan untuk BR-03 dan BR-10. |
