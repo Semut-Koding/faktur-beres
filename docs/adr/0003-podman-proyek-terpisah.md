@@ -28,6 +28,21 @@
 - Cron Odoo dimatikan (`max_cron_threads = 0`) karena thread cron memproses semua database milik user `odoo`, termasuk snapshot. Membatasi dengan `db_name` tidak dipakai karena server lalu membuat database kosong otomatis saat mulai.
 - Daftar kontainer non-`fakturberes` (ID, nama, waktu dibuat, status, port) diperiksa sebelum dan sesudah M0 dan sama persis.
 
+## Catatan (tinjauan M0, 6 November 2026)
+- **Cron Odoo tetap mati** (`max_cron_threads = 0`). Evaluasi harus bebas perubahan latar: bila cron hidup, tugas yang jadwalnya sudah lewat langsung jalan setelah setiap reset, bersamaan dengan agent. Tidak ada fitur Faktur Beres yang bergantung pada cron Odoo; email dikirim `email_tool` sendiri ke Mailpit. Opsi menandai snapshot sebagai template PostgreSQL (`IS_TEMPLATE`) hanya melindungi snapshot dan menambah langkah `ALTER DATABASE`, jadi tidak dipakai. Cron yang kelak dibutuhkan dijalankan manual oleh skrip admin; susunan server demo publik diputuskan di M6.
+- **Nilai `.env` yang diteruskan podman-compose sebagai `-e` diterima untuk stack lokal.** Laptop hanya dipakai satu pengguna, dan nilai yang lewat compose hanya sandi PostgreSQL lokal. Koreksi atas catatan M0: argumen proses terbaca oleh **semua user lokal** lewat `ps`, bukan hanya user yang sama, kecuali `/proc` dipasang dengan `hidepid`.
+- API key Odoo dan Gemini tidak boleh ada di env kontainer. `npm run odoo:check` memeriksanya ("Env kontainer tanpa rahasia aplikasi") dengan membaca **nama** variabel saja lewat template `podman inspect`; nilainya tidak pernah dibaca. Hasil 6 November 2026:
+
+  | Kontainer | Nama variabel env |
+  |---|---|
+  | `fakturberes_odoo_1` | `HOME`, `HOSTNAME`, `LANG`, `ODOO_RC`, `ODOO_VERSION`, `PATH`, `PGPASSWORD`, `container` |
+  | `fakturberes_odoo-db_1` | `GOSU_VERSION`, `HOME`, `HOSTNAME`, `LANG`, `PATH`, `PGDATA`, `PG_MAJOR`, `PG_VERSION`, `POSTGRES_DB`, `POSTGRES_PASSWORD`, `POSTGRES_USER`, `container` |
+  | `fakturberes_app-db_1` | `GOSU_VERSION`, `HOME`, `HOSTNAME`, `LANG`, `PATH`, `PGDATA`, `PG_MAJOR`, `PG_VERSION`, `POSTGRES_DB`, `POSTGRES_PASSWORD`, `POSTGRES_USER`, `container` |
+  | `fakturberes_mailpit_1` | `HOME`, `HOSTNAME`, `MP_DATABASE`, `MP_SMTP_AUTH_ACCEPT_ANY`, `MP_SMTP_AUTH_ALLOW_INSECURE`, `PATH`, `container` |
+
+  Satu-satunya rahasia di sana adalah sandi PostgreSQL lokal (`PGPASSWORD`, `POSTGRES_PASSWORD`).
+- **Server publik di M6 wajib memakai `podman secret`** untuk semua rahasia, tidak pernah `-e`.
+
 ## Konsekuensi
 - Kedua proyek bisa berjalan bersamaan tanpa bentrok port atau nama.
 - Aturan +20000 mudah diingat dan menjauhi port yang biasa dipakai alat lain (5433, 15432, 18000, 18080).
