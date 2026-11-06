@@ -1,0 +1,118 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2" xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+  <cbc:CustomizationID>urn:cen.eu:en16931:2017#extended#urn:fakturberes:id-ppn:1.0</cbc:CustomizationID>
+  <cbc:ID>KSM/INV/2026/11/0475</cbc:ID>
+  <cbc:IssueDate>2026-11-04</cbc:IssueDate>
+  <cbc:DueDate>2026-12-04</cbc:DueDate>
+  <cbc:InvoiceTypeCode>380</cbc:InvoiceTypeCode>
+  <cbc:DocumentCurrencyCode>IDR</cbc:DocumentCurrencyCode>
+  <cac:OrderReference>
+    <cbc:ID>P00038</cbc:ID>
+  </cac:OrderReference>
+  <cac:AdditionalDocumentReference>
+    <cbc:ID>04002600007215496</cbc:ID>
+    <cbc:IssueDate>2026-11-04</cbc:IssueDate>
+    <cbc:DocumentDescription>Faktur Pajak</cbc:DocumentDescription>
+  </cac:AdditionalDocumentReference>
+  <cac:AccountingSupplierParty>
+    <cac:Party>
+      <cac:PostalAddress>
+        <cbc:StreetName>Jl. Soekarno-Hatta Kav. 210</cbc:StreetName>
+        <cbc:CityName>Kota Bandung</cbc:CityName>
+        <cbc:PostalZone>40286</cbc:PostalZone>
+        <cbc:CountrySubentity>Jawa Barat</cbc:CountrySubentity>
+        <cac:Country>
+          <cbc:IdentificationCode>ID</cbc:IdentificationCode>
+        </cac:Country>
+      </cac:PostalAddress>
+      <cac:PartyTaxScheme>
+        <cbc:CompanyID>0990427957220000</cbc:CompanyID>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:PartyTaxScheme>
+      <cac:PartyLegalEntity>
+        <cbc:RegistrationName>PT Kertas Sagara Mandiri</cbc:RegistrationName>
+      </cac:PartyLegalEntity>
+      <cac:Contact>
+        <cbc:ElectronicMail>tagihan@kertas-sagara.test</cbc:ElectronicMail>
+      </cac:Contact>
+    </cac:Party>
+  </cac:AccountingSupplierParty>
+  <cac:AccountingCustomerParty>
+    <cac:Party>
+      <cac:PostalAddress>
+        <cbc:StreetName>Jl. Industri Barat Blok C No. 18</cbc:StreetName>
+        <cbc:CityName>Kabupaten Karawang</cbc:CityName>
+        <cbc:PostalZone>41361</cbc:PostalZone>
+        <cbc:CountrySubentity>Jawa Barat</cbc:CountrySubentity>
+        <cac:Country>
+          <cbc:IdentificationCode>ID</cbc:IdentificationCode>
+        </cac:Country>
+      </cac:PostalAddress>
+      <cac:PartyTaxScheme>
+        <cbc:CompanyID>0990229163926000</cbc:CompanyID>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:PartyTaxScheme>
+      <cac:PartyLegalEntity>
+        <cbc:RegistrationName>PT Arunika Kemas Nusantara</cbc:RegistrationName>
+      </cac:PartyLegalEntity>
+      <cac:Contact>
+        <cbc:ElectronicMail>ap@arunika.test</cbc:ElectronicMail>
+      </cac:Contact>
+    </cac:Party>
+  </cac:AccountingCustomerParty>
+  <cac:PaymentMeans>
+    <cbc:PaymentMeansCode>30</cbc:PaymentMeansCode>
+    <cac:PayeeFinancialAccount>
+      <cbc:ID>5450717927</cbc:ID>
+      <cbc:Name>PT Kertas Sagara Mandiri</cbc:Name>
+      <cac:FinancialInstitutionBranch>
+        <cbc:Name>Bank Mandala Raya</cbc:Name>
+      </cac:FinancialInstitutionBranch>
+    </cac:PayeeFinancialAccount>
+  </cac:PaymentMeans>
+  <cac:TaxTotal>
+    <cbc:TaxAmount currencyID="IDR">1478400.00</cbc:TaxAmount>
+    <cac:TaxSubtotal>
+      <cbc:TaxableAmount currencyID="IDR">12320000.00</cbc:TaxableAmount>
+      <cbc:TaxAmount currencyID="IDR">1478400.00</cbc:TaxAmount>
+      <cac:TaxCategory>
+        <cbc:ID>S</cbc:ID>
+        <cbc:Percent>12</cbc:Percent>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:TaxCategory>
+    </cac:TaxSubtotal>
+  </cac:TaxTotal>
+  <cac:LegalMonetaryTotal>
+    <cbc:LineExtensionAmount currencyID="IDR">13440000.00</cbc:LineExtensionAmount>
+    <cbc:TaxExclusiveAmount currencyID="IDR">13440000.00</cbc:TaxExclusiveAmount>
+    <cbc:TaxInclusiveAmount currencyID="IDR">14918400.00</cbc:TaxInclusiveAmount>
+    <cbc:PayableAmount currencyID="IDR">14918400.00</cbc:PayableAmount>
+  </cac:LegalMonetaryTotal>
+  <cac:InvoiceLine>
+    <cbc:ID>1</cbc:ID>
+    <cbc:InvoicedQuantity unitCode="KGM">1200</cbc:InvoicedQuantity>
+    <cbc:LineExtensionAmount currencyID="IDR">13440000.00</cbc:LineExtensionAmount>
+    <cac:Item>
+      <cbc:Name>Kraft Liner 200 gsm (KL-200)</cbc:Name>
+      <cac:SellersItemIdentification>
+        <cbc:ID>KL-200</cbc:ID>
+      </cac:SellersItemIdentification>
+      <cac:ClassifiedTaxCategory>
+        <cbc:ID>S</cbc:ID>
+        <cbc:Percent>12</cbc:Percent>
+        <cac:TaxScheme>
+          <cbc:ID>VAT</cbc:ID>
+        </cac:TaxScheme>
+      </cac:ClassifiedTaxCategory>
+    </cac:Item>
+    <cac:Price>
+      <cbc:PriceAmount currencyID="IDR">11200.00</cbc:PriceAmount>
+    </cac:Price>
+  </cac:InvoiceLine>
+</Invoice>
