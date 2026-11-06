@@ -257,7 +257,7 @@ Dashboard di Vercel. API, Odoo, dan basis data di server yang ditentukan di M6, 
 | Image Odoo berubah diam-diam | Tag bertanggal, naik versi secara sengaja |
 | Bentrok dengan DombaTek (port, data, sumber daya) | Proyek compose dan port terpisah, aturan di CLAUDE.md, pemeriksaan awal di setiap tugas |
 | Path repo mengandung spasi | Semua path dikutip; diuji di M0 |
-| Folder repo di bawah `Drive` ikut tersinkron | `.venv`, `node_modules`, dan `var` dikecualikan dari sinkronisasi; mount jaringan atau FUSE dihindari (diperiksa M0) |
+| Folder repo di bawah `Drive` ikut tersinkron | **Ditutup (6 Nov 2026): folder lokal, tidak tersinkron.** Mount jaringan atau FUSE tetap dihindari (diperiksa M0) |
 | Hasil LLM tidak deterministik | Temperature rendah, skema ketat, metrik pass^3 |
 | Label evaluasi bocor ke agent | Aturan di CLAUDE.md dan ADR-0007, tes yang memastikan data Odoo dan berkas faktur tidak memuat ID skenario |
 | Demo publik disalahgunakan | Kode akses, batas laju, dan reset berkala (M6) |

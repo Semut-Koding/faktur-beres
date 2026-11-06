@@ -74,10 +74,10 @@ ss -ltn | grep -E ':(28069|25432|21025|28025|28000|25173)\b' || echo "port Faktu
 - `npm run odoo:init` menulis `ODOO_ADMIN_API_KEY` dan `ODOO_AGENT_API_KEY` ke `.env`. Key Odoo berlaku paling lama 3 bulan; jalankan `odoo:init` lagi untuk membuat key baru bila key lama kedaluwarsa (gejalanya galat 401 `Invalid apikey`).
 - `GEMINI_API_KEY` diisi sendiri oleh pemilik (mulai M3).
 - `.env` dibuat dengan izin `600`. Hook pre-commit dari `npm run setup` menjalankan `npm run guard:secrets` sebelum setiap commit.
-- podman-compose meneruskan variabel dari `.env` sebagai argumen `-e` ke perintah `podman`. Selama perintah berjalan, nilainya terlihat di daftar proses milik user yang sama. Jangan merekam layar saat menjalankan `ps`, `podman compose config`, atau podman-compose dengan `--verbose`.
+- podman-compose meneruskan variabel dari `.env` sebagai argumen `-e` ke perintah `podman`. Selama perintah berjalan, nilainya terbaca di daftar proses (`ps`) oleh semua user lokal, kecuali `/proc` dipasang dengan `hidepid`. Ini diterima untuk laptop satu pengguna karena yang lewat compose hanya sandi PostgreSQL lokal. API key Odoo dan Gemini tidak pernah masuk env kontainer (diperiksa `npm run odoo:check`), dan server publik di M6 memakai `podman secret`. Jangan merekam layar saat menjalankan `ps`, `podman compose config`, atau podman-compose dengan `--verbose`.
 
-## Bila folder repo tersinkron ke cloud
-Bila folder `Drive` disinkronkan ke layanan cloud, kecualikan `.venv/`, `node_modules/`, `var/`, dan `eval/hasil/` dari sinkronisasi agar tidak membebani sinkronisasi dan tidak menimbulkan konflik. Database berada di volume Podman, bukan di folder repo. Jangan menaruh repo di mount jaringan atau FUSE.
+## Lokasi repo
+Repo berada di disk lokal (btrfs) dan tidak tersinkron ke layanan cloud; nama folder `Drive` hanya nama folder (dikonfirmasi 6 November 2026). Database berada di volume Podman, bukan di folder repo. Jangan memindahkan repo ke mount jaringan atau FUSE.
 
 ## Pemecahan masalah
 
