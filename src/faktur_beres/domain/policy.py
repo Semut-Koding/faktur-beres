@@ -12,25 +12,15 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import Field, model_validator
 
 from faktur_beres.config import REPO_ROOT
+from faktur_beres.domain.base import DomainModel
 
 POLICY_PATH = REPO_ROOT / "data" / "kebijakan" / "parameter.yaml"
 
 
-class _Model(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=True, populate_by_name=True)
-
-    @field_validator("*", mode="before")
-    @classmethod
-    def _no_float(cls, value: Any) -> Any:
-        if isinstance(value, float):
-            raise ValueError("pakai bilangan bulat atau string desimal, bukan float")
-        return value
-
-
-class Ratio(_Model):
+class Ratio(DomainModel):
     """An exact fraction such as 11/12; written ``"11/12"`` in YAML."""
 
     numerator: int = Field(gt=0)
@@ -60,13 +50,13 @@ class Ratio(_Model):
         return f"{self.numerator}/{self.denominator}"
 
 
-class RoundingTolerance(_Model):
+class RoundingTolerance(DomainModel):
     per_line: Decimal = Field(alias="per_baris_rupiah", ge=0)
     tax: Decimal = Field(alias="ppn_rupiah", ge=0)
     total: Decimal = Field(alias="total_rupiah", ge=0)
 
 
-class TaxPolicy(_Model):
+class TaxPolicy(DomainModel):
     vat_rate_percent: Decimal = Field(alias="tarif_ppn_persen", gt=0, le=100)
     dpp_factor: Ratio = Field(alias="faktor_dpp_nilai_lain")
     expected_transaction_code: str = Field(alias="kode_transaksi_diharapkan", pattern=r"^\d{2}$")
@@ -82,12 +72,12 @@ class TaxPolicy(_Model):
         return self.vat_rate * self.dpp_factor.fraction
 
 
-class VendorReplyPolicy(_Model):
+class VendorReplyPolicy(DomainModel):
     wait_working_days: int = Field(alias="tunggu_hari_kerja", ge=0)
     reminders: int = Field(alias="jumlah_pengingat", ge=0)
 
 
-class PolicyConfig(_Model):
+class PolicyConfig(DomainModel):
     """All parameters of SPEC §15.5. Validated: nothing negative, the DPP factor a proper ratio."""
 
     version: int = Field(alias="versi", ge=1)
