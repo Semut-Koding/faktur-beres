@@ -1,0 +1,5 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_agent_account_move,account.move faktur beres agent,account.model_account_move,group_agent,1,1,1,0
+access_agent_account_move_line,account.move.line faktur beres agent,account.model_account_move_line,group_agent,1,1,1,0
+access_agent_stock_picking,stock.picking faktur beres agent,stock.model_stock_picking,group_agent,1,0,0,0
+access_agent_stock_move,stock.move faktur beres agent,stock.model_stock_move,group_agent,1,0,0,0

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Grup dan aturan rekaman user bot Faktur Beres (RENCANA-TEKNIS §4.4).
+
+    Cara Odoo 19 menggabungkan hak (odoo/addons/base/models/ir_rule.py, _compute_domain):
+    ACL bersifat tambahan antar grup; untuk setiap mode, aturan global di-AND dan aturan grup
+    di-OR. Karena itu aturan pembatas di bawah hanya efektif selama user agent tidak berada di
+    grup lain yang punya aturan grup untuk mode yang sama (mis. purchase.group_purchase_user atau
+    account.group_account_invoice, yang memberi akses ke semua tagihan). Aturan penolak memakai
+    domain [(0, '=', 1)] dan hanya berlaku untuk mode yang ditolak (perm_read False).
+-->
+<odoo>
+    <record id="group_agent" model="res.groups">
+        <field name="name">Faktur Beres Agent</field>
+        <field name="comment">User bot Faktur Beres: baca data ERP, buat dan ubah draft tagihan vendor buatan sendiri, lampiran, dan catatan. Tanpa hapus dan posting.</field>
+        <field name="implied_ids" eval="[Command.link(ref('base.group_user')), Command.link(ref('account.group_account_readonly'))]"/>
+        <field name="api_key_duration">90</field>
+    </record>
+
+    <!-- Tagihan: buat dan ubah hanya draft in_invoice buatan user sendiri. -->
+    <record id="rule_agent_move_own_draft_bill" model="ir.rule">
+        <field name="name">Faktur Beres Agent: hanya draft tagihan vendor buatan sendiri</field>
+        <field name="model_id" ref="account.model_account_move"/>
+        <field name="groups" eval="[Command.link(ref('group_agent'))]"/>
+        <field name="domain_force">[('move_type', '=', 'in_invoice'), ('state', '=', 'draft'), ('create_uid', '=', user.id)]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <record id="rule_agent_move_line_own_draft_bill" model="ir.rule">
+        <field name="name">Faktur Beres Agent: hanya baris draft tagihan vendor buatan sendiri</field>
+        <field name="model_id" ref="account.model_account_move_line"/>
+        <field name="groups" eval="[Command.link(ref('group_agent'))]"/>
+        <field name="domain_force">[('move_id.move_type', '=', 'in_invoice'), ('move_id.state', '=', 'draft'), ('move_id.create_uid', '=', user.id)]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!-- base.group_user memberi CRUD penuh pada stock.move.line: tutup buat, ubah, dan hapus. -->
+    <record id="rule_agent_deny_stock_move_line" model="ir.rule">
+        <field name="name">Faktur Beres Agent: tidak mengubah baris penerimaan</field>
+        <field name="model_id" ref="stock.model_stock_move_line"/>
+        <field name="groups" eval="[Command.link(ref('group_agent'))]"/>
+        <field name="domain_force">[(0, '=', 1)]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <!-- base.group_user memberi hak hapus lampiran dan pesan: tutup hapus. -->
+    <record id="rule_agent_deny_unlink_attachment" model="ir.rule">
+        <field name="name">Faktur Beres Agent: tidak menghapus lampiran</field>
+        <field name="model_id" ref="base.model_ir_attachment"/>
+        <field name="groups" eval="[Command.link(ref('group_agent'))]"/>
+        <field name="domain_force">[(0, '=', 1)]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+
+    <record id="rule_agent_deny_unlink_message" model="ir.rule">
+        <field name="name">Faktur Beres Agent: tidak menghapus pesan chatter</field>
+        <field name="model_id" ref="mail.model_mail_message"/>
+        <field name="groups" eval="[Command.link(ref('group_agent'))]"/>
+        <field name="domain_force">[(0, '=', 1)]</field>
+        <field name="perm_read" eval="False"/>
+        <field name="perm_create" eval="False"/>
+        <field name="perm_write" eval="False"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+</odoo>

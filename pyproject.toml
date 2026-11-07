@@ -39,6 +39,8 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 [tool.ruff.lint.per-file-ignores]
 # Skrip ORM yang dijalankan `odoo shell` di kontainer: `env` disediakan oleh Odoo.
 "infra/odoo/shell/*.py" = ["F821"]
+# Manifest addon Odoo adalah satu ekspresi dict, sesuai format Odoo.
+"infra/odoo/addons/*/__manifest__.py" = ["B018"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
