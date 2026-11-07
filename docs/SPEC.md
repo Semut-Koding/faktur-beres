@@ -315,15 +315,20 @@ Admin mengembalikan Odoo ke snapshot seed dengan `npm run odoo:reset`. Basis dat
 ### 9.1 Odoo
 Odoo 19 Community adalah sistem pencatatan untuk vendor, PO, penerimaan, dan tagihan. Model yang dipakai:
 
-| Model | Kegunaan | Akses agent |
+| Model | Kegunaan | Akses agent (terverifikasi M2) |
 |---|---|---|
+| `res.company` | Perusahaan: NPWP (`vat`) untuk pemeriksaan NPWP pembeli (BR-10) | Baca |
 | `res.partner` | Vendor: nama, NPWP (`vat`), email penagihan | Baca |
 | `res.partner.bank` | Rekening vendor | Baca |
-| `product.product`, `product.supplierinfo` | Produk, kode produk vendor, harga vendor | Baca |
-| `purchase.order`, `purchase.order.line` | PO dan baris: kuantitas, harga, kuantitas diterima, kuantitas ditagih | Baca |
-| `stock.picking`, `stock.move` | Penerimaan barang | Baca |
-| `account.move` (`in_invoice`), `account.move.line` | Tagihan vendor | Baca, buat draft |
-| `ir.attachment`, `mail.message` | Lampiran berkas dan catatan chatter | Buat |
+| `product.product`, `product.template`, `product.supplierinfo`, `uom.uom` | Produk, kode produk vendor, harga vendor, satuan | Baca |
+| `purchase.order`, `purchase.order.line` | PO dan baris: kuantitas, harga, kuantitas diterima, kuantitas ditagih | Baca; konfirmasi dan pembatalan PO ditolak |
+| `stock.picking`, `stock.move`, `stock.move.line` | Penerimaan barang | Baca; validasi penerimaan ditolak |
+| `account.tax`, `account.journal`, `account.payment.term`, `res.currency` | Pajak, jurnal, termin, mata uang | Baca |
+| `account.move` (`in_invoice`), `account.move.line` | Tagihan vendor | Baca semua; buat dan ubah hanya draft `in_invoice` buatan agent; tanpa hapus; posting dan perubahan status ditolak |
+| `ir.attachment` | Lampiran berkas | Baca mengikuti record induk; buat hanya pada draft agent; tanpa hapus |
+| `mail.message` | Catatan chatter | Baca; buat lewat `message_post`; tanpa hapus. Odoo mengizinkan catatan di tagihan mana pun yang bisa dibaca (`_mail_post_access = 'read'`), jadi batas "hanya draft agent" dipegang `AgentOdooGateway` |
+
+Hak ini diberikan grup `faktur_beres_agent.group_agent` dari addon kecil di `infra/odoo/addons` (tanpa logika agent), diperiksa `npm run odoo:check` lewat `has_access`, dan penolakannya dibuktikan `npm run test:integrasi` ([RENCANA-TEKNIS §4.4](RENCANA-TEKNIS.md#44-odoo)).
 
 Nama field persis diverifikasi di M0 dengan `fields_get` dan dicatat di [RENCANA-TEKNIS §4.4](RENCANA-TEKNIS.md#44-odoo).
 
@@ -814,4 +819,4 @@ E-invoice uji memakai UBL 2.1 Invoice (`urn:oasis:names:specification:ubl:schema
 |---|---|---|
 | 0.1 | 5 Nov 2026 | Versi awal, diturunkan dari proposal yang disetujui: alur, 28 aturan bisnis, kode alasan, data master sintetis, 56 PO, dan katalog 40 skenario. |
 | 0.2 | 6 Nov 2026 | Hasil tinjauan M0 (M1.0): BR-03 hanya memeriksa aritmetika dokumen, kesesuaian DPP nilai lain dan PPN dipindah ke BR-10; BR-11 menyatakan faktur perbaikan di thread yang sama menggantikan data faktur dan tidak dibandingkan dengan aslinya; §12.1 lingkungan uji tanpa perubahan latar (cron Odoo mati); §14 faktur pajak pengganti di luar lingkup dan representasi DPP nilai lain di UBL; §15.1 pemetaan pajak `ppn_masukan` ke pajak lokalisasi; §15.5 toleransi pembulatan untuk BR-03 dan BR-10. Generator faktur (M1.6–M1.7): §15.6 pemetaan UBL beserta penyimpangan BR-S-08 untuk DPP nilai lain; §15.4 format label final, aturan isi label, arti setiap larangan, dan aturan penilaian. |
-| 0.3 | 7 Nov 2026 | Hasil tinjauan M1 (M2.0): §6.2 B4 mencakup PO yang belum dikonfirmasi; BR-05 urutan identifikasi vendor (NPWP valid, lalu nama ternormalisasi dan email), dan pemeriksaan yang bergantung pada data vendor hanya bila vendor teridentifikasi tunggal; BR-06 hanya PO terkonfirmasi yang dipakai, RFQ menjadi `po_unresolved`, dan pencocokan baris hanya setelah PO ditetapkan; BR-07 produk yang muncul di lebih dari satu baris PO dianggap tanpa padanan; BR-09 satuan tidak dikonversi, dan kuantitas tagihan pembanding duplikat tidak dihitung sebagai sudah ditagih; BR-10 validasi digit cek NPWP, dasar subtotal tercetak, dan NPWP tidak valid hanya `tax_invalid`; BR-11 tagihan batal tidak dihitung; BR-13 ambang berlaku untuk total lebih dari Rp50.000.000; BR-17 himpunan jalur yang diizinkan dan jalur bawaan dihitung kode. Simulasi orakel perencana atas `kebenaran_dokumen` ke-40 label: 33/40 dengan pembacaan SPEC 0.2 yang masih sah menurut teksnya (DUP-01–03, HRG-05, NPO-03–05 gagal), 40/40 dengan klarifikasi ini. §12.1 evaluasi orakel; §15.3.1 rincian dokumen per skenario, disalin dari prompt M1 bagian M1.3; §15.6 tanggal faktur pajak tidak ditulis bila tidak ada dan dibaca kosong oleh parser. |
+| 0.3 | 7 Nov 2026 | Hasil tinjauan M1 (M2.0): §6.2 B4 mencakup PO yang belum dikonfirmasi; BR-05 urutan identifikasi vendor (NPWP valid, lalu nama ternormalisasi dan email), dan pemeriksaan yang bergantung pada data vendor hanya bila vendor teridentifikasi tunggal; BR-06 hanya PO terkonfirmasi yang dipakai, RFQ menjadi `po_unresolved`, dan pencocokan baris hanya setelah PO ditetapkan; BR-07 produk yang muncul di lebih dari satu baris PO dianggap tanpa padanan; BR-09 satuan tidak dikonversi, dan kuantitas tagihan pembanding duplikat tidak dihitung sebagai sudah ditagih; BR-10 validasi digit cek NPWP, dasar subtotal tercetak, dan NPWP tidak valid hanya `tax_invalid`; BR-11 tagihan batal tidak dihitung; BR-13 ambang berlaku untuk total lebih dari Rp50.000.000; BR-17 himpunan jalur yang diizinkan dan jalur bawaan dihitung kode. Simulasi orakel perencana atas `kebenaran_dokumen` ke-40 label: 33/40 dengan pembacaan SPEC 0.2 yang masih sah menurut teksnya (DUP-01–03, HRG-05, NPO-03–05 gagal), 40/40 dengan klarifikasi ini. §12.1 evaluasi orakel; §15.3.1 rincian dokumen per skenario, disalin dari prompt M1 bagian M1.3; §15.6 tanggal faktur pajak tidak ditulis bila tidak ada dan dibaca kosong oleh parser. Grup Odoo khusus agent (M2.1): §9.1 hak agent terverifikasi, termasuk baris `res.company`. |
