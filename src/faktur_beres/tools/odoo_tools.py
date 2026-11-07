@@ -9,10 +9,11 @@ The writes (``create_draft_bill``, ``attach_file``, ``post_note``) are idempoten
 see their docstrings.
 """
 
+from collections import Counter
 from collections.abc import Iterable, Sequence
 from datetime import date
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from faktur_beres.domain.base import DomainModel
 from faktur_beres.domain.erp import (
@@ -29,10 +30,12 @@ from faktur_beres.domain.erp import (
 from faktur_beres.domain.normalize import (
     account_digits,
     normalize_email,
+    normalize_invoice_number,
     normalize_name,
     normalize_po_number,
     tax_id_digits,
 )
+from faktur_beres.domain.rules.bill_plan import BillPlan
 from faktur_beres.tools.odoo_gateway import AgentOdooGateway
 
 VENDOR_DOMAIN: list[Any] = [["supplier_rank", ">", 0]]
@@ -417,3 +420,114 @@ class OdooErpReader:
 
     def posted_bill_count(self, vendor_id: int) -> int:
         return posted_bill_count(self._gw, vendor_id)
+
+
+# -- writes -----------------------------------------------------------------------------------
+
+
+class DraftBillResult(DomainModel):
+    """Outcome of ``create_draft_bill`` (BR-18, BR-22)."""
+
+    outcome: Literal["created", "reused", "conflict"]
+    bill_id: int | None = None
+    verified: bool
+    differences: tuple[str, ...] = ()
+    total: Decimal | None = None
+    conflicts: tuple[int, ...] = ()
+    idempotency_key: str
+
+
+def verify_bill(bill: BillRecord, plan: BillPlan, tolerance: Decimal) -> tuple[str, ...]:
+    """What differs between a bill read back from Odoo and its plan (empty when it matches)."""
+    differences = []
+    if bill.state != BillState.DRAFT:
+        differences.append(f"status {bill.state.value}, seharusnya draft")
+    if bill.vendor_id != plan.partner_id:
+        differences.append(f"vendor #{bill.vendor_id}, seharusnya #{plan.partner_id}")
+    if bill.ref != plan.ref:
+        differences.append(f"ref {bill.ref!r}, seharusnya {plan.ref!r}")
+    if bill.invoice_date != plan.invoice_date:
+        differences.append(f"tanggal {bill.invoice_date}, seharusnya {plan.invoice_date}")
+    have = Counter((ln.purchase_line_id, ln.quantity, ln.price_unit) for ln in bill.lines)
+    want = Counter((ln.purchase_line_id, ln.quantity, ln.price_unit) for ln in plan.lines)
+    if have != want:
+        differences.append(
+            "baris berbeda: tagihan "
+            + ", ".join(f"{k[0]}:{k[1]}×{k[2]}" for k in sorted(have, key=str))
+            + "; rencana "
+            + ", ".join(f"{k[0]}:{k[1]}×{k[2]}" for k in sorted(want, key=str))
+        )
+    gap = bill.amount_total - plan.expected_total
+    if abs(gap) > tolerance:
+        differences.append(
+            f"total {bill.amount_total} berbeda dari total faktur {plan.expected_total} "
+            f"(selisih {gap})"
+        )
+    return tuple(differences)
+
+
+def create_draft_bill(
+    gw: AgentOdooGateway,
+    plan: BillPlan,
+    idempotency_key: str,
+    *,
+    tolerance: Decimal = Decimal(1),
+) -> DraftBillResult:
+    """Create the one draft vendor bill of ``plan``, idempotently, and verify it.
+
+    1. Natural key: vendor + ``ref`` normalised (BR-11) among the vendor's draft and posted bills.
+       A draft the agent created with the same content is reused; anything else is a conflict and
+       nothing is created.
+    2. Create the bill with all its lines in **one** ``create`` call.
+    3. Read it back and verify state draft, vendor, ``ref``, date, every line (PO line, quantity,
+       price), and the total within ``tolerance`` of the printed total. A failed verification is
+       reported, never repaired here (BR-18: the draft stays as it is and the invoice goes to C).
+    """
+    wanted = normalize_invoice_number(plan.ref)
+    same_key = [
+        b
+        for b in vendor_bills(gw, plan.partner_id)
+        if b.ref and normalize_invoice_number(b.ref) == wanted
+    ]
+    if same_key:
+        if len(same_key) == 1 and same_key[0].state == BillState.DRAFT:
+            existing = same_key[0]
+            if gw.is_agent_draft(existing.id) and not verify_bill(existing, plan, tolerance):
+                return DraftBillResult(
+                    outcome="reused",
+                    bill_id=existing.id,
+                    verified=True,
+                    total=existing.amount_total,
+                    idempotency_key=idempotency_key,
+                )
+        return DraftBillResult(
+            outcome="conflict",
+            verified=False,
+            differences=tuple(
+                f"sudah ada tagihan #{b.id} ({b.state.value}) untuk vendor dan nomor ini"
+                for b in same_key
+            ),
+            conflicts=tuple(b.id for b in same_key),
+            idempotency_key=idempotency_key,
+        )
+
+    bill_id = gw.create_vendor_bill(plan.odoo_values())
+    created = bills_by_ids(gw, [bill_id])
+    if not created:
+        return DraftBillResult(
+            outcome="created",
+            bill_id=bill_id,
+            verified=False,
+            differences=("tagihan tidak terbaca ulang",),
+            idempotency_key=idempotency_key,
+        )
+    bill = created[0]
+    differences = verify_bill(bill, plan, tolerance)
+    return DraftBillResult(
+        outcome="created",
+        bill_id=bill_id,
+        verified=not differences,
+        differences=differences,
+        total=bill.amount_total,
+        idempotency_key=idempotency_key,
+    )
