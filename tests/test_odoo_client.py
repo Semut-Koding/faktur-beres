@@ -327,3 +327,27 @@ def test_api_key_not_in_connection_error() -> None:
 def test_empty_key_is_rejected() -> None:
     with pytest.raises(ValueError):
         OdooClient(BASE_URL, "fakturberes", "")
+
+
+def test_decimals_are_sent_without_float() -> None:
+    from decimal import Decimal
+
+    recorder = Recorder(httpx.Response(200, json=[7]))
+    client, _ = make_client(recorder)
+    client.create(
+        "account.move.line", {"quantity": Decimal("840.000"), "price_unit": Decimal("12.5")}
+    )
+    body = json.loads(recorder.requests[0].content)
+    assert body["vals_list"] == [{"quantity": 840, "price_unit": "12.5"}]
+
+
+def test_parse_float_reads_exact_decimals() -> None:
+    from decimal import Decimal
+
+    raw = b'[{"id": 1, "price_unit": 185900.0, "qty": 0.1}]'
+    client, _ = make_client(Recorder(httpx.Response(200, content=raw)), parse_float=Decimal)
+    rows = client.search_read("purchase.order.line", [], ["price_unit", "qty"])
+    assert rows == [{"id": 1, "price_unit": Decimal("185900.0"), "qty": Decimal("0.1")}]
+    assert isinstance(rows[0]["qty"], Decimal)
+    plain, _ = make_client(Recorder(httpx.Response(200, content=raw)))
+    assert isinstance(plain.search_read("x", [], ["qty"])[0]["qty"], float)

@@ -16,6 +16,7 @@ import logging
 import time
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from typing import Any
 
 import httpx
@@ -70,7 +71,15 @@ class _BearerAuth(httpx.Auth):
 
 
 def _json_default(value: Any) -> Any:
-    """Serialize dates the way Odoo expects them (datetimes as naive UTC)."""
+    """Serialize dates the way Odoo expects them (datetimes as naive UTC) and Decimals exactly.
+
+    A whole ``Decimal`` becomes a JSON integer; any other ``Decimal`` a string, which Odoo's float
+    and monetary fields convert themselves, so no binary float is ever produced on this side.
+    """
+    if isinstance(value, Decimal):
+        if value == value.to_integral_value():
+            return int(value)
+        return format(value, "f")
     if isinstance(value, datetime):
         if value.tzinfo is not None:
             value = value.astimezone(UTC).replace(tzinfo=None)
@@ -97,6 +106,7 @@ class OdooClient:
         max_attempts: int = 3,
         backoff: float = 0.5,
         sleep: Callable[[float], None] = time.sleep,
+        parse_float: Callable[[str], Any] | None = None,
     ) -> None:
         key = api_key.get_secret_value() if isinstance(api_key, SecretStr) else api_key
         if not key:
@@ -107,6 +117,8 @@ class OdooClient:
         self._max_attempts = max(1, max_attempts)
         self._backoff = backoff
         self._sleep = sleep
+        # parse_float=Decimal reads JSON numbers with a fraction as exact Decimals (agent code).
+        self._parse_float = parse_float
         self._http = httpx.Client(
             base_url=self.base_url,
             timeout=timeout,
@@ -171,6 +183,8 @@ class OdooClient:
             if response.status_code == 200:
                 if not response.content:
                     return None
+                if self._parse_float is not None:
+                    return json.loads(response.content, parse_float=self._parse_float)
                 return response.json()
 
             error = self._error(response, model, method)
