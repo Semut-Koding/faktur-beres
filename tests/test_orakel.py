@@ -75,3 +75,34 @@ def test_reply_from_another_address_is_ignored(labels, simulator: Simulator) -> 
     outcome = simulator.run(forged)
     assert outcome.final_status.value == "awaiting_vendor" and outcome.bills == ()
     assert any("BR-20" in step for step in outcome.steps)
+
+
+def test_seed_state_check_wants_only_the_history_bills() -> None:
+    from fake_odoo import FakeOdoo, gateway
+    from faktur_beres.evals.orakel import seed_state_problems
+
+    ds = load_dataset()
+    history = [
+        {"id": i, "ref": bill.vendor_invoice_number, "state": "posted"}
+        for i, (_, bill) in enumerate(ds.history_bills, start=1)
+    ]
+    assert seed_state_problems(gateway(FakeOdoo({"account.move/search_read": history})), ds) == []
+    extra = [*history, {"id": 99, "ref": "KSM/INV/2026/10/0458", "state": "draft"}]
+    problems = seed_state_problems(gateway(FakeOdoo({"account.move/search_read": extra})), ds)
+    assert len(problems) == 2
+
+
+def test_modes_are_compared_without_ids(labels) -> None:
+    from faktur_beres.evals.orakel import compare_reports
+
+    report = run_oracle(offline_reader(), "luring", labels)
+    assert compare_reports(report, report) == []
+    changed = report.model_copy(
+        update={
+            "outcomes": tuple(
+                o.model_copy(update={"final_status": o.initial_status}) if o.id == "QTY-01" else o
+                for o in report.outcomes
+            )
+        }
+    )
+    assert compare_reports(report, changed) == ["QTY-01"]

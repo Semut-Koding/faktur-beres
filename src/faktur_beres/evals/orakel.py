@@ -68,6 +68,9 @@ from faktur_beres.evals.labels import (
     truth_to_invoice,
 )
 from faktur_beres.generator.label_schema import Label
+from faktur_beres.tools.errors import ToolError
+from faktur_beres.tools.odoo_gateway import AgentOdooGateway
+from faktur_beres.tools.odoo_tools import OdooErpReader
 
 RESULT_DIR = REPO_ROOT / "eval" / "hasil"
 PO_TOKEN = re.compile(r"\b[A-Z]{1,4}-?\d{3,}\b")
@@ -101,6 +104,14 @@ class Outcome(DomainModel):
     emails_total: tuple[tuple[str, int], ...]
     bills: tuple[PlannedBill, ...]
     steps: tuple[str, ...]
+
+
+def comparable(outcome: Outcome) -> dict[str, object]:
+    """An outcome without what depends on record ids (idempotency keys) or wording (steps)."""
+    data = outcome.model_dump(mode="json", exclude={"steps"})
+    for bill in data["bills"]:
+        bill.pop("key")
+    return data
 
 
 class Check(DomainModel):
@@ -412,6 +423,49 @@ def offline_reader() -> ErpReader:
     return DatasetErpReader(get_dataset())
 
 
+def seed_state_problems(gw: AgentOdooGateway, ds: Dataset) -> list[str]:
+    """Why Odoo is not in the seed state: the only vendor bills must be the posted history bills."""
+    rows = gw.search_read(
+        "account.move", [["move_type", "=", "in_invoice"]], ["id", "ref", "state"]
+    )
+    expected = sorted(bill.vendor_invoice_number for _, bill in ds.history_bills)
+    problems = []
+    if sorted(str(r["ref"]) for r in rows) != expected:
+        problems.append(f"{len(rows)} tagihan vendor, seharusnya {len(expected)} tagihan riwayat")
+    not_posted = [r["id"] for r in rows if r["state"] != "posted"]
+    if not_posted:
+        problems.append(f"tagihan belum terposting: {not_posted}")
+    return problems
+
+
+def compare_reports(offline: Report, online: Report) -> list[str]:
+    """Scenarios whose outcome differs between the two modes."""
+    off = {o.id: comparable(o) for o in offline.outcomes}
+    on = {o.id: comparable(o) for o in online.outcomes}
+    return sorted(sid for sid in off.keys() | on.keys() if off.get(sid) != on.get(sid))
+
+
+def odoo_report(labels: dict[str, Label]) -> tuple[int, Report | None, list[str]]:
+    """Run the oracle on Odoo (agent key, read only). Returns (exit code, report, differences)."""
+    ds = get_dataset()
+    try:
+        with AgentOdooGateway.from_settings() as gw:
+            problems = seed_state_problems(gw, ds)
+            if problems:
+                print(
+                    "galat: Odoo tidak dalam kondisi seed (" + "; ".join(problems) + "). "
+                    "Jalankan npm run odoo:reset lalu ulangi.",
+                    file=sys.stderr,
+                )
+                return 2, None, []
+            report = run_oracle(OdooErpReader(gw), "odoo", labels)
+    except ToolError as exc:
+        print(f"galat: Odoo tidak bisa dibaca dengan key agent: {exc}", file=sys.stderr)
+        return 2, None, []
+    differences = compare_reports(run_oracle(offline_reader(), "luring", labels), report)
+    return 0, report, differences
+
+
 def print_report(report: Report, labels: dict[str, Label]) -> None:
     rows = []
     for s, o in zip(report.scores, report.outcomes, strict=True):
@@ -449,18 +503,35 @@ def write_json(report: Report, path: Path) -> None:
 
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Evaluasi orakel 40 skenario (SPEC §12.1)")
+    parser.add_argument(
+        "--odoo",
+        action="store_true",
+        help="baca ERP dari Odoo hasil seed lewat user agent (baca saja), bukan dari dataset",
+    )
     parser.add_argument("--json", type=Path, default=None, help="berkas hasil JSON")
     args = parser.parse_args(argv)
 
     labels = load_labels()
-    mode: Mode = "luring"
-    report = run_oracle(offline_reader(), mode, labels)
+    mode: Mode = "odoo" if args.odoo else "luring"
+    differences: list[str] = []
+    if args.odoo:
+        code, found, differences = odoo_report(labels)
+        if found is None:
+            return code
+        report = found
+    else:
+        report = run_oracle(offline_reader(), mode, labels)
     print_report(report, labels)
+    if args.odoo:
+        print(
+            "Sama dengan mode luring: "
+            + ("ya" if not differences else "TIDAK, berbeda di " + ", ".join(differences))
+        )
     path = args.json or RESULT_DIR / f"orakel-{mode}.json"
     write_json(report, path)
     shown = path.relative_to(REPO_ROOT) if path.is_relative_to(REPO_ROOT) else path
     print(f"Hasil JSON: {shown}")
-    return 0 if report.passed == report.total else 1
+    return 0 if report.passed == report.total and not differences else 1
 
 
 if __name__ == "__main__":
