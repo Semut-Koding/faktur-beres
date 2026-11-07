@@ -23,6 +23,11 @@ build/
 var/
 eval/hasil/
 
+# Dokumen nyata dan berkas pribadi tidak pernah masuk repo (CLAUDE.md)
+/*.zip
+/_privat/
+/privat/
+
 # Log
 *.log
 

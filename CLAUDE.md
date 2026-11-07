@@ -33,6 +33,13 @@ Path repo berada di bawah `.../02 - Proyek Pribadi/02 - Kompetisi/...` dan menga
 - **Label evaluasi tidak boleh bocor ke agent.** ID skenario, kategori, dan jawaban yang diharapkan tidak boleh muncul di Odoo, di berkas faktur, di dokumen kebijakan untuk RAG, atau di data apa pun yang dibaca agent saat berjalan. Label hanya ada di `eval/skenario/`.
 - `.env` tidak pernah di-commit. Jangan menampilkan isi rahasia (API key, sandi) di laporan, log, atau keluaran perintah; tulis `***`. Jalankan `npm run guard:secrets` sebelum commit dan push.
 
+## Dokumen nyata dan berkas pribadi
+- Dokumen nyata (faktur, faktur pajak, atau dokumen usaha milik siapa pun) tidak pernah masuk repo dan tidak pernah diproses agen. Bila pemilik menyimpan dokumen seperti itu, letaknya di folder `_privat` di luar repo.
+- Jangan membuka, membaca, menyalin, mengonversi, atau mengirim isi folder `_privat` atau `privat` (di mana pun letaknya) ke LLM, walaupun hanya untuk melihat contoh.
+- Dokumen nyata tidak dipakai sebagai data uji, contoh di tes, atau bahan dokumen. Kebutuhan realisme dipenuhi dokumen sintetis (set uji ketahanan, RENCANA-TEKNIS §6).
+- Bila menemukan arsip `.zip` atau berkas yang tampak sebagai dokumen nyata di dalam repo (nama perusahaan, NPWP, atau rekening yang tidak ada di dataset), jangan membukanya. Berhenti dan laporkan nama berkasnya saja.
+- `.gitignore` memuat `/*.zip`, `/_privat/`, dan `/privat/`, dan `guard:secrets` menolak berkas `.zip` serta path `_privat/` atau `privat/` yang di-stage. Pengaman ini tidak menggantikan aturan di atas.
+
 ## Odoo
 - Integrasi hanya lewat **External JSON-2 API** (`POST /json/2/<model>/<method>`, `Authorization: bearer <API key>`, header `X-Odoo-Database`). XML-RPC dan JSON-RPC tidak dipakai ([ADR-0004](docs/adr/0004-odoo-19-json2-api.md)).
 - Ada dua API key: **admin** untuk skrip pengembang (init, seed, check) dan **agent** untuk kode agent. Kode agent tidak boleh memakai key admin.

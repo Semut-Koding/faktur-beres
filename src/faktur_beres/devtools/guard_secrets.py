@@ -5,7 +5,10 @@ Fails when:
 * a ``.env`` or ``.env.*`` file (other than ``.env.example``) is tracked or staged;
 * the value of a secret variable from the local ``.env`` (8 characters or longer) appears in a
   tracked or staged file;
-* a well-known secret pattern appears (Google API key, private key header, ...).
+* a well-known secret pattern appears (Google API key, private key header, ...);
+* a ``.zip`` archive, or a path with a ``_privat`` or ``privat`` component, is tracked or staged.
+  Real documents never enter the repository (CLAUDE.md, "Dokumen nyata dan berkas pribadi"), so
+  such files are reported by name only and their content is never read.
 
 Everything in the git index is scanned, i.e. tracked files plus staged changes. Messages name the
 file and line but never print the secret itself.
@@ -60,6 +63,19 @@ def _git(repo: Path, *args: str, stdin: bytes | None = None) -> bytes:
 def is_forbidden_env_file(path: str) -> bool:
     name = path.rsplit("/", 1)[-1]
     return (name == ".env" or name.startswith(".env.")) and name != ".env.example"
+
+
+PRIVATE_COMPONENTS = frozenset({"_privat", "privat"})
+
+
+def private_document_reason(path: str) -> str | None:
+    """Why ``path`` may hold a real or private document, or ``None`` when it is fine."""
+    parts = path.lower().split("/")
+    if PRIVATE_COMPONENTS & set(parts):
+        return "path _privat/privat ter-track atau di-stage"
+    if parts[-1].endswith(".zip"):
+        return "arsip .zip ter-track atau di-stage"
+    return None
 
 
 def secret_values(env: dict[str, str]) -> dict[str, str]:
@@ -118,10 +134,16 @@ def scan(repo: Path, env_file: Path | None = None) -> list[Finding]:
     entries = index_blobs(repo)
     findings: list[Finding] = []
 
+    private: set[str] = set()
     for _sha, path in entries:
         if is_forbidden_env_file(path):
             findings.append(Finding(path, None, "berkas rahasia ter-track atau di-stage"))
+        if (reason := private_document_reason(path)) is not None:
+            findings.append(Finding(path, None, reason))
+            private.add(path)
 
+    # Possible real documents are reported by name only; their content is never read.
+    entries = [(sha, path) for sha, path in entries if path not in private]
     blobs = read_blobs(repo, [sha for sha, _ in entries])
     for sha, path in entries:
         data = blobs.get(sha)
@@ -159,8 +181,8 @@ def main(argv: list[str] | None = None) -> int:
         for finding in findings:
             print(f"  - {finding}", file=sys.stderr)
         print(
-            "Keluarkan rahasia dari berkas itu (atau `git rm --cached <berkas>` untuk .env), "
-            "lalu ulangi.",
+            "Keluarkan rahasia dari berkas itu (atau `git rm --cached <berkas>` untuk .env, "
+            "arsip .zip, dan berkas _privat/privat tanpa membukanya), lalu ulangi.",
             file=sys.stderr,
         )
         return 1

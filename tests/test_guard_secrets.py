@@ -65,6 +65,34 @@ def test_env_example_is_allowed(repo: Path) -> None:
     assert scan(repo) == []
 
 
+@pytest.mark.parametrize(
+    "name",
+    [
+        "arsip.zip",
+        "docs/ekspor 05.ZIP",
+        "_privat/faktur.pdf",
+        "data/privat/catatan.txt",
+        "eval/Privat/a.png",
+        "privat",
+    ],
+)
+def test_private_documents_must_not_be_staged(repo: Path, name: str) -> None:
+    stage(repo, name, f"isi tidak dibaca {SECRET}\n")
+    findings = scan(repo)
+    # Reported by name only: the secret inside is not scanned, so there is exactly one finding.
+    assert [f.path for f in findings] == [name]
+    assert findings[0].line is None
+    assert "zip" in findings[0].what or "privat" in findings[0].what
+
+
+@pytest.mark.parametrize(
+    "name", ["docs/privatisasi.md", "data/privat.md", "src/zipper.py", "catatan_privat.txt"]
+)
+def test_similar_names_are_allowed(repo: Path, name: str) -> None:
+    stage(repo, name, "halo\n")
+    assert scan(repo) == []
+
+
 def test_secret_value_in_staged_file(repo: Path) -> None:
     stage(repo, "docs/catatan.md", f"baris satu\nsandi: {SECRET}\n")
 
