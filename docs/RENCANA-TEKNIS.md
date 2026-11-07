@@ -246,8 +246,8 @@ Dashboard di Vercel. API, Odoo, dan basis data di server yang ditentukan di M6, 
 |---|---|---|---|
 | **M0 Fondasi dan data Odoo** ✅ selesai 5 Nov 2026 | Kerangka repo, `compose.yaml`, init Odoo, klien JSON-2, pemuat dataset, seed, check, snapshot dan reset, `guard:secrets` | `odoo:check` lulus dari database kosong; reset < 1 menit; tes lulus; dokumen diperbarui | 6–7 Nov |
 | **M1 Generator faktur** ✅ selesai 6 Nov 2026 | 40 skenario: berkas PDF/gambar/UBL, label, dan balasan vendor | Label lengkap sesuai SPEC §15.3–15.4; generator deterministik; tes | 8–9 Nov |
-| **M2 Lapisan alat** | `odoo_tools` dengan daftar operasi yang diizinkan, `match_engine`, `tax_check`, konfigurasi kebijakan, grup Odoo khusus agent | Tes unit untuk setiap aturan yang dihitung kode | 10–11 Nov |
-| **M3 Ekstraksi** | Skema Pydantic, ekstraksi Gemini, parser UBL, perbaikan maksimal 2 kali, cache | Akurasi per field pada 40 faktur dilaporkan | 11–12 Nov |
+| **M2 Lapisan alat** | Grup Odoo khusus agent (addon `faktur_beres_agent`) dan key agent tanpa `sudo()`, konfigurasi kebijakan, model faktur kanonis `InvoiceData` dan helper normalisasi, aturan deterministik dan mesin analisis, `AgentOdooGateway` dan `odoo_tools` dengan daftar operasi yang diizinkan, `match_engine`, `tax_check`, evaluasi orakel, tes integrasi | Tes unit untuk setiap aturan yang dihitung kode, termasuk tes keterlacakan dan arsitektur; mypy `--strict` untuk paket baru; `odoo:check` lulus dengan matriks hak agent; `eval:orakel` 40/40 luring dan `--odoo`; `test:integrasi` lulus (penolakan hak, tiga draft tagihan sama dengan label, idempotensi) | 10–11 Nov |
+| **M3 Ekstraksi** | Skema ekstraksi Gemini yang dipetakan ke `InvoiceData` (M2), parser UBL, perbaikan maksimal 2 kali, cache, injeksi lapis pertama atas teks hasil baca dan lapisan teks PDF, **set uji ketahanan bergaya dunia nyata** | Akurasi per field pada 40 faktur dan pada set ketahanan, dilaporkan terpisah | 11–12 Nov |
 | **M4 Graph lengkap** | Node LangGraph, routing, interrupt, checkpointer, `email_tool` dan pemantau inbox, RAG kebijakan, FastAPI + SSE, tabel aplikasi | Jalur A, B, dan C berjalan ujung ke ujung untuk satu skenario per kategori | 13–16 Nov |
 | **M5 Dashboard dan evaluasi** | Dashboard (SPEC §10), harness 40 × 3, laporan metrik | Metrik terisi; target tercapai atau selisihnya dijelaskan | 16–19 Nov |
 | **M6 Publik dan finalisasi** | Deploy publik, pengetatan guardrail, README demo, bahan video dan proposal | Tautan live dan repo publik; daftar periksa lomba lengkap | 20–26 Nov |
@@ -265,6 +265,22 @@ Dashboard di Vercel. API, Odoo, dan basis data di server yang ditentukan di M6, 
 - **Pajak** dirujuk lewat external ID (`fb_seed.tax_ppn_masukan`), bukan nama.
 - **e-Faktur:** periksa field tambahan `l10n_id_efaktur_coretax` di tagihan vendor (mis. nomor faktur pajak) dan isi bila ada.
 - **Dependensi:** `python-stdnum` dipindah ke dependensi utama bila `tax_check` memakainya saat runtime.
+
+### Masukan dari tinjauan M1 untuk M3–M4 (7 November 2026)
+- **Set uji ketahanan bergaya dunia nyata (M3).** Selain 40 skenario, M3 menambah set kecil dokumen sintetis yang meniru ciri umum faktur lapangan:
+  - PDF hasil pindai tanpa lapisan teks;
+  - satu PDF berisi beberapa dokumen: faktur, ringkasan faktur pajak buatan sendiri (tanpa QR dan tanpa tata letak resmi DJP), dan surat jalan;
+  - harga termasuk PPN, dan cetakan tarif "PPN 11%" dengan angka yang sama dengan 12% × DPP nilai lain;
+  - stempel perusahaan fiktif dan tanda tangan coretan yang menimpa teks, tanpa meniru meterai atau tanda resmi lain;
+  - tabel tanpa kode produk, sehingga baris harus dipetakan dari deskripsi;
+  - NPWP dan NSFP dengan pemisah, halaman sedikit miring, dan ukuran kertas selain A4.
+
+  Setiap dokumen punya label `kebenaran_dokumen` dan jalur yang diharapkan. Hasilnya dilaporkan terpisah dari metrik utama. Di proposal, set ini disebut "dokumen sintetis yang meniru ciri umum dokumen lapangan", bukan dokumen nyata.
+- **Injeksi lapis pertama (M3)** dijalankan atas semua teks hasil baca LLM (termasuk teks di gambar dan pindaian), lapisan teks PDF (termasuk teks yang tidak terlihat), dan seluruh teks bebas UBL. Di M4, subjek dan isi email ikut diperiksa.
+- **Skema ekstraksi (M3)** untuk Gemini terpisah dari `InvoiceData` M2, dan hasilnya dinormalisasi dengan helper M2. Format angka yang ambigu menjadi kegagalan validasi (BR-04), bukan ditebak.
+- **Parser UBL (M3)** mengikuti SPEC §15.6, termasuk tanggal faktur pajak yang boleh tidak ada.
+- **Balasan teks vendor (M4)** bisa menyebut lebih dari satu nomor PO, misalnya PO batal dan penggantinya. Isi balasan diekstrak sebagai data, lalu BR-06 dijalankan ulang untuk memutuskan.
+- **Evaluasi penuh (M5)** dilaporkan berdampingan dengan evaluasi orakel. Selisih keduanya menunjukkan kesalahan yang berasal dari ekstraksi atau LLM.
 
 ---
 
