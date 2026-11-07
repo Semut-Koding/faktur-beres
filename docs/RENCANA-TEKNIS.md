@@ -349,7 +349,7 @@ Dashboard di Vercel. API, Odoo, dan basis data di server yang ditentukan di M6, 
 | Hasil LLM tidak deterministik | Temperature rendah, skema ketat, metrik pass^3 |
 | Label evaluasi bocor ke agent | Aturan di CLAUDE.md dan ADR-0007, tes yang memastikan data Odoo dan berkas faktur tidak memuat ID skenario |
 | Demo publik disalahgunakan | Kode akses, batas laju, dan reset berkala (M6) |
-| Hak user agent di M0 masih terlalu luas | Sementara; diketatkan di M2, dan alat agent tetap hanya mengizinkan operasi tertentu |
+| Hak user agent di M0 masih terlalu luas | **Ditutup (7 Nov 2026):** grup khusus `faktur_beres_agent.group_agent` tanpa hapus dan posting, aturan rekaman hanya untuk draft tagihan vendor buatan agent, pengaman perubahan status, dan `AgentOdooGateway`; diperiksa `odoo:check` dan dibuktikan `test:integrasi` (§4.4) |
 | Waktu tiga minggu | Milestone kecil, commit kecil, cadangan 27–28 November |
 
 ---
