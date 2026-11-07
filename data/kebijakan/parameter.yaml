@@ -1,0 +1,43 @@
+# parameter.yaml — konfigurasi kebijakan Faktur Beres (SPEC §15.5).
+#
+# Nilai ambang dan toleransi dibaca kode dari berkas ini (BR-28), tidak pernah dari teks hasil RAG.
+# Teks SOP untuk RAG (M4) wajib memuat angka yang sama; tes memeriksanya.
+# Model dan validasinya: faktur_beres.domain.policy.PolicyConfig. Uang dalam rupiah, persen dalam
+# persen; tulis bilangan bulat atau string desimal, jangan pecahan desimal YAML (float).
+versi: 1
+
+# BR-13: total faktur termasuk PPN LEBIH DARI nilai ini -> over_threshold (C1). Tepat sama tidak.
+ambang_persetujuan_rupiah: 50000000
+
+# BR-08: harga satuan faktur <= harga PO x (1 + toleransi). Harga lebih rendah lulus dengan catatan.
+toleransi_harga_persen: 1
+
+# BR-09: kuantitas faktur boleh melebihi sisa diterima yang belum ditagih sebanyak nilai ini.
+toleransi_kuantitas: 0
+
+# BR-03 dan BR-10: selisih yang masih dianggap pembulatan.
+toleransi_pembulatan:
+  per_baris_rupiah: 1
+  ppn_rupiah: 1
+  total_rupiah: 1
+
+# BR-10, PMK 131/2024: PPN = tarif x DPP nilai lain, DPP nilai lain = faktor x harga jual.
+pajak:
+  tarif_ppn_persen: 12
+  faktor_dpp_nilai_lain: 11/12
+  # Dua digit pertama NSFP. Kode lain dicatat sebagai catatan, bukan exception.
+  kode_transaksi_diharapkan: '04'
+
+# BR-04: ekstraksi diulang paling banyak sekian kali dengan umpan balik.
+batas_perbaikan_ekstraksi: 2
+
+# BR-14: vendor tanpa tagihan vendor terposting di Odoo (atau tidak terdaftar) adalah vendor baru.
+vendor_baru: tanpa_tagihan_terposting
+
+# BR-19: menunggu balasan vendor sekian hari kerja, lalu sekian pengingat.
+balasan_vendor:
+  tunggu_hari_kerja: 5
+  jumlah_pengingat: 1
+
+# BR-25: email keluar hanya ke alamat penagihan vendor terdaftar dan ke domain internal ini.
+domain_email_internal: arunika.test

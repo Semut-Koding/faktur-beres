@@ -76,4 +76,7 @@ ignore_errors = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = ["-ra"]
+addopts = ["-ra", "--strict-markers"]
+markers = [
+    "aturan(kode): tes untuk aturan bisnis SPEC §8 (mis. \"BR-10\"); dipakai tes keterlacakan",
+]
