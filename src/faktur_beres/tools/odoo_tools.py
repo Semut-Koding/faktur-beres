@@ -1,0 +1,419 @@
+"""``odoo_tools`` (SPEC §5.2): typed reads and the three writes, all through ``AgentOdooGateway``.
+
+Inputs and outputs are Pydantic models so that M4 can expose the functions as LangGraph tools. The
+reads return the ERP records of ``faktur_beres.domain.erp``; ``OdooErpReader`` implements
+``ErpReader`` on top of them for the rules. Searches are loose on the Odoo side (``ilike``) and
+exact on ours: every result is filtered again with the normalisation of the business rules.
+
+The writes (``create_draft_bill``, ``attach_file``, ``post_note``) are idempotent and verified;
+see their docstrings.
+"""
+
+from collections.abc import Iterable, Sequence
+from datetime import date
+from decimal import Decimal
+from typing import Any
+
+from faktur_beres.domain.base import DomainModel
+from faktur_beres.domain.erp import (
+    BankAccountRecord,
+    BillLineRecord,
+    BillRecord,
+    BillState,
+    CompanyRecord,
+    PoState,
+    PurchaseOrderLineRecord,
+    PurchaseOrderRecord,
+    VendorRecord,
+)
+from faktur_beres.domain.normalize import (
+    account_digits,
+    normalize_email,
+    normalize_name,
+    normalize_po_number,
+    tax_id_digits,
+)
+from faktur_beres.tools.odoo_gateway import AgentOdooGateway
+
+VENDOR_DOMAIN: list[Any] = [["supplier_rank", ">", 0]]
+VENDOR_FIELDS = ("id", "name", "vat", "email")
+BANK_FIELDS = ("id", "partner_id", "acc_number", "bank_id", "acc_holder_name")
+PO_FIELDS = (
+    "id",
+    "name",
+    "partner_id",
+    "state",
+    "locked",
+    "currency_id",
+    "fiscal_position_id",
+    "payment_term_id",
+    "order_line",
+)
+PO_LINE_FIELDS = (
+    "id",
+    "order_id",
+    "product_id",
+    "name",
+    "product_qty",
+    "qty_received",
+    "qty_invoiced",
+    "price_unit",
+    "product_uom_id",
+    "tax_ids",
+    "display_type",
+)
+BILL_FIELDS = ("id", "partner_id", "ref", "invoice_date", "state", "amount_total", "create_uid")
+BILL_LINE_FIELDS = ("id", "move_id", "purchase_line_id", "product_id", "quantity", "price_unit")
+COUNTED_BILL_STATES = ["draft", "posted"]
+
+
+# -- conversions ------------------------------------------------------------------------------
+
+
+def _m2o(value: Any) -> tuple[int, str] | None:
+    """Odoo many2one ``[id, name]`` (or ``False``)."""
+    if isinstance(value, list | tuple) and value:
+        return int(value[0]), str(value[1]) if len(value) > 1 else ""
+    return None
+
+
+def _m2o_id(value: Any) -> int | None:
+    pair = _m2o(value)
+    return pair[0] if pair else None
+
+
+def _text(value: Any) -> str | None:
+    return value if isinstance(value, str) and value else None
+
+
+def _decimal(value: Any) -> Decimal:
+    if isinstance(value, Decimal):
+        return value
+    if isinstance(value, int) and not isinstance(value, bool):
+        return Decimal(value)
+    raise TypeError(f"angka Odoo tidak terduga: {value!r}")
+
+
+def _date(value: Any) -> date | None:
+    return date.fromisoformat(value) if isinstance(value, str) and value else None
+
+
+def _vendor(row: dict[str, Any]) -> VendorRecord:
+    return VendorRecord(
+        id=row["id"], name=row["name"], vat=_text(row.get("vat")), email=_text(row.get("email"))
+    )
+
+
+def _bank(row: dict[str, Any]) -> BankAccountRecord:
+    bank = _m2o(row.get("bank_id"))
+    partner = _m2o_id(row.get("partner_id"))
+    if partner is None:
+        raise ValueError(f"rekening #{row['id']} tanpa pemilik")
+    return BankAccountRecord(
+        id=row["id"],
+        partner_id=partner,
+        number=row["acc_number"],
+        bank_name=bank[1] if bank else None,
+        holder=_text(row.get("acc_holder_name")),
+    )
+
+
+def _unique(records: Iterable[VendorRecord]) -> tuple[VendorRecord, ...]:
+    seen: dict[int, VendorRecord] = {}
+    for record in records:
+        seen.setdefault(record.id, record)
+    return tuple(seen.values())
+
+
+# -- company, vendors, bank accounts -----------------------------------------------------------
+
+
+def company_profile(gw: AgentOdooGateway) -> CompanyRecord:
+    """The company, with its NPWP (``vat``) for BR-10."""
+    (row,) = gw.search_read("res.company", [], ["id", "name", "vat"], limit=1)
+    return CompanyRecord(id=row["id"], name=row["name"], vat=_text(row.get("vat")))
+
+
+class VendorSearch(DomainModel):
+    npwp: str | None = None
+    name: str | None = None
+    email: str | None = None
+
+
+def find_vendors(gw: AgentOdooGateway, query: VendorSearch) -> tuple[VendorRecord, ...]:
+    """Vendors by NPWP (as digits), name (BR-05 normalisation), or e-mail (normalised)."""
+    found: list[VendorRecord] = []
+    digits = tax_id_digits(query.npwp) if query.npwp else None
+    if digits:
+        rows = gw.search_read(
+            "res.partner", [*VENDOR_DOMAIN, ["vat", "ilike", digits[-8:]]], VENDOR_FIELDS
+        )
+        found += [v for v in map(_vendor, rows) if tax_id_digits(v.vat) == digits]
+    wanted_name = normalize_name(query.name) if query.name else ""
+    if wanted_name:
+        token = max(wanted_name.split(), key=len)
+        rows = gw.search_read(
+            "res.partner", [*VENDOR_DOMAIN, ["name", "ilike", token]], VENDOR_FIELDS
+        )
+        found += [v for v in map(_vendor, rows) if normalize_name(v.name) == wanted_name]
+    email = normalize_email(query.email) if query.email else None
+    if email:
+        rows = gw.search_read(
+            "res.partner", [*VENDOR_DOMAIN, ["email", "=ilike", email]], VENDOR_FIELDS
+        )
+        found += [v for v in map(_vendor, rows) if normalize_email(v.email) == email]
+    return _unique(found)
+
+
+def vendor_bank_accounts(gw: AgentOdooGateway, vendor_id: int) -> tuple[BankAccountRecord, ...]:
+    rows = gw.search_read("res.partner.bank", [["partner_id", "=", vendor_id]], BANK_FIELDS)
+    return tuple(map(_bank, rows))
+
+
+def bank_account_owners(gw: AgentOdooGateway, number: str) -> tuple[BankAccountRecord, ...]:
+    """Every account in Odoo with these digits, through ``sanitized_acc_number``."""
+    digits = account_digits(number)
+    if not digits:
+        return ()
+    rows = gw.search_read("res.partner.bank", [["sanitized_acc_number", "=", digits]], BANK_FIELDS)
+    return tuple(a for a in map(_bank, rows) if a.digits == digits)
+
+
+# -- purchase orders --------------------------------------------------------------------------
+
+
+def _purchase_orders(
+    gw: AgentOdooGateway, rows: Sequence[dict[str, Any]]
+) -> tuple[PurchaseOrderRecord, ...]:
+    if not rows:
+        return ()
+    line_ids = sorted({i for row in rows for i in row.get("order_line") or []})
+    lines = [
+        line
+        for line in gw.read("purchase.order.line", line_ids, PO_LINE_FIELDS)
+        if not line["display_type"]
+    ]
+    product_ids = sorted({pid for line in lines if (pid := _m2o_id(line["product_id"]))})
+    products = {
+        p["id"]: p
+        for p in gw.read(
+            "product.product", product_ids, ["id", "name", "default_code", "product_tmpl_id"]
+        )
+    }
+    vendor_ids = sorted({vid for row in rows if (vid := _m2o_id(row["partner_id"]))})
+    template_ids = sorted(
+        {tid for p in products.values() if (tid := _m2o_id(p["product_tmpl_id"]))}
+    )
+    codes: dict[tuple[int, int], list[str]] = {}
+    if vendor_ids and template_ids:
+        infos = gw.search_read(
+            "product.supplierinfo",
+            [["partner_id", "in", vendor_ids], ["product_tmpl_id", "in", template_ids]],
+            ["id", "partner_id", "product_tmpl_id", "product_id", "product_code"],
+        )
+        for info in infos:
+            code = _text(info.get("product_code"))
+            vendor, template = _m2o_id(info["partner_id"]), _m2o_id(info["product_tmpl_id"])
+            if not code or vendor is None or template is None:
+                continue
+            variant = _m2o_id(info.get("product_id"))
+            targets = (
+                [variant]
+                if variant
+                else [
+                    pid for pid, p in products.items() if _m2o_id(p["product_tmpl_id"]) == template
+                ]
+            )
+            for pid in targets:
+                codes.setdefault((vendor, pid), []).append(code)
+
+    by_order: dict[int, list[dict[str, Any]]] = {}
+    for line in lines:
+        order = _m2o_id(line["order_id"])
+        if order is not None:
+            by_order.setdefault(order, []).append(line)
+
+    result = []
+    for row in rows:
+        vendor_id = _m2o_id(row["partner_id"])
+        if vendor_id is None:
+            continue
+        records = []
+        for line in sorted(by_order.get(row["id"], []), key=lambda ln: ln["id"]):
+            product_id = _m2o_id(line["product_id"])
+            uom = _m2o(line["product_uom_id"])
+            if product_id is None or uom is None:
+                continue
+            product = products.get(product_id, {})
+            records.append(
+                PurchaseOrderLineRecord(
+                    id=line["id"],
+                    product_id=product_id,
+                    product_code=_text(product.get("default_code")),
+                    product_name=product.get("name") or line["name"],
+                    vendor_codes=tuple(sorted(set(codes.get((vendor_id, product_id), [])))),
+                    description=line["name"],
+                    uom_id=uom[0],
+                    uom_name=uom[1],
+                    quantity=_decimal(line["product_qty"]),
+                    qty_received=_decimal(line["qty_received"]),
+                    qty_invoiced=_decimal(line["qty_invoiced"]),
+                    price_unit=_decimal(line["price_unit"]),
+                    tax_ids=tuple(line.get("tax_ids") or ()),
+                )
+            )
+        result.append(
+            PurchaseOrderRecord(
+                id=row["id"],
+                number=row["name"],
+                vendor_id=vendor_id,
+                state=PoState(row["state"]),
+                locked=bool(row.get("locked")),
+                currency_id=_m2o_id(row.get("currency_id")),
+                fiscal_position_id=_m2o_id(row.get("fiscal_position_id")),
+                payment_term_id=_m2o_id(row.get("payment_term_id")),
+                lines=tuple(records),
+            )
+        )
+    return tuple(result)
+
+
+def purchase_order_by_number(gw: AgentOdooGateway, number: str) -> PurchaseOrderRecord | None:
+    """The PO with exactly this number (BR-06 normalisation), in any state, with its lines."""
+    wanted = normalize_po_number(number)
+    if not wanted:
+        return None
+    rows = gw.search_read("purchase.order", [["name", "=ilike", wanted]], PO_FIELDS, limit=2)
+    rows = [r for r in rows if normalize_po_number(r["name"]) == wanted]
+    if len(rows) != 1:
+        return None
+    return _purchase_orders(gw, rows)[0]
+
+
+def confirmed_purchase_orders(
+    gw: AgentOdooGateway, vendor_id: int
+) -> tuple[PurchaseOrderRecord, ...]:
+    """The vendor's confirmed POs (state ``purchase``, locked or not), for BR-06 candidates."""
+    rows = gw.search_read(
+        "purchase.order",
+        [["partner_id", "=", vendor_id], ["state", "=", "purchase"]],
+        PO_FIELDS,
+        order="name",
+    )
+    return _purchase_orders(gw, rows)
+
+
+# -- vendor bills -----------------------------------------------------------------------------
+
+
+def _bills(gw: AgentOdooGateway, rows: Sequence[dict[str, Any]]) -> tuple[BillRecord, ...]:
+    if not rows:
+        return ()
+    lines = gw.search_read(
+        "account.move.line",
+        [["move_id", "in", [r["id"] for r in rows]], ["display_type", "=", "product"]],
+        BILL_LINE_FIELDS,
+    )
+    by_move: dict[int, list[BillLineRecord]] = {}
+    for line in lines:
+        move = _m2o_id(line["move_id"])
+        if move is None:
+            continue
+        by_move.setdefault(move, []).append(
+            BillLineRecord(
+                id=line["id"],
+                purchase_line_id=_m2o_id(line.get("purchase_line_id")),
+                product_id=_m2o_id(line.get("product_id")),
+                quantity=_decimal(line["quantity"]),
+                price_unit=_decimal(line["price_unit"]),
+            )
+        )
+    result = []
+    for row in rows:
+        vendor = _m2o_id(row["partner_id"])
+        if vendor is None:
+            continue
+        result.append(
+            BillRecord(
+                id=row["id"],
+                vendor_id=vendor,
+                ref=_text(row.get("ref")),
+                invoice_date=_date(row.get("invoice_date")),
+                state=BillState(row["state"]),
+                amount_total=_decimal(row["amount_total"]),
+                created_by=_m2o_id(row.get("create_uid")),
+                lines=tuple(sorted(by_move.get(row["id"], []), key=lambda ln: ln.id)),
+            )
+        )
+    return tuple(result)
+
+
+def vendor_bills(gw: AgentOdooGateway, vendor_id: int) -> tuple[BillRecord, ...]:
+    """The vendor's bills in state draft or posted, with lines linked to PO lines (BR-11)."""
+    rows = gw.search_read(
+        "account.move",
+        [
+            ["move_type", "=", "in_invoice"],
+            ["partner_id", "=", vendor_id],
+            ["state", "in", COUNTED_BILL_STATES],
+        ],
+        BILL_FIELDS,
+        order="id",
+    )
+    return _bills(gw, rows)
+
+
+def bills_by_ids(gw: AgentOdooGateway, ids: Sequence[int]) -> tuple[BillRecord, ...]:
+    return _bills(gw, gw.read("account.move", ids, BILL_FIELDS))
+
+
+def posted_bill_count(gw: AgentOdooGateway, vendor_id: int) -> int:
+    """Number of posted vendor bills (BR-14: zero means a new vendor)."""
+    return gw.search_count(
+        "account.move",
+        [
+            ["move_type", "=", "in_invoice"],
+            ["partner_id", "=", vendor_id],
+            ["state", "=", "posted"],
+        ],
+    )
+
+
+class OdooErpReader:
+    """``ErpReader`` over Odoo, with the agent key and through the gateway only."""
+
+    def __init__(self, gw: AgentOdooGateway) -> None:
+        self._gw = gw
+        self._company: CompanyRecord | None = None
+
+    def company(self) -> CompanyRecord:
+        if self._company is None:
+            self._company = company_profile(self._gw)
+        return self._company
+
+    def vendors_by_vat(self, digits: str) -> Sequence[VendorRecord]:
+        return find_vendors(self._gw, VendorSearch(npwp=digits))
+
+    def vendors_by_name(self, name: str) -> Sequence[VendorRecord]:
+        return find_vendors(self._gw, VendorSearch(name=name))
+
+    def vendors_by_email(self, email: str) -> Sequence[VendorRecord]:
+        return find_vendors(self._gw, VendorSearch(email=email))
+
+    def bank_accounts(self, vendor_id: int) -> Sequence[BankAccountRecord]:
+        return vendor_bank_accounts(self._gw, vendor_id)
+
+    def bank_account_owners(self, digits: str) -> Sequence[BankAccountRecord]:
+        return bank_account_owners(self._gw, digits)
+
+    def purchase_order(self, number: str) -> PurchaseOrderRecord | None:
+        return purchase_order_by_number(self._gw, number)
+
+    def confirmed_purchase_orders(self, vendor_id: int) -> Sequence[PurchaseOrderRecord]:
+        return confirmed_purchase_orders(self._gw, vendor_id)
+
+    def vendor_bills(self, vendor_id: int) -> Sequence[BillRecord]:
+        return vendor_bills(self._gw, vendor_id)
+
+    def posted_bill_count(self, vendor_id: int) -> int:
+        return posted_bill_count(self._gw, vendor_id)
