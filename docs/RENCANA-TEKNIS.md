@@ -48,6 +48,8 @@
 > **Dikunci di M0 (5 November 2026):** PostgreSQL untuk Odoo `17.11` (Debian trixie, `PG_VERSION=17.11-1.pgdg13+2`; tag `17` saat itu menunjuk image yang sama), PostgreSQL aplikasi 18.6 dari image pgvector. Alat di laptop pemilik: Podman 6.1.4, podman-compose 1.6.0, uv 0.13.1, Python 3.13.16 (dipasang uv), Node.js 24.22.0, npm 11.19.1, git 2.56.0. Pustaka Python yang dipakai M0 (lihat `uv.lock`): httpx 0.28.1, Pydantic 2.14.3, pydantic-settings 2.16.2, PyYAML 6.0.3; dev: pytest 9.2.0, Ruff 0.17.3, python-stdnum 2.2.
 >
 > **Generator faktur (M1, 6 November 2026):** lxml 6.1.3 (dependensi utama, juga untuk parser UBL M3); dev: ReportLab 5.1.0, Pillow 13.0.0, pypdfium2 5.14.0 (PDFium 156.0.8076.0). Keluaran `gen:faktur` identik byte per byte untuk versi di `uv.lock` pada platform yang sama (diperiksa `gen:periksa`).
+>
+> **Lapisan alat (M2, 7 November 2026):** python-stdnum 2.2 pindah ke dependensi utama (dipakai `tax_check` saat runtime); dev: mypy 2.4.1 dengan plugin Pydantic dan types-PyYAML 6.0.12.20261103. `npm run typecheck` menjalankan mypy `--strict` untuk paket `domain`, `tools`, dan `evals`. Modul M0–M1 (`config`, `textui`, `odoo`, `dataset`, `seed`, `generator`, `devtools`) dikecualikan lewat `[[tool.mypy.overrides]]` dengan `ignore_errors` di `pyproject.toml`: tetap dibaca mypy saat diimpor paket baru, tetapi galatnya sendiri tidak dilaporkan.
 
 ---
 
@@ -130,19 +132,20 @@ faktur-beres/            # nama folder repo (lihat README)
 ├─ tests/                # pytest
 ├─ data/
 │  ├─ seed/dataset.yaml  # sumber tunggal data sintetis (SPEC §9.4)
-│  └─ kebijakan/         # SOP AP dan kontrak vendor sintetis untuk RAG (M4)
+│  └─ kebijakan/
+│     └─ parameter.yaml  # konfigurasi kebijakan SPEC §15.5 (M2); SOP AP dan kontrak sintetis untuk RAG menyusul (M4)
 ├─ eval/
 │  ├─ skenario/          # label 40 skenario (M1, hasil generator, di-commit)
 │  ├─ berkas/            # faktur uji dan balasan vendor (M1, hasil generator, di-commit)
 │  ├─ DAFTAR.md          # tabel ringkas 40 skenario (hasil generator)
 │  ├─ README.md          # penjelasan folder (ditulis tangan)
-│  └─ hasil/             # hasil evaluasi (tidak di-commit)
+│  └─ hasil/             # hasil evaluasi orakel (M2) dan penuh (M5), tidak di-commit
 ├─ web/                  # dashboard React + Vite (M5), workspace npm
 ├─ infra/
 │  ├─ odoo/odoo.conf     # konfigurasi Odoo lokal (tanpa rahasia)
-│  ├─ odoo/addons/       # folder addon Odoo (kosong sampai M2)
+│  ├─ odoo/addons/       # addon faktur_beres_agent: grup dan hak user agent (M2), tanpa logika agent
 │  ├─ odoo/shell/        # skrip ORM untuk `odoo shell` (bootstrap odoo:init)
-│  └─ scripts/           # skrip shell untuk Podman: init, snapshot, reset, tunggu layanan
+│  └─ scripts/           # skrip shell untuk Podman: init, snapshot, reset, tunggu layanan, tes integrasi
 ├─ var/                  # berkas runtime lokal, mis. var/berkas/ (tidak di-commit)
 ├─ docs/
 ├─ compose.yaml
@@ -165,10 +168,14 @@ Semua dijalankan dari akar repo.
 | Isi data sintetis dari dataset (idempoten) | `npm run odoo:seed` | M0 |
 | Periksa isi Odoo sama dengan dataset dan kebutuhan skenario | `npm run odoo:check` | M0 |
 | Simpan kondisi seed / kembalikan Odoo ke kondisi itu | `npm run odoo:snapshot` / `npm run odoo:reset` | M0 |
-| Lint dan tes | `npm run check` (gabungan `npm run lint` dan `npm test`) | M0 |
+| Lint, cek tipe, dan tes unit (tes integrasi tidak ikut) | `npm run check` (gabungan `npm run lint`, `npm run typecheck`, dan `npm test`) | M0, cek tipe sejak M2 |
+| Cek tipe mypy `--strict` untuk paket `domain`, `tools`, dan `evals` | `npm run typecheck` | M2 |
 | Pastikan tidak ada nilai rahasia di berkas yang akan di-commit | `npm run guard:secrets` | M0 |
 | Buat faktur uji, label, dan balasan vendor (tulis ulang `eval/skenario/`, `eval/berkas/`, `eval/DAFTAR.md`) | `npm run gen:faktur` | M1 |
 | Pastikan berkas di `eval/` identik byte per byte dengan keluaran generator (SHA-256) | `npm run gen:periksa` | M1 |
+| Evaluasi orakel 40 skenario: aturan deterministik pada `kebenaran_dokumen` label, ERP dari dataset; hasil JSON di `eval/hasil/` | `npm run eval:orakel` | M2 |
+| Evaluasi orakel dengan ERP dari Odoo hasil seed lewat user agent (baca saja; hasil harus sama dengan mode luring) | `npm run eval:orakel -- --odoo` | M2 |
+| Tes integrasi terhadap Odoo dengan key agent (`pytest -m integrasi`), dengan `odoo:reset` sebelum dan sesudahnya | `npm run test:integrasi` | M2 |
 | Jalankan API dan dashboard untuk pengembangan | `npm run dev:api` / `npm run dev:web` | M4 / M5 |
 | Evaluasi 40 skenario × 3 | `npm run eval` | M5 |
 | Tambah dependensi Python | `uv add <paket>` atau `uv add --dev <paket>` | |
