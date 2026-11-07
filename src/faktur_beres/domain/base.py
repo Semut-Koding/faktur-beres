@@ -10,15 +10,28 @@
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, model_validator
+
+
+def _contains_float(value: Any) -> bool:
+    if isinstance(value, float):
+        return True
+    if isinstance(value, list | tuple):
+        return any(_contains_float(item) for item in value)
+    return False
 
 
 class DomainModel(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, populate_by_name=True)
 
-    @field_validator("*", mode="before")
+    @model_validator(mode="before")
     @classmethod
-    def _no_float(cls, value: Any) -> Any:
-        if isinstance(value, float):
-            raise ValueError("pakai Decimal, bilangan bulat, atau string desimal, bukan float")
-        return value
+    def _no_float(cls, data: Any) -> Any:
+        # Nested models run this check on their own input.
+        if isinstance(data, dict):
+            for key, value in data.items():
+                if _contains_float(value):
+                    raise ValueError(
+                        f"{key}: pakai Decimal, bilangan bulat, atau string desimal, bukan float"
+                    )
+        return data
