@@ -2,19 +2,24 @@
 
 Prints ``Pemeriksaan | Hasil | Status`` and exits non-zero when any row fails. Expected numbers
 are computed from the dataset, not hard-coded. Reads with the admin key; the agent's rights are
-checked with the agent key and ``has_access``/``has_group`` only. Nothing is deleted or posted.
+checked with the agent key and ``has_access`` only (the matrix of RENCANA-TEKNIS §4.4: ACL level
+on empty recordsets, record-rule level on seed records). Nothing is created, deleted, or posted;
+the refusals themselves are exercised by ``npm run test:integrasi``.
 """
 
+import ast
 import re
 import sys
 from collections import Counter
 from collections.abc import Callable, Iterable
+from datetime import datetime, timedelta
 from typing import Any
 
-from faktur_beres.config import Settings
+from faktur_beres.config import REPO_ROOT, Settings
 from faktur_beres.dataset import Dataset, get_dataset
 from faktur_beres.odoo import OdooClient, OdooError
 from faktur_beres.seed.common import SeedError, XmlIds, admin_client, m2o_id
+from faktur_beres.seed.init import AGENT_GROUPS, API_KEY_DAYS, access_params
 from faktur_beres.seed.load import MIN_NEXT_PO_NUMBER, PO_STATE, TAX_XMLID
 from faktur_beres.seed.runtime import (
     FORBIDDEN_CONTAINER_ENV,
@@ -46,24 +51,69 @@ LEAK_FIELDS = {
     "account.tax": ["name", "description", "invoice_label"],
     "mail.message": ["subject", "body"],
 }
-AGENT_READ_MODELS = (
-    "purchase.order",
-    "purchase.order.line",
-    "stock.picking",
-    "stock.move",
-    "res.partner",
-    "res.partner.bank",
-    "product.product",
-    "account.move",
-    "account.move.line",
+AGENT_ADDON = "faktur_beres_agent"
+AGENT_MANIFEST = REPO_ROOT / "infra" / "odoo" / "addons" / AGENT_ADDON / "__manifest__.py"
+INBOX_GROUP = "mail.group_mail_notification_type_inbox"
+#: Groups that would give the agent posting rights or rules over all vendor bills (M2.1).
+FORBIDDEN_AGENT_GROUPS = (
+    "account.group_account_invoice",
+    "account.group_account_basic",
+    "account.group_account_user",
+    "account.group_account_manager",
+    "purchase.group_purchase_user",
+    "stock.group_stock_user",
 )
-AGENT_RIGHTS = {
-    "account.move": ("read", "create", "write", "unlink"),
-    "account.move.line": ("unlink",),
-    "purchase.order": ("write", "unlink"),
-    "stock.picking": ("write", "unlink"),
-    "res.partner.bank": ("write", "unlink"),
+OPERATIONS = ("read", "create", "write", "unlink")
+OPERATION_LABELS = {"read": "baca", "create": "buat", "write": "ubah", "unlink": "hapus"}
+READ_ONLY = ("read",)
+#: ACL level (``has_access`` on an empty recordset): operations the agent's groups allow.
+#: stock.move.line, ir.attachment, and mail.message get full CRUD from base.group_user; record
+#: rules of the addon close what the agent must not do (see AGENT_RULE_CLOSED).
+AGENT_ACL: dict[str, tuple[str, ...]] = {
+    "res.company": READ_ONLY,
+    "res.partner": READ_ONLY,
+    "res.partner.bank": READ_ONLY,
+    "product.product": READ_ONLY,
+    "product.template": READ_ONLY,
+    "product.supplierinfo": READ_ONLY,
+    "uom.uom": READ_ONLY,
+    "purchase.order": READ_ONLY,
+    "purchase.order.line": READ_ONLY,
+    "stock.picking": READ_ONLY,
+    "stock.move": READ_ONLY,
+    "stock.move.line": OPERATIONS,
+    "account.tax": READ_ONLY,
+    "account.journal": READ_ONLY,
+    "account.payment.term": READ_ONLY,
+    "res.currency": READ_ONLY,
+    "account.move": ("read", "create", "write"),
+    "account.move.line": ("read", "create", "write"),
+    "ir.attachment": OPERATIONS,
+    "mail.message": OPERATIONS,
 }
+AGENT_RULE_CLOSED = {
+    "stock.move.line": "buat, ubah, hapus ditutup aturan",
+    "ir.attachment": "hapus ditutup aturan; buat hanya pada draft agent",
+    "mail.message": "hapus ditutup aturan; buat lewat message_post",
+    "account.move": "buat dan ubah hanya draft in_invoice buatan agent",
+    "account.move.line": "buat dan ubah hanya di draft itu",
+}
+
+
+def manifest_version(path=AGENT_MANIFEST) -> str:
+    """The addon version written in the repository (installed one must be the same)."""
+    return ast.literal_eval(path.read_text(encoding="utf-8"))["version"]
+
+
+def judge_operations(allowed: Iterable[str], expected: Iterable[str]) -> tuple[str, bool]:
+    """Describe the allowed operations and say whether they are exactly the expected ones."""
+    allowed, expected = set(allowed), set(expected)
+    yes = [OPERATION_LABELS[op] for op in OPERATIONS if op in allowed]
+    no = [OPERATION_LABELS[op] for op in OPERATIONS if op not in allowed]
+    text = ", ".join(yes) or "-"
+    if no:
+        text += "; tidak: " + ", ".join(no)
+    return text, allowed == expected
 
 
 class Checker:
@@ -537,74 +587,161 @@ class Checker:
             not hits,
         )
 
-    # -- agent rights ---------------------------------------------------------------------------
+    # -- agent setup and rights (M2.1) -----------------------------------------------------------
 
-    def check_agent(self) -> None:
+    def _xmlids(self, model: str, ids: Iterable[int]) -> list[str]:
+        rows = self.c.search_read(
+            "ir.model.data",
+            [["model", "=", model], ["res_id", "in", sorted(set(ids))]],
+            ["module", "name", "res_id"],
+        )
+        return sorted(f"{r['module']}.{r['name']}" for r in rows)
+
+    def check_agent_setup(self) -> None:
+        addon = self.c.search_read(
+            "ir.module.module", [["name", "=", AGENT_ADDON]], ["state", "latest_version"]
+        )
+        want = manifest_version()
+        state = addon[0]["state"] if addon else "tidak ada"
+        version = addon[0]["latest_version"] if addon else None
+        self.row(
+            f"Addon {AGENT_ADDON} terpasang (versi repo {want})",
+            f"{state}, versi {version}",
+            state == "installed" and version == want,
+        )
+
+        agent_id = self.x.get("user_agen", "res.users")
+        if agent_id is None:
+            self.row("User agent", "fb_seed.user_agen tidak ada", False)
+            return
+        user = self.c.read("res.users", [agent_id], ["group_ids", "all_group_ids"])[0]
+        explicit = self._xmlids("res.groups", user["group_ids"])
+        want_groups = sorted([*AGENT_GROUPS, INBOX_GROUP])
+        self.row(
+            "Grup user agent persis grup addon + notifikasi inbox",
+            ", ".join(explicit) + f" ({len(user['all_group_ids'])} grup termasuk tersirat)",
+            explicit == want_groups,
+        )
+        implied = set(self._xmlids("res.groups", user["all_group_ids"]))
+        bad = sorted(implied & set(FORBIDDEN_AGENT_GROUPS))
+        self.row(
+            "Agent tanpa grup posting atau aturan semua tagihan (langsung maupun tersirat)",
+            "tidak ada" if not bad else ", ".join(bad),
+            not bad,
+        )
+
+        key_name = access_params(self.ds)["agent"]["key_name"]
+        keys = self.c.search_read(
+            "res.users.apikeys", [["user_id", "=", agent_id]], ["name", "expiration_date"]
+        )
+        now = datetime.now()
+        limit = now + timedelta(days=API_KEY_DAYS, minutes=5)
+        good = [
+            k
+            for k in keys
+            if k["name"] == key_name
+            and k["expiration_date"]
+            and now < datetime.fromisoformat(k["expiration_date"]) <= limit
+        ]
+        self.row(
+            f"Key agent dibuat odoo:init tanpa sudo, berlaku ≤ {API_KEY_DAYS} hari",
+            (
+                f"{len(keys)} key; berlaku sampai {good[0]['expiration_date'][:10]}"
+                if good
+                else f"{len(keys)} key, tidak ada yang bernama dan berdurasi benar"
+            ),
+            len(keys) == 1 and len(good) == 1,
+        )
+
+    def _rule_targets(self) -> list[tuple[str, str, int | None]]:
+        """Seed records for the record-rule level: (model, description, id)."""
+        vendors = self.seeded("res.partner", "vendor_")
+        po_id = self.po_ids["o01"]
+        po_line = next(iter(self.lines.get(po_id, {}).values()), None)
+        picking = next(iter(self.pos[po_id]["picking_ids"]), None)
+        move = self.c.search("stock.move", [["picking_id", "=", picking]], limit=1)
+        move_line = self.c.search("stock.move.line", [["move_id", "in", move]], limit=1)
+        bill = self.seeded("account.move", "bill_").get("h01")
+        bill_line = self.c.search("account.move.line", [["move_id", "=", bill]], limit=1)
+        message = self.c.search(
+            "mail.message", [["model", "=", "purchase.order"], ["res_id", "=", po_id]], limit=1
+        )
+        company = self.c.search("res.company", [], limit=1)
+        po_name = self.pos[po_id]["name"]
+        return [
+            ("res.company", "perusahaan", next(iter(company), None)),
+            ("res.partner", "vendor v01", vendors.get("v01")),
+            (
+                "res.partner.bank",
+                "rekening v01",
+                self.seeded("res.partner.bank", "bank_account_").get("v01"),
+            ),
+            ("product.product", "produk p01", self.products.get("p01")),
+            (
+                "product.template",
+                "template p01",
+                self.seeded("product.template", "product_template_").get("p01"),
+            ),
+            (
+                "product.supplierinfo",
+                "info pemasok p01",
+                self.seeded("product.supplierinfo", "supplierinfo_").get("p01"),
+            ),
+            ("purchase.order", f"PO {po_name}", po_id),
+            ("purchase.order.line", f"baris {po_name}", po_line["id"] if po_line else None),
+            ("stock.picking", f"penerimaan {po_name}", picking),
+            ("stock.move", f"stock.move {po_name}", next(iter(move), None)),
+            ("stock.move.line", f"stock.move.line {po_name}", next(iter(move_line), None)),
+            ("account.move", "tagihan riwayat terposting", bill),
+            ("account.move.line", "baris tagihan riwayat", next(iter(bill_line), None)),
+            ("mail.message", f"pesan chatter {po_name}", next(iter(message), None)),
+        ]
+
+    def check_agent_rights(self) -> None:
         if self.agent is None:
             self.row("Key agent", "ODOO_AGENT_API_KEY kosong", False)
             return
         unreadable = []
-        for model in AGENT_READ_MODELS:
+        for model in AGENT_ACL:
             try:
                 rows = self.agent.search_read(model, [], ["id"], limit=1)
             except OdooError as exc:
                 unreadable.append(f"{model} ({type(exc).__name__})")
                 continue
-            if not rows:
+            if not rows and model not in ("ir.attachment",):
                 unreadable.append(f"{model} (kosong)")
         self.row(
-            "Key agent bisa membaca PO, penerimaan, rekening, tagihan (JSON-2)",
+            "Key agent bisa membaca semua model di matriks (JSON-2)",
             (
-                f"{len(AGENT_READ_MODELS)}/{len(AGENT_READ_MODELS)} model terbaca"
+                f"{len(AGENT_ACL)}/{len(AGENT_ACL)} model terbaca"
                 if not unreadable
                 else f"gagal: {unreadable}"
             ),
             not unreadable,
         )
 
-        rights = []
-        for model, operations in AGENT_RIGHTS.items():
+        for model, expected in AGENT_ACL.items():
             allowed = [
                 op
-                for op in operations
+                for op in OPERATIONS
                 if self.agent.call(model, "has_access", ids=[], operation=op)
             ]
-            denied = [op for op in operations if op not in allowed]
-            rights.append((model, allowed, denied))
-        bill = self.seeded("account.move", "bill_")
-        draft_create = "create" in next(a for m, a, _ in rights if m == "account.move")
-        self.row(
-            "Agent boleh membuat draft tagihan (create account.move)",
-            "ya" if draft_create else "tidak",
-            draft_create,
-        )
-        for model, allowed, denied in rights:
-            parts = []
-            if allowed:
-                parts.append("boleh " + ", ".join(allowed))
-            if denied:
-                parts.append("tidak boleh " + ", ".join(denied))
-            self.row(f"Hak agent di {model} (has_access)", "; ".join(parts), None)
+            text, ok = judge_operations(allowed, expected)
+            if model in AGENT_RULE_CLOSED:
+                text += f" ({AGENT_RULE_CLOSED[model]})"
+            self.row(f"Hak agent tingkat ACL: {model}", text, ok)
 
-        agent_id = self.x.get("user_agen", "res.users")
-        can_post = bool(
-            agent_id
-            and self.agent.call(
-                "res.users",
-                "has_group",
-                ids=[agent_id],
-                group_ext_id="account.group_account_invoice",
-            )
-        )
-        sample = next(iter(bill.values()), None)
-        write_bill = bool(sample) and self.agent.call(
-            "account.move", "has_access", ids=[sample], operation="write"
-        )
-        self.row(
-            "Agent bisa memposting tagihan (grup account.group_account_invoice + write)",
-            "ya, diketatkan di M2" if can_post and write_bill else "tidak",
-            None,
-        )
+        for model, what, record_id in self._rule_targets():
+            if record_id is None:
+                self.row(f"Hak agent tingkat aturan: {what}", "record seed tidak ada", False)
+                continue
+            allowed = [
+                op
+                for op in OPERATIONS
+                if self.agent.call(model, "has_access", ids=[record_id], operation=op)
+            ]
+            text, ok = judge_operations(allowed, READ_ONLY)
+            self.row(f"Hak agent tingkat aturan: {what} ({model})", text, ok)
 
     # -- local runtime (ADR-0003, tinjauan M0) -------------------------------------------------
 
@@ -646,7 +783,8 @@ class Checker:
         self.check_numbers()
         self.check_scenario_needs()
         self.check_label_leak()
-        self.check_agent()
+        self.check_agent_setup()
+        self.check_agent_rights()
         self.check_runtime()
 
 

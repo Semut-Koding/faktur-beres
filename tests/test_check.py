@@ -96,3 +96,25 @@ def test_main_exit_code_on_failure(ds, monkeypatch: pytest.MonkeyPatch, capsys) 
 def test_label_pattern_matches_catalogue_ids() -> None:
     assert LABEL_PATTERN.search("INJ-05")
     assert not LABEL_PATTERN.search("P00027 dan WH/IN/00026")
+
+
+def test_judge_operations_requires_the_exact_set() -> None:
+    assert check.judge_operations(["read"], ["read"]) == ("baca; tidak: buat, ubah, hapus", True)
+    text, ok = check.judge_operations(["read", "write"], ["read"])
+    assert (text, ok) == ("baca, ubah; tidak: buat, hapus", False)
+    assert check.judge_operations([], ["read"])[1] is False
+
+
+def test_agent_matrix_covers_every_model_of_the_task() -> None:
+    # M2.1 matrix: the agent only reads master data and only writes draft vendor bills.
+    read_only = {m for m, ops in check.AGENT_ACL.items() if ops == check.READ_ONLY}
+    assert {"res.partner", "res.partner.bank", "purchase.order", "stock.picking"} <= read_only
+    assert check.AGENT_ACL["account.move"] == ("read", "create", "write")
+    assert set(check.AGENT_RULE_CLOSED) == {
+        m for m, ops in check.AGENT_ACL.items() if ops != check.READ_ONLY
+    }
+    assert "account.group_account_invoice" in check.FORBIDDEN_AGENT_GROUPS
+
+
+def test_manifest_version_is_read_from_the_repository() -> None:
+    assert check.manifest_version() == "19.0.1.0.0"
