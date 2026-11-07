@@ -13,10 +13,12 @@ It wraps the M0 JSON-2 client with the **agent** key and allows a short list of 
   only its own drafts, so ``has_access("write")`` answers the question).
 
 Anything else raises ``ForbiddenOperation`` before a request is sent. Every call carries the context
-``{"lang": "id_ID", "tz": "Asia/Jakarta"}``; callers cannot override it. Odoo errors become typed
-tool errors; only reads are retried (by the client). Each call is logged as one structured record
-(model, method, masked parameters per BR-24, duration, status) on the ``faktur_beres.tools.odoo``
-logger; storing it in ``audit_log`` is M4.
+``{"lang": "id_ID", "tz": "Asia/Jakarta"}``; callers cannot override it. Creating an attachment adds
+``image_no_postprocess``, because Odoo otherwise shrinks images above 1920 px and re-encodes them
+(``ir.attachment._postprocess_contents``), and the original invoice file must be kept as received.
+Odoo errors become typed tool errors; only reads are retried (by the client). Each call is logged
+as one structured record (model, method, masked parameters per BR-24, duration, status) on the
+``faktur_beres.tools.odoo`` logger; storing it in ``audit_log`` is M4.
 
 Odoo still enforces the rights on its side (addon ``faktur_beres_agent``); the gateway is the second
 fence, not the only one.
@@ -276,11 +278,14 @@ class AgentOdooGateway:
 
     # -- the one place that sends requests ----------------------------------------------------
 
-    def _send(self, model: str, method: str, **kwargs: Any) -> Any:
+    def _send(self, model: str, method: str, *, keep_file: bool = False, **kwargs: Any) -> Any:
         started = time.monotonic()
         status, error = "ok", None
+        context: dict[str, str | bool] = dict(AGENT_CONTEXT)
+        if keep_file:
+            context["image_no_postprocess"] = True
         try:
-            return self._client.call(model, method, context=dict(AGENT_CONTEXT), **kwargs)
+            return self._client.call(model, method, context=context, **kwargs)
         except OdooError as exc:
             status, error = "error", type(exc).__name__
             raise from_odoo(exc) from exc
@@ -370,7 +375,7 @@ class AgentOdooGateway:
             "datas": base64.b64encode(content).decode("ascii"),
             "mimetype": mimetype,
         }
-        result = self._send("ir.attachment", "create", vals_list=[values])
+        result = self._send("ir.attachment", "create", keep_file=True, vals_list=[values])
         return int(result[0] if isinstance(result, list) else result)
 
     def post_note(self, bill_id: int, body: str) -> int:

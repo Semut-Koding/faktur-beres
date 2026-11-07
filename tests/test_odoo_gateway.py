@@ -143,6 +143,8 @@ def test_attachment_and_note_on_the_agents_draft() -> None:
     assert gw.create_attachment(42, "faktur.pdf", b"%PDF", "application/pdf") == 9
     assert gw.post_note(42, "Draft dibuat dari faktur.") == 11
     create = next(b for p, b in fake.requests if p == "ir.attachment/create")
+    # The original file is kept as received: Odoo must not shrink and re-encode images.
+    assert create["context"] == {**AGENT_CONTEXT, "image_no_postprocess": True}
     assert create["vals_list"][0] == {
         "name": "faktur.pdf",
         "res_model": "account.move",
