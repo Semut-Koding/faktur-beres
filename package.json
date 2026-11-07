@@ -20,6 +20,7 @@
     "odoo:reset": "bash infra/scripts/odoo-reset.sh",
     "gen:faktur": "uv run python -m faktur_beres.generator tulis",
     "gen:periksa": "uv run python -m faktur_beres.generator periksa",
+    "eval:orakel": "uv run python -m faktur_beres.evals.orakel",
     "lint": "uv run ruff check . && uv run ruff format --check .",
     "typecheck": "uv run mypy --strict",
     "test": "uv run python -m pytest",
