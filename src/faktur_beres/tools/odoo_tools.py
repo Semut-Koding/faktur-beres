@@ -9,6 +9,8 @@ The writes (``create_draft_bill``, ``attach_file``, ``post_note``) are idempoten
 see their docstrings.
 """
 
+import hashlib
+import re
 from collections import Counter
 from collections.abc import Iterable, Sequence
 from datetime import date
@@ -36,6 +38,7 @@ from faktur_beres.domain.normalize import (
     tax_id_digits,
 )
 from faktur_beres.domain.rules.bill_plan import BillPlan
+from faktur_beres.tools.errors import ForbiddenOperation
 from faktur_beres.tools.odoo_gateway import AgentOdooGateway
 
 VENDOR_DOMAIN: list[Any] = [["supplier_rank", ">", 0]]
@@ -531,3 +534,103 @@ def create_draft_bill(
         total=bill.amount_total,
         idempotency_key=idempotency_key,
     )
+
+
+class AttachmentResult(DomainModel):
+    attachment_id: int
+    created: bool
+    checksum: str  # SHA-1 of the content, as ``ir.attachment.checksum``
+
+
+def attach_file(
+    gw: AgentOdooGateway, bill_id: int, name: str, content: bytes, mimetype: str
+) -> AttachmentResult:
+    """Attach the original file to the agent's draft; the same name and checksum is reused."""
+    if not gw.is_agent_draft(bill_id):
+        raise ForbiddenOperation(
+            f"lampiran hanya pada draft tagihan agent (#{bill_id})",
+            model="ir.attachment",
+            method="create",
+        )
+    checksum = hashlib.sha1(content).hexdigest()  # noqa: S324 - Odoo's own checksum, not security
+    rows = gw.search_read(
+        "ir.attachment",
+        [["res_model", "=", "account.move"], ["res_id", "=", bill_id], ["name", "=", name]],
+        ["id", "checksum"],
+    )
+    same = [r for r in rows if r.get("checksum") == checksum]
+    if same:
+        return AttachmentResult(attachment_id=same[0]["id"], created=False, checksum=checksum)
+    attachment_id = gw.create_attachment(bill_id, name, content, mimetype)
+    return AttachmentResult(attachment_id=attachment_id, created=True, checksum=checksum)
+
+
+class NoteResult(DomainModel):
+    message_id: int
+    created: bool
+    marker: str
+
+
+_KEY = re.compile(r"^[0-9a-f]{64}$")
+
+
+def note_marker(idempotency_key: str) -> str:
+    if not _KEY.match(idempotency_key):
+        raise ValueError("kunci idempoten harus SHA-256 heksadesimal")
+    return f"[faktur-beres {idempotency_key}]"
+
+
+def post_note(gw: AgentOdooGateway, bill_id: int, text: str, idempotency_key: str) -> NoteResult:
+    """An internal note (``mail.mt_note``) on the agent's draft, once per idempotency key.
+
+    The key is written into the note as a marker; a note that already carries it is reused.
+    """
+    marker = note_marker(idempotency_key)
+    if not gw.is_agent_draft(bill_id):
+        raise ForbiddenOperation(
+            f"catatan hanya pada draft tagihan agent (#{bill_id})",
+            model="account.move",
+            method="message_post",
+        )
+    rows = gw.search_read(
+        "mail.message",
+        [["model", "=", "account.move"], ["res_id", "=", bill_id], ["body", "ilike", marker]],
+        ["id"],
+        limit=1,
+    )
+    if rows:
+        return NoteResult(message_id=rows[0]["id"], created=False, marker=marker)
+    message_id = gw.post_note(bill_id, f"{text}\n\n{marker}")
+    return NoteResult(message_id=message_id, created=True, marker=marker)
+
+
+#: Field names that would hold an incoming tax invoice number (NSFP) on a vendor bill.
+NSFP_FIELD_CANDIDATES = ("l10n_id_nsfp", "l10n_id_tax_number", "l10n_id_efaktur_number")
+
+
+def vendor_bill_nsfp_field(gw: AgentOdooGateway) -> str | None:
+    """The ``account.move`` field for the NSFP of a vendor bill, if this Odoo has one.
+
+    Odoo 19's ``l10n_id_efaktur_coretax`` fields are for customer invoices (``out_invoice``);
+    without a field for vendor bills the NSFP goes into the chatter note (RENCANA-TEKNIS §4.4).
+    """
+    fields = gw.fields_get("account.move", ["type", "string"])
+    for name in NSFP_FIELD_CANDIDATES:
+        if name in fields and fields[name].get("type") == "char":
+            return name
+    return None
+
+
+def bill_note_text(
+    invoice_number: str, nsfp: str | None, tax_invoice_date: date | None, file_name: str | None
+) -> str:
+    """The note on a new draft: source, and the NSFP that has no field on a vendor bill."""
+    parts = [f"Draft tagihan dibuat Faktur Beres dari faktur {invoice_number}"]
+    if file_name:
+        parts[0] += f" (berkas {file_name})"
+    parts[0] += "."
+    if nsfp:
+        when = f", tanggal {tax_invoice_date.isoformat()}" if tax_invoice_date else ""
+        parts.append(f"Faktur pajak: NSFP {nsfp}{when}.")
+    parts.append("Agent tidak memposting tagihan; posting oleh staf AP.")
+    return " ".join(parts)
