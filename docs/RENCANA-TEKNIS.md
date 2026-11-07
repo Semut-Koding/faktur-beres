@@ -79,17 +79,44 @@
 | `faktur_beres.dataset` | Model Pydantic dan pemuat `data/seed/dataset.yaml`, beserta pemeriksaan konsistensinya | M0 |
 | `faktur_beres.seed` | `init`, `seed`, `check`; dipakai lewat npm scripts | M0 |
 | `faktur_beres.generator` | Generator faktur PDF/gambar/UBL, label, dan balasan vendor | M1 |
-| `faktur_beres.domain` | Model faktur, normalisasi, aturan pencocokan dan pajak | M2 |
-| `faktur_beres.tools` | Enam alat agent dengan daftar operasi yang diizinkan | M2–M4 |
+| `faktur_beres.domain` | Model faktur kanonis `InvoiceData`, kode alasan dan jalur, record ERP dan protokol `ErpReader`, helper normalisasi, `PolicyConfig`, aturan deterministik (`rules/`, satu modul per kelompok BR) dan mesin `analyse()`. Kode agent: tidak mengimpor `evals`, `generator`, `dataset`, atau `seed` (tes arsitektur) | M2 |
+| `faktur_beres.tools` | Alat agent: `AgentOdooGateway` (satu-satunya pintu kode agent ke Odoo, key agent, daftar operasi dan field yang diizinkan), `odoo_tools` dan `OdooErpReader`, `match_engine`, `tax_check` (M2); `extract_invoice`, `policy_rag`, `email_tool` (M3–M4) | M2–M4 |
 | `faktur_beres.graph` | Node, state, dan routing LangGraph | M4 |
 | `faktur_beres.api` | FastAPI, SSE, dan pemantau inbox | M4 |
-| `faktur_beres.evals` | Harness evaluasi dan penilai state akhir | M5 |
+| `faktur_beres.evals` | Kode evaluasi, satu-satunya yang membaca label dan dataset: konverter label ke `InvoiceData`, pembaca ERP dari dataset, evaluasi orakel (M2); harness 40 × 3 dan penilai state akhir (M5) | M2–M5 |
 
 ### 3.3 Penanganan kesalahan dan skala
 - Panggilan Odoo dan LLM memakai retry dengan backoff eksponensial dan batas waktu. Kesalahan JSON-2 dipetakan dari objek error Odoo (`name`, `message`) ke exception Python yang jelas.
 - Setiap panggilan JSON-2 adalah satu transaksi. Operasi yang harus atomik memakai satu metode Odoo (mis. `create` dengan baris sekaligus), dan kegagalan di tengah ditangani lewat kunci idempoten dan pemeriksaan ulang (SPEC BR-22).
 - Bila kuota LLM habis, agent beralih ke model cadangan. Hasil ekstraksi di-cache per hash berkas untuk demo; cache dimatikan saat evaluasi.
 - MVP memakai satu proses API yang menjalankan graph di latar. Karena state ada di PostgreSQL, worker bisa dipisah dan ditambah tanpa mengubah graph.
+
+### 3.4 Keterlacakan aturan
+Setiap aturan yang dihitung kode punya tes bertanda `@pytest.mark.aturan("BR-xx")`. Daftar aturannya adalah konstanta `faktur_beres.domain.rules.CODE_RULES`, dan `tests/test_traceability.py` memastikan tiap BR di daftar itu punya minimal satu tes. Jumlah di bawah dihitung saat M2 selesai (7 November 2026): fungsi tes, dan kasus setelah parametrisasi.
+
+| BR | Fungsi atau modul | Berkas tes | Tes (kasus) |
+|---|---|---|---|
+| BR-03 | `rules/arithmetic.py`: `check_arithmetic` | `test_rule_arithmetic.py` | 6 (10) |
+| BR-05 | `rules/vendor.py`: `identify_vendor`; `engine.analyse` melewati pemeriksaan bergantung vendor | `test_rule_vendor.py`, `test_engine.py` | 11 (12) |
+| BR-06 | `rules/purchase_order.py`: `identify_purchase_order`, `is_strong_candidate` | `test_rule_purchase_order.py`, `test_engine.py` | 12 (16) |
+| BR-07 | `rules/lines.py`: `map_line` | `test_rule_lines.py` | 4 (9) |
+| BR-08 | `rules/lines.py`: `check_price`, `price_limit` | `test_rule_lines.py` | 4 (4) |
+| BR-09 | `rules/lines.py`: `check_quantity`, `match_lines`; `tools/match_engine.py` | `test_rule_lines.py`, `test_engine.py`, `test_match_and_tax_tools.py` | 10 (10) |
+| BR-10 | `rules/tax.py`: `check_tax`, `check_seller_identity`; `tax_ids.py`; `tools/tax_check.py` | `test_rule_tax.py`, `test_match_and_tax_tools.py` | 14 (22) |
+| BR-11 | `rules/duplicates.py`: `find_duplicates` | `test_rule_duplicates.py` | 9 (9) |
+| BR-12 | `rules/bank.py`: `check_bank_account` | `test_rule_bank.py` | 7 (7) |
+| BR-13 | `rules/policy_checks.py`: `check_threshold` | `test_rule_policy_checks.py` | 1 (4) |
+| BR-14 | `rules/policy_checks.py`: `check_new_vendor` | `test_rule_policy_checks.py` | 3 (3) |
+| BR-15 | `rules/injection.py`: `PATTERNS`, `scan_fragments` (lapis pertama) | `test_rule_injection.py` | 8 (37) |
+| BR-16 | `rules/routing.py`: `priority_route`, `initial_status` | `test_rule_routing.py` | 2 (6) |
+| BR-17 | `rules/routing.py`: `allowed_routes`, `default_route`, `guard_route` | `test_rule_routing.py` | 4 (15) |
+| BR-18 | `rules/bill_plan.py`: `plan_bill`, `BillPlan`; `tools/odoo_tools.py`: `create_draft_bill`, `verify_bill` | `test_rule_bill_plan.py` (+ `test_odoo_tools_draft.py`, `test_integrasi_draft.py`) | 5 (5) |
+| BR-22 | `rules/safety.py`: `canonical_json`, `idempotency_key` | `test_rule_safety.py` | 3 (3) |
+| BR-24 | `rules/safety.py`: `mask_npwp`, `mask_account`, `mask_params` (dipakai log gateway) | `test_rule_safety.py` (+ `test_odoo_gateway.py`) | 2 (2) |
+| BR-25 | `rules/safety.py`: `check_recipient` | `test_rule_safety.py` | 2 (15) |
+| BR-28 | `domain/policy.py`: `PolicyConfig`, `load_policy` | `test_policy.py` | 2 (2) |
+
+Rangkaian lengkapnya diuji `tests/test_engine.py` dan evaluasi orakel (`tests/test_orakel.py`, 40/40). Batas antara kode agent dan kode evaluasi diuji `tests/test_architecture.py`.
 
 ---
 
