@@ -3,12 +3,15 @@
 # sudah terpenuhi dilewati dan dilaporkan "sudah ada".
 #
 # Modul dipasang lewat CLI Odoo di kontainer sekali jalan (`compose run --rm`) saat layanan odoo
-# dihentikan. Pemeriksaan kondisi memakai kueri baca saja ke PostgreSQL milik Odoo.
+# dihentikan. Pemeriksaan kondisi memakai kueri baca saja ke PostgreSQL milik Odoo. Addon Faktur
+# Beres (infra/odoo/addons) selalu dipasang, atau di-upgrade bila sudah terpasang, supaya grup dan
+# aturan aksesnya selalu sama dengan isi repo.
 source "$(dirname "${BASH_SOURCE[0]}")/odoo-lib.sh"
 
 LANG_CODE="id_ID"
 COUNTRY="ID"
 MODULES=(purchase stock account l10n_id)
+ADDON="faktur_beres_agent"
 
 require_odoo_services
 
@@ -61,6 +64,18 @@ else
   odoo_cli i18n loadlang -d "$DB" -l "$LANG_CODE"
   echo "  dimuat"
 fi
+
+echo "== Addon $ADDON"
+stop_odoo
+if [[ "$(module_state "$ADDON")" == "installed" ]]; then
+  odoo_cli module upgrade -d "$DB" "$ADDON"
+  action="di-upgrade"
+else
+  odoo_cli module install -d "$DB" "$ADDON"
+  action="dipasang"
+fi
+[[ "$(module_state "$ADDON")" == "installed" ]] || die "addon $ADDON gagal dipasang; lihat $ODOO_LOG"
+echo "  $action, versi $(odoo_sql "$DB" "SELECT latest_version FROM ir_module_module WHERE name = '$ADDON'")"
 
 demo="$(odoo_sql "$DB" "SELECT count(*) FROM ir_module_module WHERE demo")"
 [[ "$demo" == "0" ]] || die "ada $demo modul dengan data demo; database harus tanpa demo"

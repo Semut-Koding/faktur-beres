@@ -80,6 +80,8 @@ else:
         report("grup user agent", "diatur ulang")
 if "notification_type" in wanted and agent.notification_type != wanted["notification_type"]:
     raise SystemExit("notification_type user agent tidak tersimpan")
+if set(agent.group_ids.ids) != set(groups.ids):
+    raise SystemExit("grup user agent tidak persis sama dengan yang diminta")
 
 env.cr.execute("SELECT COALESCE(password, '') FROM res_users WHERE id = %s", [agent.id])
 if env.cr.fetchone()[0]:

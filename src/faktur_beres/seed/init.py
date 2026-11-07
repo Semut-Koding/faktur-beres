@@ -3,8 +3,9 @@
 Steps, all safe to repeat:
 
 1. company data from the dataset, time zone, base URL, and the purchase tax (ORM script);
-2. admin password, the agent bot user (no password, standard groups), and the admin and agent
-   API keys (ORM script). New keys go straight into ``.env`` and are never printed;
+2. admin password, the agent bot user (no password; exactly the dedicated group
+   ``faktur_beres_agent.group_agent`` plus inbox notifications), and the admin and agent API keys
+   (ORM script). New keys go straight into ``.env`` and are never printed;
 3. smoke test: the agent key can call ``res.partner/search_read`` over JSON-2.
 """
 
@@ -26,14 +27,10 @@ TAX_XMLID = "fb_seed.tax_ppn_masukan"
 LOCALIZATION_TAX_TEMPLATE = "tax_PT4"
 
 AGENT_XMLID = "fb_seed.user_agen"
-# Standard groups, the smallest set that reads purchase orders, receipts, vendors, and bank
-# accounts and creates draft vendor bills. They also allow deleting drafts and posting bills;
-# M2 replaces them with a dedicated group (RENCANA-TEKNIS §4.4).
-AGENT_GROUPS = (
-    "purchase.group_purchase_user",
-    "stock.group_stock_user",
-    "account.group_account_invoice",
-)
+# The dedicated group of the faktur_beres_agent addon (infra/odoo/addons): read ERP data, create and
+# edit the agent's own draft vendor bills, attachments, and notes; no delete, no posting. The ORM
+# script adds mail.group_mail_notification_type_inbox and nothing else (RENCANA-TEKNIS §4.4).
+AGENT_GROUPS = ("faktur_beres_agent.group_agent",)
 API_KEY_DAYS = 90
 API_KEY_SCOPE = "rpc"
 ENV_KEYS = {"admin": "ODOO_ADMIN_API_KEY", "agent": "ODOO_AGENT_API_KEY"}
