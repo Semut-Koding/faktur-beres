@@ -4,7 +4,7 @@ AI agent yang menuntaskan *exception* faktur pemasok di proses *accounts payable
 
 Karya Tim **Daftar H-2 Jam** (Politeknik Negeri Subang) untuk **GTNIC 2026, kategori AI Agent**.
 
-**Status:** M1 selesai (6 November 2026): stack lokal dan data Odoo (M0), serta 40 skenario uji berlabel dengan berkas faktur dan balasan vendor di [`eval/`](eval/README.md). Berikutnya M2 (lapisan alat agent). Rencana lengkap ada di [RENCANA-TEKNIS §6](docs/RENCANA-TEKNIS.md#6-milestone).
+**Status:** M2 selesai (7 November 2026): stack lokal dan data Odoo (M0), 40 skenario uji berlabel dengan berkas faktur dan balasan vendor di [`eval/`](eval/README.md) (M1), dan lapisan alat agent (M2): grup Odoo khusus agent tanpa hak hapus dan posting, aturan bisnis deterministik, `odoo_tools`, serta evaluasi orakel 40/40. Berikutnya M3 (ekstraksi Gemini dan parser UBL). Rencana lengkap ada di [RENCANA-TEKNIS §6](docs/RENCANA-TEKNIS.md#6-milestone).
 
 ## Prasyarat
 - Linux dengan **Podman 6 rootless** dan **podman-compose ≥ 1.6** sebagai penyedia `podman compose`. Docker Compose v2 juga bisa dipakai.
@@ -17,7 +17,7 @@ Karya Tim **Daftar H-2 Jam** (Politeknik Negeri Subang) untuk **GTNIC 2026, kate
 ```bash
 npm run setup          # cek versi alat, buat .env dengan rahasia acak, pasang hook git
 npm run services:up    # Odoo 19, PostgreSQL Odoo, PostgreSQL + pgvector, Mailpit (proyek compose fakturberes)
-npm run odoo:init      # database fakturberes, modul, perusahaan, user agent, dan API key
+npm run odoo:init      # database fakturberes, modul, addon grup agent, perusahaan, user agent, API key
 npm run odoo:seed      # data sintetis dari data/seed/dataset.yaml (aman diulang)
 npm run odoo:check     # pastikan isi Odoo sama dengan dataset
 npm run odoo:snapshot  # simpan kondisi seed untuk reset cepat
@@ -39,9 +39,11 @@ Kembalikan data Odoo ke kondisi seed kapan saja dengan `npm run odoo:reset`.
 ## Tes dan pemeriksaan
 
 ```bash
-npm run check          # lint dan tes Python
+npm run check          # lint, cek tipe (mypy), dan tes unit Python
 npm run guard:secrets  # pastikan tidak ada nilai rahasia di berkas yang akan di-commit
 npm run gen:periksa    # pastikan berkas uji di eval/ sama persis dengan keluaran generator
+npm run eval:orakel    # aturan deterministik pada 40 label (tambahkan -- --odoo untuk ERP dari Odoo)
+npm run test:integrasi # tes terhadap Odoo dengan key agent, dengan odoo:reset sebelum dan sesudahnya
 ```
 
 ## Demo publik
@@ -54,6 +56,7 @@ faktur-beres/
 ├─ src/faktur_beres/   # paket Python: klien Odoo, dataset, seed, generator, alat agent, graph, API
 ├─ tests/              # tes Python
 ├─ data/seed/          # dataset.yaml: sumber tunggal data sintetis
+├─ data/kebijakan/     # parameter.yaml: ambang dan toleransi kebijakan (SPEC §15.5)
 ├─ eval/               # katalog skenario, berkas faktur uji, hasil evaluasi
 ├─ web/                # dashboard React + Vite (M5)
 ├─ infra/              # konfigurasi Odoo dan skrip Podman
