@@ -1,4 +1,4 @@
-"""The catalogue of 40 test scenarios (SPEC §15.3, details in docs/tugas/M1.md, step M1.3).
+"""The catalogue of 40 test scenarios (SPEC §15.3, document details in SPEC §15.3.1).
 
 Each scenario is declarative: which vendor and PO it is about, which lines the invoice prints, what
 is deliberately wrong, how the vendor replies or the approver decides, and what the agent is

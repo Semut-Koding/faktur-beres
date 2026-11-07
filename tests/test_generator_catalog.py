@@ -1,4 +1,4 @@
-"""Tests for the scenario catalogue: composition, SPEC §15.3, the M1.3 table, and document rules."""
+"""Tests for the scenario catalogue: composition, SPEC §15.3 and §15.3.1, and document rules."""
 
 import re
 from collections import Counter
@@ -55,17 +55,20 @@ def table_rows(path, start: str, stop: str) -> list[list[str]]:
     return rows
 
 
+SPEC = REPO_ROOT / "docs" / "SPEC.md"
+
+
 def spec_table() -> dict[str, list[str]]:
-    rows = table_rows(
-        REPO_ROOT / "docs" / "SPEC.md", "### 15.3 Katalog skenario uji", "**Kebutuhan"
-    )
+    """The catalogue table of SPEC §15.3 (ends before the data needs; §15.3.1 is separate)."""
+    rows = table_rows(SPEC, "### 15.3 Katalog skenario uji", "**Kebutuhan")
+    assert rows and len(rows[0]) == 6, "tabel katalog §15.3 berubah bentuk"
     return {row[0]: row for row in rows}
 
 
-def task_table() -> dict[str, list[str]]:
-    rows = table_rows(
-        REPO_ROOT / "docs" / "tugas" / "M1.md", "### M1.3 Katalog 40 skenario", "Ketentuan isi"
-    )
+def detail_table() -> dict[str, list[str]]:
+    """The per-scenario document details of SPEC §15.3.1 (copied there from the M1 task)."""
+    rows = table_rows(SPEC, "#### 15.3.1 Rincian dokumen per skenario", "Ketentuan isi")
+    assert rows and len(rows[0]) == 5, "tabel rincian §15.3.1 berubah bentuk"
     return {row[0]: row for row in rows}
 
 
@@ -116,7 +119,7 @@ def test_replies_and_decisions_follow_the_route() -> None:
     assert {s.id for s in SCENARIOS if s.idempotency} == {"COC-04", "COC-05"}
 
 
-# -- SPEC §15.3 and the M1.3 table ---------------------------------------------------------------
+# -- SPEC §15.3 and §15.3.1 ---------------------------------------------------------------------
 
 
 def test_catalogue_matches_spec_table(ds) -> None:
@@ -140,8 +143,8 @@ def test_catalogue_matches_spec_table(ds) -> None:
         assert s.extra_reasons == extra, s.id
 
 
-def test_catalogue_matches_task_table(built) -> None:
-    table = task_table()
+def test_catalogue_matches_detail_table(built) -> None:
+    table = detail_table()
     assert set(table) == set(built)
     for sid, b in built.items():
         _, channel, _, _, bill_cell = table[sid]
