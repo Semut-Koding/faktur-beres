@@ -167,7 +167,8 @@ class InjectionEvidence(DomainModel):
     kind: Literal["injection"] = "injection"
     source: str
     where: str | None
-    pattern: str
+    patterns: tuple[str, ...]
+    categories: tuple[str, ...]
     quote: str
 
 
