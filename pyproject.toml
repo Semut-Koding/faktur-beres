@@ -41,6 +41,8 @@ select = ["E", "F", "I", "B", "UP", "SIM"]
 "infra/odoo/shell/*.py" = ["F821"]
 # Manifest addon Odoo adalah satu ekspresi dict, sesuai format Odoo.
 "infra/odoo/addons/*/__manifest__.py" = ["B018"]
+# Odoo memuat model lewat impor submodul di __init__.py addon.
+"infra/odoo/addons/**/__init__.py" = ["F401"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
