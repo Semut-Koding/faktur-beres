@@ -13,6 +13,7 @@ Prompt yang sudah disimpan tidak diubah. Koreksi atau tambahan ditulis sebagai p
 |---|---|---|
 | [`M0.md`](M0.md) | Fondasi repo, stack Podman, inisialisasi dan seed Odoo | Selesai |
 | [`M1.md`](M1.md) | Catatan tinjauan M0 dan generator faktur uji 40 skenario | Selesai |
+| [`M2.md`](M2.md) | Catatan tinjauan M1 dan lapisan alat: grup Odoo agent, aturan deterministik, `odoo_tools`, evaluasi orakel | Berjalan |
 
 ## Format laporan
 Laporan ditulis di akhir tugas dalam bahasa Indonesia, dengan bagian berikut secara berurutan:
