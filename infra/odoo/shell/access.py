@@ -6,8 +6,10 @@ generated when the current one is missing, invalid, or expired, and only new key
 Idempotent; one commit at the end.
 
 API keys use ``res.users.apikeys._generate(scope, name, expiration_date)`` (Odoo 19,
-odoo/addons/base/models/res_users.py). It is called in sudo for the agent so the 90-day duration
-is accepted regardless of the agent's group limits.
+odoo/addons/base/models/res_users.py). The admin key is generated in sudo. The agent key is
+generated as the agent user itself, *without* sudo, so ``_check_expiration_date`` applies the
+largest ``api_key_duration`` of the agent's groups (90 days on faktur_beres_agent.group_agent).
+A valid agent key with an older name (made in sudo before M2) is rotated once.
 """
 
 import json
@@ -102,29 +104,51 @@ report(
 Keys = env["res.users.apikeys"].sudo()
 
 
-def ensure_key(label, user, current, key_name):
+key_modes = {}
+
+
+def ensure_key(label, user, current, key_name, *, old_names=(), without_sudo=False):
     uid = Keys._check_credentials(scope=P["scope"], key=current) if current else None
+    reason = "kosong di .env" if not current else "tidak valid/kedaluwarsa"
     if uid == user.id:
         env.cr.execute(
-            "SELECT expiration_date FROM res_users_apikeys WHERE user_id = %s AND index = %s",
+            "SELECT name, expiration_date FROM res_users_apikeys WHERE user_id = %s AND index = %s",
             [user.id, current[:8]],
         )
         row = env.cr.fetchone()
-        expiries[label] = str(row[0])[:10] if row and row[0] else None
-        report(f"API key {label}", f"sudah ada, berlaku sampai {expiries[label]}")
-        return
+        if row and row[0] == key_name:
+            expiries[label] = str(row[1])[:10] if row[1] else None
+            key_modes[label] = "tanpa sudo" if without_sudo else "sudo"
+            report(f"API key {label}", f"sudah ada, berlaku sampai {expiries[label]}")
+            return
+        reason = "diputar: key lama dibuat dengan sudo"
     # Remove keys this tool created earlier for the user; keys made by hand are left alone.
-    Keys.search([("user_id", "=", user.id), ("name", "=", key_name)])._remove()
+    Keys.search([("user_id", "=", user.id), ("name", "in", [key_name, *old_names])])._remove()
     expiration = fields.Datetime.now() + timedelta(days=P["key_days"])
-    key = Keys.with_user(user).sudo()._generate(P["scope"], key_name, expiration)
+    if without_sudo:
+        # As the user itself: Odoo enforces the api_key_duration of the user's groups.
+        key = env["res.users.apikeys"].with_user(user)._generate(P["scope"], key_name, expiration)
+        key_modes[label] = "tanpa sudo"
+    else:
+        key = Keys.with_user(user).sudo()._generate(P["scope"], key_name, expiration)
+        key_modes[label] = "sudo"
     new_keys[label] = key
     expiries[label] = str(expiration)[:10]
-    reason = "kosong di .env" if not current else "tidak valid/kedaluwarsa"
-    report(f"API key {label}", f"dibuat ({reason}), berlaku sampai {expiries[label]}")
+    report(
+        f"API key {label}",
+        f"dibuat {key_modes[label]} ({reason}), berlaku sampai {expiries[label]}",
+    )
 
 
 ensure_key("admin", admin, os.environ.get("FB_ADMIN_KEY", ""), P["admin_key_name"])
-ensure_key("agent", agent, os.environ.get("FB_AGENT_KEY", ""), a["key_name"])
+ensure_key(
+    "agent",
+    agent,
+    os.environ.get("FB_AGENT_KEY", ""),
+    a["key_name"],
+    old_names=a["old_key_names"],
+    without_sudo=True,
+)
 
 env.cr.commit()
 print(
@@ -134,6 +158,7 @@ print(
             "steps": steps,
             "keys": new_keys,
             "expiries": expiries,
+            "key_modes": key_modes,
             "agent": {
                 "id": agent.id,
                 "groups": explicit,

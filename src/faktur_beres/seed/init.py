@@ -92,7 +92,10 @@ def access_params(ds: Dataset) -> dict:
             "groups": list(AGENT_GROUPS),
             "lang": "id_ID",
             "tz": TIME_ZONE,
-            "key_name": "faktur-beres agent (odoo:init)",
+            # Generated as the agent itself without sudo (since M2). The M0 name marks the old
+            # key made in sudo, which odoo:init rotates once.
+            "key_name": "faktur-beres agent (odoo:init, tanpa sudo)",
+            "old_key_names": ["faktur-beres agent (odoo:init)"],
         },
     }
 
@@ -113,6 +116,8 @@ def init_access(ds: Dataset) -> dict:
     print_table(("Langkah", "Hasil"), result["steps"])
     for name in sorted(new_keys):
         print(f"  {name} ditulis ke .env (nilai tidak ditampilkan)")
+    if result.get("key_modes", {}).get("agent") != "tanpa sudo":
+        raise OdooShellError("key agent tidak dibuat tanpa sudo")
     return result
 
 
