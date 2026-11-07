@@ -76,7 +76,9 @@ ignore_errors = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = ["-ra", "--strict-markers"]
+# Integration tests need a running Odoo and are run only by `npm run test:integrasi`.
+addopts = ["-ra", "--strict-markers", "-m", "not integrasi"]
 markers = [
     "aturan(kode): tes untuk aturan bisnis SPEC §8 (mis. \"BR-10\"); dipakai tes keterlacakan",
+    "integrasi: tes terhadap Odoo yang menyala (npm run test:integrasi, dengan odoo:reset)",
 ]
