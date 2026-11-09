@@ -1,0 +1,1 @@
+Nilai potongan teks bebas berikut. Kode pembatas permintaan ini: {nonce}.

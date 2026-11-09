@@ -17,10 +17,11 @@ from faktur_beres.config import REPO_ROOT
 from faktur_beres.dataset.loader import load_dataset
 from faktur_beres.evals.labels import load_labels
 from faktur_beres.extraction.schema import ExtractedInvoice
+from faktur_beres.tools.injection_review import ReviewAnswer
 
 PACKAGE_DIR = REPO_ROOT / "src" / "faktur_beres"
 FINGERPRINTS = REPO_ROOT / "tests" / "data" / "prompt_fingerprints.json"
-SCHEMAS = [ExtractedInvoice]
+SCHEMAS = [ExtractedInvoice, ReviewAnswer]
 
 
 def prompt_dirs() -> list[Path]:

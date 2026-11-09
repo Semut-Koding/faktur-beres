@@ -32,6 +32,7 @@ it stays inside one clause.
 import re
 import unicodedata
 from collections.abc import Iterable, Sequence
+from enum import StrEnum
 from typing import Literal
 
 from faktur_beres.domain.base import DomainModel
@@ -356,3 +357,43 @@ def merge_fragments(*groups: Sequence[TextFragment]) -> tuple[TextFragment, ...]
                 seen.add(key)
                 merged.append(fragment)
     return tuple(merged)
+
+
+def document_fragments(
+    invoice: InvoiceData | None, fragments: Sequence[TextFragment]
+) -> tuple[TextFragment, ...]:
+    """Every free text of one document, once: what layer 1 scans and what layer 2 reads.
+
+    ``analyse()`` and the caller of the layer-2 reviewer both use this, so the reviewer judges
+    exactly the fragments the rules see.
+    """
+    own = invoice_fragments(invoice) if invoice is not None else []
+    return merge_fragments(fragments, own)
+
+
+# -- layer 2: the result of the LLM reviewer (produced by faktur_beres.tools.injection_review) -----
+
+
+class ReviewStatus(StrEnum):
+    OK = "ok"  # the reviewer answered, with a verified quote when it said yes
+    UNAVAILABLE = "unavailable"  # no model could answer (BR-27)
+    INVALID = "invalid"  # yes without a quote that matches the fragment, twice
+    TOO_LONG = "too_long"  # more free text than the reviewer may read
+
+
+class ReviewQuote(DomainModel):
+    """A quote of the reviewer, checked by code against the fragment it names."""
+
+    source: TextSource
+    where: str | None
+    text: str
+
+
+class InjectionReview(DomainModel):
+    status: ReviewStatus
+    injection: bool | None = None  # the answer, when the status is ok
+    quotes: tuple[ReviewQuote, ...] = ()
+
+    @property
+    def says_injection(self) -> bool:
+        return self.status is ReviewStatus.OK and self.injection is True
