@@ -1,6 +1,7 @@
 """M4a.5 and M4a.7: the graph's behaviour, without any service (fake store, Odoo and mail)."""
 
 from collections.abc import Callable
+from functools import cache
 from io import BytesIO
 from pathlib import Path
 from typing import Any
@@ -36,6 +37,7 @@ LABELS = load_labels()
 ROBUST = load_robustness_labels()
 
 
+@cache  # reportlab stamps the current time: the same text must give the same bytes
 def pdf(text: str = "uji") -> bytes:
     buffer = BytesIO()
     canvas = Canvas(buffer)

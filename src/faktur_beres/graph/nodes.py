@@ -47,6 +47,7 @@ from faktur_beres.domain.rules.routing import initial_status
 from faktur_beres.domain.rules.safety import content_version, idempotency_key
 from faktur_beres.domain.rules.vendor import VendorStatus
 from faktur_beres.extraction.outcome import ExtractionOutcome, ExtractionStatus
+from faktur_beres.graph.audit import AuditedReader
 from faktur_beres.graph.deps import Dependencies
 from faktur_beres.graph.state import GraphState
 from faktur_beres.tools.email_tool import (
@@ -158,6 +159,9 @@ class Nodes:
 
         return run
 
+    def _reader(self, state: GraphState, node: str) -> AuditedReader:
+        return AuditedReader(self.deps.reader, self.deps.store, state["invoice_id"], node)
+
     # --- from the file to the route -------------------------------------------------------------
 
     def intake(self, state: GraphState) -> Update:
@@ -251,7 +255,8 @@ class Nodes:
         invoice = _invoice(state)
         assert invoice is not None
         intake = IntakeContext.model_validate(state["intake"])
-        ident = identify_step(invoice, intake, self.deps.reader, self.deps.policy)
+        reader = self._reader(state, "identify")
+        ident = identify_step(invoice, intake, reader, self.deps.policy)
         return {
             "identification": ident.model_dump(mode="json"),
             "planner": self._plan(state, invoice, ident),
@@ -269,7 +274,7 @@ class Nodes:
         ):
             return None
         invoice_id, store = state["invoice_id"], self.deps.store
-        outcome = self.deps.planner(invoice, vendor, self.deps.reader)
+        outcome = self.deps.planner(invoice, vendor, self._reader(state, "identify"))
         store.audit_llm(invoice_id, "identify", outcome.calls)
         po = ident.purchase_order.purchase_order
         rule = normalize_po_number(po.number) if po is not None else None
@@ -328,7 +333,7 @@ class Nodes:
             intake,
             _fragments(state),
             ident,
-            deps.reader,
+            self._reader(state, "match"),
             deps.policy,
             registry=deps.registry,
             injection_review=review,
@@ -411,7 +416,7 @@ class Nodes:
             StepResult.model_validate(state["arithmetic"]),
             Identification.model_validate(state["identification"]),
             matching,
-            deps.reader,
+            self._reader(state, "decide"),
             deps.policy,
         )
 
