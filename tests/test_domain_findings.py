@@ -99,4 +99,4 @@ def test_records() -> None:
         invoice_date=date(2026, 10, 1),
     )
     assert BillRecord.model_validate_json(bill.model_dump_json()) == bill
-    assert NoOtherInvoices().other_invoices(3) == ()
+    assert NoOtherInvoices().other_invoices(3, exclude_invoice_id=None) == ()

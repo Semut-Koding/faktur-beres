@@ -168,13 +168,21 @@ class RegisteredInvoice(DomainModel):
 
 
 class InvoiceRegistry(Protocol):
-    """BR-11 compares with "faktur lain di Faktur Beres"; the source is the application DB (M4)."""
+    """BR-11 compares with "faktur lain di Faktur Beres"; the source is the application DB (M4).
 
-    def other_invoices(self, vendor_id: int) -> Sequence[RegisteredInvoice]: ...
+    The invoice being processed is never among the "other" invoices: an implementation leaves out
+    the invoice whose ``invoice_id`` is ``exclude_invoice_id``.
+    """
+
+    def other_invoices(
+        self, vendor_id: int, *, exclude_invoice_id: str | None
+    ) -> Sequence[RegisteredInvoice]: ...
 
 
 class NoOtherInvoices:
-    """The M2 registry: there is no application database yet, so it is always empty."""
+    """The registry until the application database exists (M4): always empty."""
 
-    def other_invoices(self, vendor_id: int) -> Sequence[RegisteredInvoice]:
+    def other_invoices(
+        self, vendor_id: int, *, exclude_invoice_id: str | None
+    ) -> Sequence[RegisteredInvoice]:
         return ()

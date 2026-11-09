@@ -78,8 +78,14 @@ class Channel(StrEnum):
 
 
 class IntakeContext(DomainModel):
-    """How the invoice arrived: channel, e-mail sender, file name, and SHA-256 of the file."""
+    """How the invoice arrived: its id, channel, e-mail sender, file name, and SHA-256 of the file.
 
+    ``invoice_id`` is the thread of the invoice in Faktur Beres (BR-01); a corrected invoice that
+    arrives as a vendor reply keeps the thread's id. It lets BR-11 leave the invoice itself out of
+    "other invoices in Faktur Beres".
+    """
+
+    invoice_id: str | None = Field(default=None, min_length=1, max_length=64)
     channel: Channel
     sender_email: str | None = None
     file_name: str | None = None

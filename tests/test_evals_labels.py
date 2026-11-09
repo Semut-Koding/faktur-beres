@@ -65,12 +65,24 @@ def test_intake_and_email(labels) -> None:
 
 def test_reply_inputs(labels) -> None:
     reply = labels["QTY-01"].simulasi.balasan_vendor
-    ctx = reply_intake(reply)
+    ctx = reply_intake(reply, invoice_id="FB-000000000001")
     assert (ctx.channel, ctx.sender_email) == (Channel.EMAIL, "tagihan@kertas-sagara.test")
     sources = {f.source for f in reply_fragments(reply, document_format="pdf")}
     assert {TextSource.VENDOR_REPLY, TextSource.LINE_DESCRIPTION} <= sources
     text_reply = labels["NPO-03"].simulasi.balasan_vendor
-    assert reply_intake(text_reply).file_name is None
+    assert reply_intake(text_reply, invoice_id="FB-000000000002").file_name is None
     assert [f.source for f in reply_fragments(text_reply, document_format="pdf")] == [
         TextSource.VENDOR_REPLY
     ]
+
+
+def test_invoice_ids_are_neutral_and_shared_by_the_thread(labels) -> None:
+    from faktur_beres.evals.labels import invoice_id_for, label_invoice_id
+
+    label = labels["QTY-01"]
+    iid = label_invoice_id(label)
+    assert iid == invoice_id_for(label.berkas.sha256) == "FB-" + label.berkas.sha256[:12]
+    assert label_intake(label).invoice_id == iid
+    reply = label.simulasi.balasan_vendor
+    assert reply_intake(reply, invoice_id=iid).invoice_id == iid
+    assert "QTY" not in iid

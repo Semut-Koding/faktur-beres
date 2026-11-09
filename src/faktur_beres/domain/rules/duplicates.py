@@ -87,7 +87,10 @@ def find_duplicates(
     bills: Sequence[BillRecord],
     others: Sequence[RegisteredInvoice],
     policy: PolicyConfig,
+    *,
+    exclude_invoice_id: str | None = None,
 ) -> DuplicateResult:
+    """``exclude_invoice_id`` is the invoice being processed; it is never its own duplicate."""
     findings: list[Finding] = []
     comparators: list[BillRecord] = []
     for bill in bills:
@@ -118,7 +121,9 @@ def find_duplicates(
         )
         comparators.append(bill)
     for other in others:
-        if other.vendor_id != vendor_id:
+        if other.vendor_id != vendor_id or (
+            exclude_invoice_id is not None and other.invoice_id == exclude_invoice_id
+        ):
             continue
         found = _match(invoice, other.invoice_number, other.invoice_date, other.total, policy)
         if found is None:

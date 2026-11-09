@@ -125,3 +125,47 @@ def test_result_is_deterministic_and_round_trips() -> None:
     first, second = run(), run()
     assert first == second
     assert AnalysisResult.model_validate_json(first.model_dump_json()) == first
+
+
+class OneOtherInvoice:
+    """A registry holding one earlier Faktur Beres invoice with the same number and total."""
+
+    def __init__(self, invoice) -> None:
+        from faktur_beres.domain.erp import RegisteredInvoice
+
+        self.record = RegisteredInvoice(
+            invoice_id="FB-aaaaaaaaaaaa",
+            vendor_id=VENDOR.id,
+            invoice_number=invoice.invoice_number,
+            invoice_date=invoice.invoice_date,
+            total=invoice.total,
+        )
+        self.asked: list[str | None] = []
+
+    def other_invoices(self, vendor_id, *, exclude_invoice_id):
+        self.asked.append(exclude_invoice_id)
+        return () if exclude_invoice_id == self.record.invoice_id else (self.record,)
+
+
+@pytest.mark.aturan("BR-11")
+def test_the_invoice_being_processed_is_not_its_own_duplicate() -> None:
+    inv = invoice()
+    registry = OneOtherInvoice(inv)
+    same = IntakeContext(channel=Channel.UPLOAD, invoice_id="FB-aaaaaaaaaaaa")
+    other = IntakeContext(channel=Channel.UPLOAD, invoice_id="FB-bbbbbbbbbbbb")
+    assert analyse(inv, same, [], erp(), POLICY, registry=registry).reasons == ()
+    result = analyse(inv, other, [], erp(), POLICY, registry=registry)
+    assert result.reasons == (ReasonCode.DUPLICATE_CONFIRMED,)
+    assert registry.asked == ["FB-aaaaaaaaaaaa", "FB-bbbbbbbbbbbb"]
+
+
+@pytest.mark.aturan("BR-11")
+def test_rule_leaves_out_the_current_invoice_even_if_a_registry_returns_it() -> None:
+    from faktur_beres.domain.rules.duplicates import find_duplicates
+
+    inv = invoice()
+    record = OneOtherInvoice(inv).record
+    found = find_duplicates(
+        inv, VENDOR.id, [], [record], POLICY, exclude_invoice_id=record.invoice_id
+    )
+    assert found.findings == ()

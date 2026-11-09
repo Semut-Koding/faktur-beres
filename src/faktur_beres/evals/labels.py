@@ -165,10 +165,24 @@ def truth_fragments(truth: DocumentTruth, *, document_format: str) -> list[TextF
     return fragments
 
 
+def invoice_id_for(file_sha256: str) -> str:
+    """The neutral invoice id used by evaluation code: ``FB-`` + the first 12 hex of the file hash.
+
+    Nothing in it names the scenario, so it may reach Odoo (notes, idempotency keys).
+    """
+    return "FB-" + file_sha256[:12]
+
+
+def label_invoice_id(label: Label) -> str:
+    """The thread id of a scenario: from the hash of its original invoice file."""
+    return invoice_id_for(label.berkas.sha256)
+
+
 def label_intake(label: Label) -> IntakeContext:
-    """Channel, sender, file name, and hash of the original invoice."""
+    """Thread id, channel, sender, file name, and hash of the original invoice."""
     sender = normalize_email(label.email.dari) if label.email else None
     return IntakeContext(
+        invoice_id=label_invoice_id(label),
         channel=CHANNELS[label.kanal],
         sender_email=sender,
         file_name=label.berkas.nama_kirim,
@@ -186,9 +200,11 @@ def email_fragments(label: Label) -> list[TextFragment]:
     ]
 
 
-def reply_intake(reply: VendorReply) -> IntakeContext:
-    """The vendor's reply arrives by e-mail; an attachment carries a file name and hash."""
+def reply_intake(reply: VendorReply, *, invoice_id: str) -> IntakeContext:
+    """The vendor's reply arrives by e-mail in the thread ``invoice_id`` (BR-11: the corrected
+    invoice replaces the thread's invoice); an attachment carries a file name and hash."""
     return IntakeContext(
+        invoice_id=invoice_id,
         channel=Channel.EMAIL,
         sender_email=normalize_email(reply.dari),
         file_name=reply.berkas.nama_kirim if reply.berkas else None,

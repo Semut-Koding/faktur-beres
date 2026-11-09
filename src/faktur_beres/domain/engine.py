@@ -146,8 +146,9 @@ def analyse(
             invoice,
             vendor.id,
             reader.vendor_bills(vendor.id),
-            registry.other_invoices(vendor.id),
+            registry.other_invoices(vendor.id, exclude_invoice_id=intake.invoice_id),
             policy,
+            exclude_invoice_id=intake.invoice_id,
         )
         number = po_number_from_reply or invoice.po_number
         found = reader.purchase_order(normalize_po_number(number)) if number else None

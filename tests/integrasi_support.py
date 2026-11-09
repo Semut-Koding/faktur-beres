@@ -10,6 +10,7 @@ from faktur_beres.domain.rules.safety import idempotency_key
 from faktur_beres.evals.labels import (
     email_fragments,
     label_intake,
+    label_invoice_id,
     truth_fragments,
     truth_to_invoice,
 )
@@ -33,7 +34,7 @@ def analyse_label(label: Label, erp: OdooErpReader) -> AnalysisResult:
 
 def invoice_id(label: Label) -> str:
     """A neutral invoice id from the file hash: nothing in Odoo may name the scenario."""
-    return "FB-" + label.berkas.sha256[:12]
+    return label_invoice_id(label)
 
 
 def keys(label: Label, bill_target: str) -> dict[str, str]:

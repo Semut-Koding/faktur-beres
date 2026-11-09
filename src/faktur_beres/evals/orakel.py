@@ -61,6 +61,7 @@ from faktur_beres.evals.dataset_erp import DatasetErpReader
 from faktur_beres.evals.labels import (
     email_fragments,
     label_intake,
+    label_invoice_id,
     load_labels,
     reply_fragments,
     reply_intake,
@@ -264,7 +265,7 @@ class Simulator:
             corrected = truth_to_invoice(reply.kebenaran_dokumen)
             again = analyse(
                 corrected,
-                reply_intake(reply),
+                reply_intake(reply, invoice_id=label_invoice_id(label)),
                 reply_fragments(reply, document_format=label.format),
                 self.reader,
                 self.policy,
