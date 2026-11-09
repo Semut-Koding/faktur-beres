@@ -73,6 +73,7 @@ MAX_RETRIES = 3  # per model: quota per minute, server errors, timeouts
 MAX_INVALID_RETRIES = 1
 MAX_WAIT_MS = 120_000  # a longer RetryInfo wait goes to the fallback model instead
 HTTP_LOGGERS = ("httpx", "httpcore", "google_genai")
+MESSAGE_SHOWN = 300
 LOGGER = logging.getLogger("faktur_beres.llm")
 
 THINKING = {
@@ -253,6 +254,16 @@ def classify(exc: BaseException) -> Failure | None:
     if isinstance(exc, httpx.TransportError):
         return Failure(ErrorKind.NETWORK_ERROR)
     return None
+
+
+def api_message(exc: BaseException) -> str:
+    """The status and message the API gave, shortened; they hold neither the key nor content."""
+    if not isinstance(exc, errors.APIError):
+        return ""
+    message = " ".join(str(exc.message or "").split())
+    if len(message) > MESSAGE_SHOWN:
+        message = message[:MESSAGE_SHOWN] + "…"
+    return f" {exc.status or ''}: {message}".rstrip(": ")
 
 
 @dataclass(frozen=True)
@@ -474,7 +485,9 @@ class GeminiClient:
                 )
                 if failure.kind is ErrorKind.CONFIG_ERROR:
                     raise LlmConfigError(
-                        f"{model}: permintaan ditolak (HTTP {failure.http_status})", calls
+                        f"{model}: permintaan ditolak (HTTP {failure.http_status})"
+                        f"{api_message(exc)}",
+                        calls,
                     ) from exc
                 if failure.kind is ErrorKind.QUOTA_PER_DAY:
                     self._exhausted.add(model)
