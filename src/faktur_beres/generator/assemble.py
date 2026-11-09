@@ -3,13 +3,13 @@
 from datetime import timedelta
 
 from faktur_beres.dataset import get_dataset
+from faktur_beres.generator import render_image, render_ubl
 from faktur_beres.generator.daftar import render_daftar
 from faktur_beres.generator.documents import BuiltScenario, build_catalog
 from faktur_beres.generator.formatting import rupiah_plain
 from faktur_beres.generator.labels import dump_label, label_data
 from faktur_beres.generator.model import InvoiceDoc, RenderedFile
 from faktur_beres.generator.naming import pdf_name, photo_name, scan_name, ubl_name
-from faktur_beres.generator import render_image, render_ubl
 from faktur_beres.generator.render_pdf import PRINTED_PARTIES as PDF_PARTIES
 from faktur_beres.generator.render_pdf import render_pdf
 from faktur_beres.generator.styles import STYLES
