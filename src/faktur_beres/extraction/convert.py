@@ -276,6 +276,7 @@ class _Converter:
         nsfp = self.tax_id("nsfp", x.nsfp, ProblemKind.NSFP_FORMAT)
         tax_date = self.day("tanggal_faktur_pajak", x.tax_invoice_date, required=False)
         bank = self.bank_account(x.bank_account)
+        self.values["baris"] = str(len(x.lines))  # the line count, compared like a field
         if not x.lines:
             self.problem("baris", ProblemKind.MISSING_REQUIRED, None)
         lines = [self.line(i, line) for i, line in enumerate(x.lines, start=1)]

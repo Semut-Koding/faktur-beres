@@ -5,11 +5,24 @@ building, error classification, retry, fallback, throttle and audit code all run
 the fake clock forward by ``latency_ms``, like a real request would.
 """
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from decimal import Decimal
 
 from google.genai import errors, types
+from pydantic import BaseModel
+
+from faktur_beres.llm.contracts import (
+    CacheUse,
+    CallStatus,
+    ErrorKind,
+    LlmCallRecord,
+    LlmRequest,
+    LlmResult,
+    ModelRole,
+    TextPart,
+)
 
 NS_PER_MS = 1_000_000
 START = datetime(2026, 11, 9, 8, 0, tzinfo=UTC)
@@ -146,3 +159,65 @@ def quota_per_day() -> Exception:
             {"@type": RETRY_INFO, "retryDelay": "40s"},
         ],
     )
+
+
+# --- a fake StructuredLlm, for the code that uses the client ---------------------------------
+
+
+def call_record(request: LlmRequest, model: str, *, ok: bool = True) -> LlmCallRecord:
+    return LlmCallRecord(
+        at=START,
+        purpose=request.purpose,
+        role=request.role,
+        model=model,
+        fallback=False,
+        prompt_version=request.prompt_version,
+        request_key="0" * 16,
+        attempt=1,
+        cache=CacheUse.OFF,
+        duration_ms=1_000,
+        status=CallStatus.OK if ok else CallStatus.ERROR,
+        error_kind=None if ok else ErrorKind.INVALID_OUTPUT,
+        finish_reason="STOP",
+        input_tokens=1_000,
+        output_tokens=200,
+        thinking_tokens=50,
+        total_tokens=1_250,
+        cost_usd=Decimal("0.001"),
+    )
+
+
+class ScriptedLlm:
+    """``StructuredLlm`` fake: each request gets the next scripted answer, a value or an error.
+
+    An answer that is a function of the request is called with it, so a test can answer by role.
+    """
+
+    def __init__(
+        self,
+        answers: Iterable[BaseModel | BaseException | Callable[[LlmRequest], BaseModel]],
+        *,
+        models: dict[ModelRole, str] | None = None,
+    ) -> None:
+        self.answers = list(answers)
+        self.models = models or {ModelRole.PRIMARY: "model-utama", ModelRole.STRONG: "model-kuat"}
+        self.requests: list[LlmRequest] = []
+
+    def generate[T: BaseModel](self, request: LlmRequest, schema: type[T]) -> LlmResult[T]:
+        self.requests.append(request)
+        if not self.answers:
+            raise AssertionError("tidak ada jawaban terjadwal")
+        answer = self.answers.pop(0)
+        if isinstance(answer, BaseException):
+            raise answer
+        if callable(answer) and not isinstance(answer, BaseModel):
+            answer = answer(request)
+        model = self.models[request.role]
+        value = schema.model_validate(answer.model_dump())
+        return LlmResult(value=value, model=model, calls=(call_record(request, model),))
+
+    def texts(self, index: int) -> str:
+        """All text parts of request ``index`` (the system instruction included)."""
+        request = self.requests[index]
+        parts = [p.text for p in request.parts if isinstance(p, TextPart)]
+        return "\n".join([request.system_instruction, *parts])

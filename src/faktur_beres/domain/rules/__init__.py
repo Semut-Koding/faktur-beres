@@ -9,6 +9,7 @@ values with evidence. No rule reads the ERP, a file, or the clock itself.
 CODE_RULES: tuple[str, ...] = (
     "BR-02",
     "BR-03",
+    "BR-04",
     "BR-05",
     "BR-06",
     "BR-07",

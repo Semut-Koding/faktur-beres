@@ -174,6 +174,15 @@ class InjectionEvidence(DomainModel):
     quote: str
 
 
+class ExtractionEvidence(DomainModel):
+    """BR-04: why the reading of a document was not accepted (``validation_failed``)."""
+
+    kind: Literal["extraction"] = "extraction"
+    fields: tuple[str, ...]  # field paths, e.g. "baris[2].jumlah"
+    problems: tuple[str, ...]  # "<path>: <kind> (<text as read>)"
+    attempts: tuple[str, ...]  # one summary per reading attempt
+
+
 Evidence = Annotated[
     LineAmountEvidence
     | DocumentSumEvidence
@@ -190,7 +199,8 @@ Evidence = Annotated[
     | BankAccountEvidence
     | ThresholdEvidence
     | NewVendorEvidence
-    | InjectionEvidence,
+    | InjectionEvidence
+    | ExtractionEvidence,
     Field(discriminator="kind"),
 ]
 
