@@ -65,7 +65,15 @@ from faktur_beres.llm.contracts import (
     request_key,
 )
 from faktur_beres.llm.cost import Cost, PriceList, load_prices
-from faktur_beres.llm.pacing import NS_PER_MS, Clock, SystemClock, Throttle, backoff_ms, jitter_ms
+from faktur_beres.llm.pacing import (
+    DEFAULT_RPM,
+    NS_PER_MS,
+    Clock,
+    SystemClock,
+    Throttle,
+    backoff_ms,
+    jitter_ms,
+)
 
 API_VERSION = "v1beta"  # written out: SDK 3.x changes the default to v1 (M3.2)
 JSON_MIME = "application/json"
@@ -142,13 +150,23 @@ def cache_dir(settings: Settings) -> Path:
     return path if path.is_absolute() else REPO_ROOT / path
 
 
-def gemini_client(settings: Settings, *, use_cache: bool = False) -> "GeminiClient":
-    """The agent's client; the cache only when the caller asks for it (``--pakai-cache``)."""
+def gemini_client(
+    settings: Settings, *, use_cache: bool = False, only_model: str | None = None
+) -> "GeminiClient":
+    """The agent's client; the cache only when the caller asks for it (``--pakai-cache``).
+
+    ``only_model`` puts one model in both roles (comparison runs, M3.7): every request goes to it
+    and there is no fallback.
+    """
+    primary = only_model or settings.gemini_model_primary
+    strong = only_model or settings.gemini_model_strong
+    known = rpm_by_model(settings)
+    rpm = {model: known.get(model, DEFAULT_RPM) for model in {primary, strong}}
     return GeminiClient(
         SdkGenerate(sdk_client(settings)),
-        primary=settings.gemini_model_primary,
-        strong=settings.gemini_model_strong,
-        rpm=rpm_by_model(settings),
+        primary=primary,
+        strong=strong,
+        rpm=rpm,
         cache=LlmCache(cache_dir(settings)) if use_cache else None,
         prices=load_prices(),
     )
