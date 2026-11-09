@@ -109,8 +109,8 @@ def judge_layer1(phrase: Phrase) -> PhraseResult:
     """Layer 1 only; ``--lapis1`` treats every pattern hit as C5 (no reviewer to clear it)."""
     hits = scan_text(phrase.teks)
     names = tuple(pattern.name for pattern, _ in hits)
-    tiers = {getattr(pattern, "tier", "tanpa_tingkat") for pattern, _ in hits}
-    tier = "strong" if "strong" in tiers else next(iter(sorted(tiers)), None)
+    tiers = {pattern.tier for pattern, _ in hits}
+    tier = "strong" if "strong" in tiers else ("weak" if tiers else None)
     return PhraseResult(
         id=phrase.id,
         label=phrase.label,
