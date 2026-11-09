@@ -1,11 +1,22 @@
-"""``python -m faktur_beres.generator [tulis|periksa]`` (npm run gen:faktur / gen:periksa)."""
+"""``python -m faktur_beres.generator [tulis|ketahanan|periksa]``.
+
+``tulis`` writes the 40 scenarios (npm run gen:faktur), ``ketahanan`` the robustness set
+(npm run gen:ketahanan), and ``periksa`` checks both against the repository (npm run gen:periksa).
+"""
 
 import argparse
 import sys
 import time
 from collections import Counter
 
-from faktur_beres.generator.build import EVAL_DIR, build_outputs, check_outputs, write_outputs
+from faktur_beres.generator.build import (
+    EVAL_DIR,
+    ROBUSTNESS_DIR,
+    build_outputs,
+    build_robustness_outputs,
+    check_outputs,
+    write_outputs,
+)
 
 
 def _summary(files: dict[str, bytes]) -> list[str]:
@@ -30,8 +41,11 @@ def main(argv: list[str] | None = None) -> int:
         "perintah",
         nargs="?",
         default="tulis",
-        choices=("tulis", "periksa"),
-        help="tulis: tulis ulang eval/; periksa: bandingkan hasil generator dengan eval/",
+        choices=("tulis", "ketahanan", "periksa"),
+        help=(
+            "tulis: tulis ulang 40 skenario di eval/; ketahanan: tulis ulang eval/ketahanan/; "
+            "periksa: bandingkan hasil generator dengan kedua set di repo"
+        ),
     )
     parser.add_argument(
         "--byte",
@@ -49,24 +63,39 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  waktu: {time.perf_counter() - start:.1f} detik")
         return 0
 
-    result = check_outputs(by_bytes=args.byte)
-    elapsed = time.perf_counter() - start
+    if args.perintah == "ketahanan":
+        files = build_robustness_outputs()
+        write_outputs(files, ROBUSTNESS_DIR)
+        print(f"gen:ketahanan menulis {len(files)} berkas ke eval/ketahanan/")
+        print("\n".join(_summary(files)).replace("eval/berkas", "eval/ketahanan/berkas"))
+        print(f"  waktu: {time.perf_counter() - start:.1f} detik")
+        return 0
+
     mode = "byte" if args.byte else "isi"
-    counts = (
-        f"{len(result.same_bytes)} identik byte, {len(result.same_content)} identik isi, "
-        f"{len(result.problems)} berbeda"
-    )
-    for rel in result.same_content:
-        print(f"  identik isi (byte berbeda): {rel}")
-    if not result.ok:
-        print(
-            f"gen:periksa GAGAL (perbandingan {mode}): {counts} ({elapsed:.1f} detik)",
-            file=sys.stderr,
+    failed = False
+    for name, builder, root in (
+        ("40 skenario", build_outputs, EVAL_DIR),
+        ("set ketahanan", build_robustness_outputs, ROBUSTNESS_DIR),
+    ):
+        result = check_outputs(builder, root, by_bytes=args.byte)
+        counts = (
+            f"{len(result.same_bytes)} identik byte, {len(result.same_content)} identik isi, "
+            f"{len(result.problems)} berbeda"
         )
+        for rel in result.same_content:
+            print(f"  identik isi (byte berbeda): {rel}")
+        if result.ok:
+            print(f"gen:periksa {name}: lulus ({counts})")
+            continue
+        failed = True
+        print(f"gen:periksa {name}: GAGAL ({counts})", file=sys.stderr)
         for line in result.problems[:50]:
             print(f"  - {line}", file=sys.stderr)
+    elapsed = time.perf_counter() - start
+    if failed:
+        print(f"gen:periksa GAGAL (perbandingan {mode}, {elapsed:.1f} detik)", file=sys.stderr)
         return 1
-    print(f"gen:periksa lulus (perbandingan {mode}): {counts} ({elapsed:.1f} detik)")
+    print(f"gen:periksa lulus (perbandingan {mode}, {elapsed:.1f} detik)")
     return 0
 
 

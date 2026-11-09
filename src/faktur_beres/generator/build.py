@@ -37,6 +37,16 @@ def build_outputs() -> dict[str, bytes]:
     return assemble()
 
 
+ROBUSTNESS_DIR = EVAL_DIR / "ketahanan"
+
+
+def build_robustness_outputs() -> dict[str, bytes]:
+    """The robustness set (M3.6) as ``{path relative to eval/ketahanan/: content}``."""
+    from faktur_beres.generator.robust_build import assemble_robustness
+
+    return assemble_robustness()
+
+
 def _generated_paths(root: Path) -> dict[str, Path]:
     found: dict[str, Path] = {}
     for name in GENERATED_DIRS:

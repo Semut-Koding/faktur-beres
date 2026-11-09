@@ -19,6 +19,7 @@
     "odoo:snapshot": "bash infra/scripts/odoo-snapshot.sh",
     "odoo:reset": "bash infra/scripts/odoo-reset.sh",
     "gen:faktur": "uv run python -m faktur_beres.generator tulis",
+    "gen:ketahanan": "uv run python -m faktur_beres.generator ketahanan",
     "gen:periksa": "uv run python -m faktur_beres.generator periksa",
     "eval:orakel": "uv run python -m faktur_beres.evals.orakel",
     "eval:injeksi": "uv run python -m faktur_beres.evals.injeksi",
