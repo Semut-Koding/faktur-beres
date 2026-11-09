@@ -18,7 +18,7 @@ import yaml
 from faktur_beres.generator.catalog import APPROVER_NOTES
 from faktur_beres.generator.documents import BuiltScenario
 from faktur_beres.generator.label_schema import APPROVAL_FORBIDDEN, BASE_FORBIDDEN, Label
-from faktur_beres.generator.model import InvoiceDoc, RenderedFile
+from faktur_beres.generator.model import InvoiceDoc, PrintedParties, RenderedFile
 
 HEADER = (
     "# Label skenario uji Faktur Beres (SPEC §15.4).\n"
@@ -53,11 +53,18 @@ def file_ref(rendered: RenderedFile) -> dict[str, str]:
     }
 
 
-def document_truth(doc: InvoiceDoc, *, ubl: bool, image: bool) -> dict[str, Any]:
-    """The values exactly as printed (or written in the UBL file)."""
+def document_truth(
+    doc: InvoiceDoc, printed: PrintedParties, *, ubl: bool, image: bool
+) -> dict[str, Any]:
+    """The values exactly as printed (or written in the UBL file).
 
-    def party(p) -> dict[str, Any]:
-        return {"nama": p.name, "npwp": p.npwp, "alamat": p.address, "email": p.email}
+    ``printed`` comes from the renderer that made the file: an e-mail address it does not print is
+    ``None`` here, whatever the document model holds.
+    """
+
+    def party(p, email_printed: bool) -> dict[str, Any]:
+        email = p.email if email_printed else None
+        return {"nama": p.name, "npwp": p.npwp, "alamat": p.address, "email": email}
 
     notes = list(doc.notes)
     if image and doc.photo_note:
@@ -67,8 +74,8 @@ def document_truth(doc: InvoiceDoc, *, ubl: bool, image: bool) -> dict[str, Any]
         "tanggal_faktur": doc.issue_date,
         "jatuh_tempo": doc.due_date,
         "nomor_po": doc.po_ref,
-        "penjual": party(doc.seller),
-        "pembeli": party(doc.buyer),
+        "penjual": party(doc.seller, printed.seller_email),
+        "pembeli": party(doc.buyer, printed.buyer_email),
         "nsfp": doc.nsfp,
         "tanggal_faktur_pajak": doc.tax_invoice_date,
         "rekening": (
@@ -111,7 +118,9 @@ def label_data(
             "isi": b.reply_text,
             "berkas": file_ref(reply) if reply else None,
             "kebenaran_dokumen": (
-                document_truth(b.reply_doc, ubl=ubl, image=image) if b.reply_doc else None
+                document_truth(b.reply_doc, reply.printed, ubl=ubl, image=image)
+                if b.reply_doc and reply
+                else None
             ),
         }
     decision = None
@@ -148,7 +157,7 @@ def label_data(
         }
     data = {
         "id": s.id,
-        "versi_label": 1,
+        "versi_label": 2,
         "kategori": s.category,
         "varian": s.variant,
         "format": s.format,
@@ -158,7 +167,7 @@ def label_data(
         "po_rujukan": s.po,
         "berkas": file_ref(original),
         "email": email,
-        "kebenaran_dokumen": document_truth(doc, ubl=ubl, image=image),
+        "kebenaran_dokumen": document_truth(doc, original.printed, ubl=ubl, image=image),
         "simulasi": {
             "balasan_vendor": reply_data,
             "keputusan_approver": decision,

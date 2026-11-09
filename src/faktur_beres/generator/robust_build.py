@@ -38,6 +38,7 @@ from faktur_beres.generator.numbering import format_number, group_digits, histor
 from faktur_beres.generator.products import PRINTED
 from faktur_beres.generator.robust_catalog import ROBUST, RobustSpec
 from faktur_beres.generator.robust_render import (
+    PRINTED_PARTIES,
     photo,
     render_pdf_document,
     scanned_image,
@@ -156,17 +157,19 @@ def render_file(spec: RobustSpec, doc: InvoiceDoc) -> RenderedFile:
     pdf = render_pdf_document(doc, spec, spec.id)
     if spec.format == "pdf":
         content = scanned_pdf(pdf, spec, spec.id) if spec.scanned_pdf else pdf
-        return RenderedFile(f"{stem}.pdf", pdf_name(doc.number), content)
+        return RenderedFile(f"{stem}.pdf", pdf_name(doc.number), content, PRINTED_PARTIES)
     if spec.image_style == "foto":
-        return RenderedFile(f"{stem}.jpg", photo_name(spec.id, doc.issue_date), photo(pdf, spec.id))
+        name = photo_name(spec.id, doc.issue_date)
+        return RenderedFile(f"{stem}.jpg", name, photo(pdf, spec.id), PRINTED_PARTIES)
     content = scanned_image(pdf, spec.id, spec.skew)
-    return RenderedFile(f"{stem}.jpg", scan_name(spec.id, doc.issue_date, "jpg"), content)
+    name = scan_name(spec.id, doc.issue_date, "jpg")
+    return RenderedFile(f"{stem}.jpg", name, content, PRINTED_PARTIES)
 
 
 def label_data(spec: RobustSpec, doc: InvoiceDoc, rendered: RenderedFile) -> dict[str, Any]:
     data = {
         "id": spec.id,
-        "versi_label": 1,
+        "versi_label": 2,
         "ciri": list(spec.traits),
         "format": spec.format,
         "gaya_gambar": spec.image_style,
@@ -178,7 +181,7 @@ def label_data(spec: RobustSpec, doc: InvoiceDoc, rendered: RenderedFile) -> dic
             "nama_kirim": rendered.send_name,
             "sha256": hashlib.sha256(rendered.content).hexdigest(),
         },
-        "kebenaran_dokumen": document_truth(doc, ubl=False, image=False),
+        "kebenaran_dokumen": document_truth(doc, rendered.printed, ubl=False, image=False),
         "harapan": {
             "jalur_awal": spec.route,
             "alasan_wajib": list(spec.reasons),

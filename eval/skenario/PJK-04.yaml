@@ -2,7 +2,7 @@
 # Dibuat `npm run gen:faktur`; jangan disunting tangan.
 # Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
 id: PJK-04
-versi_label: 1
+versi_label: 2
 kategori: pajak_tidak_lengkap
 varian: PPN 12% × harga jual = Rp990.000, seharusnya Rp907.500
 format: gambar
@@ -29,7 +29,7 @@ kebenaran_dokumen:
     nama: PT Arunika Kemas Nusantara
     npwp: '0990229163926000'
     alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
-    email: ap@arunika.test
+    email: null
   nsfp: '04002600007215512'
   tanggal_faktur_pajak: 2026-11-05
   rekening:
@@ -72,7 +72,7 @@ simulasi:
         nama: PT Arunika Kemas Nusantara
         npwp: '0990229163926000'
         alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
-        email: ap@arunika.test
+        email: null
       nsfp: '04002600007215512'
       tanggal_faktur_pajak: 2026-11-05
       rekening:

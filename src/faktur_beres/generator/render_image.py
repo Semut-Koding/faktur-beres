@@ -18,6 +18,7 @@ from reportlab.pdfgen.canvas import Canvas
 
 from faktur_beres.generator.determinism import rng
 from faktur_beres.generator.pdfinfo import render_page
+from faktur_beres.generator.render_pdf import PRINTED_PARTIES as PRINTED_PARTIES
 from faktur_beres.generator.render_pdf import SYNTHETIC_MARK
 
 DPI = 150

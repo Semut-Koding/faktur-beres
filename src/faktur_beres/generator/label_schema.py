@@ -156,7 +156,7 @@ class Expectation(_Strict):
 
 class Label(_Strict):
     id: str = Field(pattern=r"^(COC|HRG|QTY|DUP|NPO|PJK|REK|INJ)-0[1-5]$")
-    versi_label: Literal[1]
+    versi_label: Literal[2]
     kategori: Category
     varian: str
     format: Literal["pdf", "gambar", "ubl"]
@@ -204,7 +204,7 @@ class RobustnessLabel(_Strict):
     """A document of the robustness set: real-world traits, judged apart from the 40 scenarios."""
 
     id: str = Field(pattern=r"^KTH-\d{2}$")
-    versi_label: Literal[1]
+    versi_label: Literal[2]
     ciri: list[Trait] = Field(min_length=1)
     format: Literal["pdf", "gambar"]
     gaya_gambar: Literal["foto", "pindaian"] | None

@@ -102,9 +102,18 @@ class EmailMeta:
 
 
 @dataclass(frozen=True)
+class PrintedParties:
+    """Which party fields a renderer really prints; the label truth follows this, not the format."""
+
+    seller_email: bool
+    buyer_email: bool
+
+
+@dataclass(frozen=True)
 class RenderedFile:
-    """A rendered document file and the name it is sent under."""
+    """A rendered document file, the name it is sent under, and what its renderer prints."""
 
     path: str  # relative to eval/
     send_name: str
     content: bytes = field(repr=False)
+    printed: PrintedParties

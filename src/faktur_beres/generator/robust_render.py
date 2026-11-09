@@ -25,12 +25,15 @@ from reportlab.pdfgen.canvas import Canvas
 
 from faktur_beres.generator.determinism import rng
 from faktur_beres.generator.formatting import long_date
-from faktur_beres.generator.model import InvoiceDoc
+from faktur_beres.generator.model import InvoiceDoc, PrintedParties
 from faktur_beres.generator.render_image import _noise, _save_jpeg, render_photo
 from faktur_beres.generator.render_pdf import CREATOR, SYNTHETIC_MARK
 from faktur_beres.generator.robust_catalog import RobustSpec
 
 rl_config.invariant = 1
+
+#: The buyer block of every layout here shows name, address and NPWP only.
+PRINTED_PARTIES = PrintedParties(seller_email=True, buyer_email=False)
 
 PAPERS = {"A4": A4, "Letter": LETTER, "F4": (215 * mm, 330 * mm)}
 EN_MONTHS = (

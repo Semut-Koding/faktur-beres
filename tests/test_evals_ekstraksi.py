@@ -97,14 +97,14 @@ def test_field_rules() -> None:
     assert "jatuh_tempo" not in critical
 
 
-def test_buyer_email_is_judged_only_where_it_is_printed() -> None:
+def test_buyer_email_is_judged_against_the_label() -> None:
     truth = truth_to_invoice(LABELS["COC-01"].kebenaran_dokumen)
-    assert truth.buyer is not None and truth.buyer.email
-    no_email = truth.model_copy(update={"buyer": truth.buyer.model_copy(update={"email": None})})
-    pdf = {c.path for c in compare_fields(truth, no_email, buyer_email=False)}
-    assert "pembeli.email" not in pdf and "penjual.email" in pdf
-    ubl = {c.path: c.ok for c in compare_fields(truth, no_email)}
-    assert ubl["pembeli.email"] is False
+    assert truth.buyer is not None and truth.buyer.email is None  # a PDF does not print it
+    invented = truth.model_copy(
+        update={"buyer": truth.buyer.model_copy(update={"email": "karangan@contoh.test"})}
+    )
+    assert {c.path: c.ok for c in compare_fields(truth, invented)}["pembeli.email"] is False
+    assert {c.path: c.ok for c in compare_fields(truth, truth)}["pembeli.email"] is True
 
 
 def test_notes_must_be_found_in_the_free_texts() -> None:

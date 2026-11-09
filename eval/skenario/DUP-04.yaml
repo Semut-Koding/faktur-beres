@@ -2,7 +2,7 @@
 # Dibuat `npm run gen:faktur`; jangan disunting tangan.
 # Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
 id: DUP-04
-versi_label: 1
+versi_label: 2
 kategori: duplikat
 varian: Nomor INV-2026-0412 sama dengan tagihan milik v06, faktur v08 sah
 format: pdf
@@ -44,7 +44,7 @@ kebenaran_dokumen:
     nama: PT Arunika Kemas Nusantara
     npwp: '0990229163926000'
     alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
-    email: ap@arunika.test
+    email: null
   nsfp: '04002600007215376'
   tanggal_faktur_pajak: 2026-11-03
   rekening:

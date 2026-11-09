@@ -15,13 +15,15 @@ from reportlab.lib.utils import simpleSplit
 from reportlab.pdfgen.canvas import Canvas
 
 from faktur_beres.generator.formatting import amount, date_text, money, quantity
-from faktur_beres.generator.model import InvoiceDoc
+from faktur_beres.generator.model import InvoiceDoc, PrintedParties
 from faktur_beres.generator.styles import VendorStyle
 from faktur_beres.generator.terbilang import terbilang_rupiah
 
 rl_config.invariant = 1
 
 SYNTHETIC_MARK = "DOKUMEN SINTETIS – UNTUK PENGUJIAN"
+#: See seller_lines() and buyer_lines().
+PRINTED_PARTIES = PrintedParties(seller_email=True, buyer_email=False)
 CREATOR = "Faktur Beres generator"
 PAGE_W, PAGE_H = A4
 MARGIN = 40.0

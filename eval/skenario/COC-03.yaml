@@ -2,7 +2,7 @@
 # Dibuat `npm run gen:faktur`; jangan disunting tangan.
 # Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
 id: COC-03
-versi_label: 1
+versi_label: 2
 kategori: cocok
 varian: E-invoice UBL cocok
 format: ubl

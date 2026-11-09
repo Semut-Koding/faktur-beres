@@ -2,7 +2,7 @@
 # Dibuat `npm run gen:ketahanan`; jangan disunting tangan.
 # Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
 id: KTH-03
-versi_label: 1
+versi_label: 2
 ciri:
 - harga_termasuk_ppn
 format: pdf
@@ -28,7 +28,7 @@ kebenaran_dokumen:
     nama: PT Arunika Kemas Nusantara
     npwp: '0990229163926000'
     alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
-    email: ap@arunika.test
+    email: null
   nsfp: '04002600007300039'
   tanggal_faktur_pajak: 2026-11-05
   rekening:

@@ -12,7 +12,7 @@ from faktur_beres.generator.label_schema import RobustnessLabel
 TRUTH = load_labels()["COC-01"].kebenaran_dokumen.model_dump(mode="json")
 VALID: dict[str, Any] = {
     "id": "KTH-01",
-    "versi_label": 1,
+    "versi_label": 2,
     "ciri": ["pindaian_tanpa_teks"],
     "format": "pdf",
     "gaya_gambar": "pindaian",

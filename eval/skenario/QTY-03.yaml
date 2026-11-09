@@ -2,7 +2,7 @@
 # Dibuat `npm run gen:faktur`; jangan disunting tangan.
 # Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
 id: QTY-03
-versi_label: 1
+versi_label: 2
 kategori: kuantitas_kurang
 varian: Diterima 840 dari 1.050 kg, ditagih tepat 840 kg
 format: ubl

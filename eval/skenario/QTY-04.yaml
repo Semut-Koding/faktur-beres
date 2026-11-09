@@ -2,7 +2,7 @@
 # Dibuat `npm run gen:faktur`; jangan disunting tangan.
 # Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
 id: QTY-04
-versi_label: 1
+versi_label: 2
 kategori: kuantitas_kurang
 varian: Baris tambahan "Ongkos kirim" Rp450.000 di luar PO
 format: pdf
@@ -29,7 +29,7 @@ kebenaran_dokumen:
     nama: PT Arunika Kemas Nusantara
     npwp: '0990229163926000'
     alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
-    email: ap@arunika.test
+    email: null
   nsfp: '04002600007215346'
   tanggal_faktur_pajak: 2026-11-01
   rekening:
@@ -78,7 +78,7 @@ simulasi:
         nama: PT Arunika Kemas Nusantara
         npwp: '0990229163926000'
         alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
-        email: ap@arunika.test
+        email: null
       nsfp: '04002600007215346'
       tanggal_faktur_pajak: 2026-11-01
       rekening:

@@ -10,7 +10,7 @@ from typing import Any
 
 from lxml import etree
 
-from faktur_beres.generator.model import InvoiceDoc, Party
+from faktur_beres.generator.model import InvoiceDoc, Party, PrintedParties
 
 NS = {
     "inv": "urn:oasis:names:specification:ubl:schema:xsd:Invoice-2",
@@ -23,6 +23,8 @@ CURRENCY = "IDR"
 TAX_INVOICE_DESCRIPTION = "Faktur Pajak"
 PAYMENT_MEANS_CODE = "30"  # credit transfer
 VAT_RATE = "12"
+#: Both parties carry their e-mail in cac:Contact.
+PRINTED_PARTIES = PrintedParties(seller_email=True, buyer_email=True)
 
 
 def _q(prefix: str, name: str) -> str:

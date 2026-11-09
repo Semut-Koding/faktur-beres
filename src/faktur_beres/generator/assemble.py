@@ -9,9 +9,9 @@ from faktur_beres.generator.formatting import rupiah_plain
 from faktur_beres.generator.labels import dump_label, label_data
 from faktur_beres.generator.model import InvoiceDoc, RenderedFile
 from faktur_beres.generator.naming import pdf_name, photo_name, scan_name, ubl_name
-from faktur_beres.generator.render_image import render_photo, render_scan
+from faktur_beres.generator import render_image, render_ubl
+from faktur_beres.generator.render_pdf import PRINTED_PARTIES as PDF_PARTIES
 from faktur_beres.generator.render_pdf import render_pdf
-from faktur_beres.generator.render_ubl import render_ubl
 from faktur_beres.generator.styles import STYLES
 
 #: Scans saved as PNG; the other scans are greyscale JPEG.
@@ -24,17 +24,24 @@ def render_file(b: BuiltScenario, doc: InvoiceDoc, *, reply: bool) -> RenderedFi
     key = f"{s.id}/balasan" if reply else s.id
     stem = f"berkas/{s.id}/{'balasan' if reply else 'faktur'}"
     if s.format == "ubl":
-        return RenderedFile(f"{stem}.xml", ubl_name(doc.number), render_ubl(doc))
+        return RenderedFile(
+            f"{stem}.xml",
+            ubl_name(doc.number),
+            render_ubl.render_ubl(doc),
+            render_ubl.PRINTED_PARTIES,
+        )
     pdf = render_pdf(doc, STYLES[s.vendor])
     if s.format == "pdf":
-        return RenderedFile(f"{stem}.pdf", pdf_name(doc.number), pdf)
+        return RenderedFile(f"{stem}.pdf", pdf_name(doc.number), pdf, PDF_PARTIES)
     day = doc.issue_date + (REPLY_PHOTO_DELAY if reply else timedelta())
     if s.image_style == "foto":
-        content = render_photo(pdf, key, note=doc.photo_note)
-        return RenderedFile(f"{stem}.jpg", photo_name(key, day), content)
+        content = render_image.render_photo(pdf, key, note=doc.photo_note)
+        printed = render_image.PRINTED_PARTIES
+        return RenderedFile(f"{stem}.jpg", photo_name(key, day), content, printed)
     extension = "png" if s.id in SCANS_AS_PNG else "jpg"
-    content = render_scan(pdf, key, png=extension == "png")
-    return RenderedFile(f"{stem}.{extension}", scan_name(key, day, extension), content)
+    content = render_image.render_scan(pdf, key, png=extension == "png")
+    name = scan_name(key, day, extension)
+    return RenderedFile(f"{stem}.{extension}", name, content, render_image.PRINTED_PARTIES)
 
 
 def daftar_row(b: BuiltScenario, original: RenderedFile, reply: RenderedFile | None) -> list[str]:
