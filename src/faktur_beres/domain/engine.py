@@ -168,9 +168,14 @@ def analyse(
             else LinesResult(ran=False)
         )
         accounts = tuple(reader.bank_accounts(vendor.id))
+        printed = invoice.bank_account
         bank = StepResult(
             findings=check_bank_account(
-                invoice, vendor, accounts, _printed_account_owners(invoice, accounts, reader)
+                invoice,
+                vendor,
+                accounts,
+                _printed_account_owners(invoice, accounts, reader),
+                tuple(reader.banks()) if printed is not None and printed.bank else (),
             )
         )
         posted = reader.posted_bill_count(vendor.id)

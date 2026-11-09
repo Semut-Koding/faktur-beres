@@ -148,6 +148,8 @@ class BankAccountEvidence(DomainModel):
     printed_bank: str | None
     registered_digits: tuple[str, ...]
     other_owner_ids: tuple[int, ...] = ()
+    registered_bank: str | None = None  # bank of the matching ERP account (different_bank)
+    matched_bank: str | None = None  # the other registered bank the printed name matches
     problem: Literal["not_registered", "other_owner", "different_bank"]
 
 

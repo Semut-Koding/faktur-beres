@@ -11,6 +11,7 @@ from faktur_beres.domain.normalize import (
     InvalidNumberError,
     NumberStyle,
     account_digits,
+    bank_name_key,
     document_number_style,
     normalize_code,
     normalize_email,
@@ -154,3 +155,22 @@ def test_accounts_names_codes_and_emails() -> None:
     assert normalize_email("mailto:AP@arunika.test") == "ap@arunika.test"
     assert normalize_email("bukan alamat") is None
     assert normalize_email(None) is None
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "PT Bank Mandala Raya Tbk",
+        "BANK MANDALA RAYA",
+        "Bank Mandala Raya (Persero)",
+        "Mandala Raya",
+        "P.T. Bank Mandala Raya (Persero) Terbuka",
+    ],
+)
+def test_bank_name_key_drops_bank_and_legal_forms(name: str) -> None:
+    assert bank_name_key(name) == "mandala raya"
+
+
+def test_bank_name_key_keeps_other_words() -> None:
+    assert bank_name_key("Bank Mandala") == "mandala"
+    assert bank_name_key("Bankindo Raya") == "bankindo raya"  # only whole words go

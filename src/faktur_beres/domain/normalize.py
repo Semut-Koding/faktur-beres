@@ -210,6 +210,18 @@ def normalize_name(text: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
+_BANK_NAME_FILLER = frozenset({"bank", "pt", "tbk", "persero", "perseroan", "terbuka"})
+
+
+def bank_name_key(text: str) -> str:
+    """BR-12: a bank name as BR-05 normalises names, without "bank" and legal forms.
+
+    ``PT Bank Mandala Raya Tbk``, ``BANK MANDALA RAYA``, and ``Bank Mandala Raya (Persero)`` all
+    become ``mandala raya``.
+    """
+    return " ".join(w for w in normalize_name(text).split() if w not in _BANK_NAME_FILLER)
+
+
 def normalize_code(text: str) -> str:
     """Product codes compared without case and punctuation (``KL-200`` = ``kl 200``)."""
     return re.sub(r"[^0-9A-Z]", "", unicodedata.normalize("NFKC", text).upper())
