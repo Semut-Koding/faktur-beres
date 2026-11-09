@@ -1,0 +1,3 @@
+Nomor pesanan pembelian
+{rincian}
+Mohon sebutkan nomor pesanan pembelian yang benar untuk faktur ini.

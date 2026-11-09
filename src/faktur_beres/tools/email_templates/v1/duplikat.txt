@@ -1,0 +1,11 @@
+Yth. Bagian Penagihan,
+
+Faktur nomor {nomor} yang kami terima sudah tercatat sebelumnya, sehingga tidak kami proses lagi.
+
+{rincian}
+
+Email ini hanya pemberitahuan dan tidak perlu dibalas. Bila menurut Bapak/Ibu pencatatan ini keliru, silakan hubungi kami dengan menyertakan kode referensi pada subjek.
+
+Salam,
+Bagian Hutang Usaha
+PT Arunika Kemas Nusantara

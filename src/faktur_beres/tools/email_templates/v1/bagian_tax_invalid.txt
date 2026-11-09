@@ -1,0 +1,3 @@
+Data pajak
+{rincian}
+Mohon kirim faktur dengan data pajak yang lengkap dan benar.

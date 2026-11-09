@@ -1,0 +1,13 @@
+Yth. Bagian Penagihan,
+
+Terima kasih atas faktur nomor {nomor} yang kami terima. Sebelum faktur ini dapat kami proses, kami memerlukan klarifikasi atas hal berikut.
+
+{bagian}
+
+{catatan}
+
+Mohon balas email ini dan pertahankan kode referensi pada subjek, dengan melampirkan faktur perbaikan atau keterangan yang diperlukan.
+
+Salam,
+Bagian Hutang Usaha
+PT Arunika Kemas Nusantara
