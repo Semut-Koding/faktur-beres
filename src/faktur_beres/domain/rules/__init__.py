@@ -7,6 +7,7 @@ values with evidence. No rule reads the ERP, a file, or the clock itself.
 #: The rules computed by code (M2, M3). Every one must have at least one unit test marked
 #: ``@pytest.mark.aturan("BR-xx")`` (tests/test_traceability.py).
 CODE_RULES: tuple[str, ...] = (
+    "BR-02",
     "BR-03",
     "BR-05",
     "BR-06",
