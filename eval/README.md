@@ -17,10 +17,10 @@ Folder ini berisi 40 skenario uji berlabel (SPEC §15.3) untuk evaluasi agent: 8
 
 ```bash
 npm run gen:faktur    # tulis ulang skenario/, berkas/, dan DAFTAR.md
-npm run gen:periksa   # buat ulang ke direktori sementara dan bandingkan SHA-256 dengan isi folder ini
+npm run gen:periksa   # buat ulang ke direktori sementara dan bandingkan isinya dengan folder ini
 ```
 
-Generator deterministik: tanpa waktu sekarang atau UUID acak, seed acak diturunkan dari SHA-256 ID skenario, ReportLab memakai `invariant = 1`, dan gambar disimpan tanpa EXIF dengan kompresi tetap. Generator tidak memanggil Odoo maupun LLM. Hasilnya di-commit supaya evaluasi bisa dijalankan tanpa generator; `gen:periksa` memastikan berkas di repo sama persis dengan keluaran generator. Kesamaan byte per byte dijamin untuk versi pustaka di `uv.lock` dan platform yang sama.
+Generator deterministik: tanpa waktu sekarang atau UUID acak, seed acak diturunkan dari SHA-256 ID skenario, ReportLab memakai `invariant = 1`, dan gambar disimpan tanpa EXIF dengan kompresi tetap. Generator tidak memanggil Odoo maupun LLM. Hasilnya di-commit supaya evaluasi bisa dijalankan tanpa generator. `gen:periksa` memastikan berkas di repo sama **isinya** dengan keluaran generator: PDF dibandingkan per halaman (ukuran, teks, dan render 50 DPI), gambar per piksel setelah didekode, dan label setelah di-parse tanpa nilai `sha256` (nilai itu tetap harus sama dengan hash berkas yang di-commit). Berkas lain dibandingkan byte. Byte berkas terkompresi bisa berbeda antar-mesin karena keluaran zlib berbeda walaupun isinya sama; di mesin yang sama dengan versi pustaka di `uv.lock` hasilnya identik byte. Keluaran `gen:periksa` menyebut jumlah berkas yang identik byte, identik isi, dan berbeda; hanya yang berbeda yang membuatnya gagal. `npm run gen:periksa -- --byte` membandingkan byte per byte.
 
 ## Evaluasi orakel
 

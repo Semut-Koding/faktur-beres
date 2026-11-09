@@ -33,6 +33,11 @@ def main(argv: list[str] | None = None) -> int:
         choices=("tulis", "periksa"),
         help="tulis: tulis ulang eval/; periksa: bandingkan hasil generator dengan eval/",
     )
+    parser.add_argument(
+        "--byte",
+        action="store_true",
+        help="periksa: bandingkan byte per byte (bawaan: isi PDF, piksel gambar, isi label)",
+    )
     args = parser.parse_args(argv)
     start = time.perf_counter()
 
@@ -44,16 +49,24 @@ def main(argv: list[str] | None = None) -> int:
         print(f"  waktu: {time.perf_counter() - start:.1f} detik")
         return 0
 
-    problems = check_outputs()
+    result = check_outputs(by_bytes=args.byte)
     elapsed = time.perf_counter() - start
-    if problems:
+    mode = "byte" if args.byte else "isi"
+    counts = (
+        f"{len(result.same_bytes)} identik byte, {len(result.same_content)} identik isi, "
+        f"{len(result.problems)} berbeda"
+    )
+    for rel in result.same_content:
+        print(f"  identik isi (byte berbeda): {rel}")
+    if not result.ok:
         print(
-            f"gen:periksa GAGAL: {len(problems)} perbedaan ({elapsed:.1f} detik)", file=sys.stderr
+            f"gen:periksa GAGAL (perbandingan {mode}): {counts} ({elapsed:.1f} detik)",
+            file=sys.stderr,
         )
-        for line in problems[:50]:
+        for line in result.problems[:50]:
             print(f"  - {line}", file=sys.stderr)
         return 1
-    print(f"gen:periksa lulus: hasil generator identik dengan eval/ ({elapsed:.1f} detik)")
+    print(f"gen:periksa lulus (perbandingan {mode}): {counts} ({elapsed:.1f} detik)")
     return 0
 
 
