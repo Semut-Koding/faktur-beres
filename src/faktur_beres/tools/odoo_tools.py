@@ -20,6 +20,7 @@ from typing import Any, Literal
 from faktur_beres.domain.base import DomainModel
 from faktur_beres.domain.erp import (
     BankAccountRecord,
+    BankRecord,
     BillLineRecord,
     BillRecord,
     BillState,
@@ -174,6 +175,12 @@ def find_vendors(gw: AgentOdooGateway, query: VendorSearch) -> tuple[VendorRecor
 def vendor_bank_accounts(gw: AgentOdooGateway, vendor_id: int) -> tuple[BankAccountRecord, ...]:
     rows = gw.search_read("res.partner.bank", [["partner_id", "=", vendor_id]], BANK_FIELDS)
     return tuple(map(_bank, rows))
+
+
+def registered_banks(gw: AgentOdooGateway) -> tuple[BankRecord, ...]:
+    """The banks in ``res.bank`` (BR-12 compares printed bank names with them)."""
+    rows = gw.search_read("res.bank", [], ["id", "name"], order="id")
+    return tuple(BankRecord(id=r["id"], name=r["name"]) for r in rows if _text(r.get("name")))
 
 
 def bank_account_owners(gw: AgentOdooGateway, number: str) -> tuple[BankAccountRecord, ...]:
@@ -391,6 +398,7 @@ class OdooErpReader:
     def __init__(self, gw: AgentOdooGateway) -> None:
         self._gw = gw
         self._company: CompanyRecord | None = None
+        self._banks: tuple[BankRecord, ...] | None = None
 
     def company(self) -> CompanyRecord:
         if self._company is None:
@@ -411,6 +419,11 @@ class OdooErpReader:
 
     def bank_account_owners(self, digits: str) -> Sequence[BankAccountRecord]:
         return bank_account_owners(self._gw, digits)
+
+    def banks(self) -> Sequence[BankRecord]:
+        if self._banks is None:
+            self._banks = registered_banks(self._gw)
+        return self._banks
 
     def purchase_order(self, number: str) -> PurchaseOrderRecord | None:
         return purchase_order_by_number(self._gw, number)

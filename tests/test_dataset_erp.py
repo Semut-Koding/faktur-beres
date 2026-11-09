@@ -66,3 +66,7 @@ def test_history_bills(ds, erp: DatasetErpReader) -> None:
         )
     v09 = erp.vendors_by_vat(ds.vendor("v09").npwp)[0]
     assert erp.posted_bill_count(v09.id) == 0
+
+
+def test_registered_banks(ds, erp: DatasetErpReader) -> None:
+    assert [b.name for b in erp.banks()] == [b.name for b in ds.banks]

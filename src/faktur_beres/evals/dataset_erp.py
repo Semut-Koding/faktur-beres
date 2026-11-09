@@ -12,6 +12,7 @@ from decimal import Decimal
 from faktur_beres.dataset import Dataset
 from faktur_beres.domain.erp import (
     BankAccountRecord,
+    BankRecord,
     BillLineRecord,
     BillRecord,
     BillState,
@@ -109,4 +110,5 @@ class DatasetErpReader(InMemoryErpReader):
                         ),
                     )
                 )
-        super().__init__(company, vendors, accounts, pos, bills)
+        banks = [BankRecord(id=10 + i, name=b.name) for i, b in enumerate(ds.banks, start=1)]
+        super().__init__(company, vendors, accounts, pos, bills, banks)

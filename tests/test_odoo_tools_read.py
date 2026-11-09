@@ -193,3 +193,19 @@ def test_reader_is_an_erp_reader() -> None:
 def test_unexpected_float_is_refused() -> None:
     with pytest.raises(TypeError):
         odoo_tools._decimal(1.5)
+
+
+def test_registered_banks() -> None:
+    fake = FakeOdoo(
+        {
+            "res.bank/search_read": [
+                {"id": 2, "name": "Bank Mandala Raya"},
+                {"id": 3, "name": False},
+            ]
+        }
+    )
+    reader = OdooErpReader(gateway(fake))
+    assert [(b.id, b.name) for b in reader.banks()] == [(2, "Bank Mandala Raya")]
+    reader.banks()
+    assert fake.methods().count("res.bank/search_read") == 1  # cached
+    assert fake.requests[0][1]["fields"] == ["id", "name"]

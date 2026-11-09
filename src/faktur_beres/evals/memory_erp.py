@@ -9,6 +9,7 @@ from collections.abc import Iterable, Sequence
 
 from faktur_beres.domain.erp import (
     BankAccountRecord,
+    BankRecord,
     BillRecord,
     BillState,
     CompanyRecord,
@@ -31,12 +32,14 @@ class InMemoryErpReader:
         accounts: Iterable[BankAccountRecord] = (),
         purchase_orders: Iterable[PurchaseOrderRecord] = (),
         bills: Iterable[BillRecord] = (),
+        banks: Iterable[BankRecord] = (),
     ) -> None:
         self._company = company
         self._vendors = tuple(vendors)
         self._accounts = tuple(accounts)
         self._pos = tuple(purchase_orders)
         self._bills = tuple(bills)
+        self._banks = tuple(banks)
 
     def company(self) -> CompanyRecord:
         return self._company
@@ -54,6 +57,9 @@ class InMemoryErpReader:
 
     def bank_accounts(self, vendor_id: int) -> Sequence[BankAccountRecord]:
         return tuple(a for a in self._accounts if a.partner_id == vendor_id)
+
+    def banks(self) -> Sequence[BankRecord]:
+        return self._banks
 
     def bank_account_owners(self, digits: str) -> Sequence[BankAccountRecord]:
         return tuple(a for a in self._accounts if digits and a.digits == digits)

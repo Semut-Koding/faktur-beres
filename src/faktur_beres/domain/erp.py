@@ -32,6 +32,13 @@ class VendorRecord(DomainModel):
     email: str | None = None
 
 
+class BankRecord(DomainModel):
+    """A bank registered in the ERP (``res.bank``), for comparing printed bank names (BR-12)."""
+
+    id: int
+    name: str
+
+
 class BankAccountRecord(DomainModel):
     """A bank account in the ERP (``res.partner.bank``)."""
 
@@ -139,6 +146,10 @@ class ErpReader(Protocol):
         ...
 
     def bank_accounts(self, vendor_id: int) -> Sequence[BankAccountRecord]: ...
+
+    def banks(self) -> Sequence[BankRecord]:
+        """Every bank registered in the ERP (``res.bank``)."""
+        ...
 
     def bank_account_owners(self, digits: str) -> Sequence[BankAccountRecord]:
         """Every account in the ERP with these digits, whoever owns it."""

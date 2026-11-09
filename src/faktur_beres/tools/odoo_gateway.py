@@ -60,6 +60,7 @@ READ_FIELDS: Mapping[str, frozenset[str]] = MappingProxyType(
         "res.partner": frozenset(
             {"id", "name", "vat", "email", "supplier_rank", "is_company", "bank_ids"}
         ),
+        "res.bank": frozenset({"id", "name", "bic"}),
         "res.partner.bank": frozenset(
             {
                 "id",

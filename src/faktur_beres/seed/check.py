@@ -73,6 +73,7 @@ AGENT_ACL: dict[str, tuple[str, ...]] = {
     "res.company": READ_ONLY,
     "res.partner": READ_ONLY,
     "res.partner.bank": READ_ONLY,
+    "res.bank": READ_ONLY,
     "product.product": READ_ONLY,
     "product.template": READ_ONLY,
     "product.supplierinfo": READ_ONLY,
@@ -671,6 +672,7 @@ class Checker:
         return [
             ("res.company", "perusahaan", next(iter(company), None)),
             ("res.partner", "vendor v01", vendors.get("v01")),
+            ("res.bank", "bank Bank Mandala Raya", self.seeded("res.bank", "").get("bank_mandala")),
             (
                 "res.partner.bank",
                 "rekening v01",
