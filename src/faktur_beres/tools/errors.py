@@ -67,6 +67,15 @@ class Rejected(ToolError):
     kind = "rejected"
 
 
+class VerificationFailed(ToolError):
+    """What Odoo stored differs from what was sent (e.g. an attachment's checksum).
+
+    In M4 the action node turns this into ``validation_failed`` (C4).
+    """
+
+    kind = "verification_failed"
+
+
 class Unavailable(ToolError):
     """Odoo could not be reached or failed (connection error, HTTP 5xx)."""
 

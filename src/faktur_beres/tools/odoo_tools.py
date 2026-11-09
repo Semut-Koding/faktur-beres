@@ -38,7 +38,7 @@ from faktur_beres.domain.normalize import (
     tax_id_digits,
 )
 from faktur_beres.domain.rules.bill_plan import BillPlan
-from faktur_beres.tools.errors import ForbiddenOperation
+from faktur_beres.tools.errors import ForbiddenOperation, VerificationFailed
 from faktur_beres.tools.odoo_gateway import AgentOdooGateway
 
 VENDOR_DOMAIN: list[Any] = [["supplier_rank", ">", 0]]
@@ -545,7 +545,12 @@ class AttachmentResult(DomainModel):
 def attach_file(
     gw: AgentOdooGateway, bill_id: int, name: str, content: bytes, mimetype: str
 ) -> AttachmentResult:
-    """Attach the original file to the agent's draft; the same name and checksum is reused."""
+    """Attach the original file to the agent's draft; the same name and checksum is reused.
+
+    A new attachment is read back from Odoo: its ``checksum`` must be the SHA-1 of the original
+    file and it must hang on this draft, otherwise ``VerificationFailed`` (the original file is
+    the evidence, so what Odoo keeps must be byte for byte what was received).
+    """
     if not gw.is_agent_draft(bill_id):
         raise ForbiddenOperation(
             f"lampiran hanya pada draft tagihan agent (#{bill_id})",
@@ -562,6 +567,24 @@ def attach_file(
     if same:
         return AttachmentResult(attachment_id=same[0]["id"], created=False, checksum=checksum)
     attachment_id = gw.create_attachment(bill_id, name, content, mimetype)
+    stored = gw.read("ir.attachment", [attachment_id], ["id", "checksum", "res_model", "res_id"])
+    if not stored:
+        raise VerificationFailed(
+            f"lampiran #{attachment_id} tidak terbaca ulang", model="ir.attachment", method="read"
+        )
+    row = stored[0]
+    if (row.get("checksum"), row.get("res_model"), row.get("res_id")) != (
+        checksum,
+        "account.move",
+        bill_id,
+    ):
+        raise VerificationFailed(
+            f"lampiran #{attachment_id} tersimpan berbeda dari berkas asli "
+            f"(checksum {row.get('checksum')}, seharusnya {checksum}; "
+            f"induk {row.get('res_model')}#{row.get('res_id')})",
+            model="ir.attachment",
+            method="read",
+        )
     return AttachmentResult(attachment_id=attachment_id, created=True, checksum=checksum)
 
 

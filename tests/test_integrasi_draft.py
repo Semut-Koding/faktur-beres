@@ -6,6 +6,7 @@ comes from ``analyse()`` with ``OdooErpReader`` (agent key), then ``create_draft
 before and after by ``npm run test:integrasi``.
 """
 
+import hashlib
 import time
 from collections import Counter
 from decimal import Decimal
@@ -166,6 +167,8 @@ def test_attachment_and_note_are_on_the_draft(made, agent_gateway: AgentOdooGate
             m["attachment"].checksum,
         ), sid
         assert att["name"] == m["file"][0]
+        # The stored file is byte for byte the original (no image post-processing by Odoo).
+        assert att["checksum"] == hashlib.sha1(m["file"][1]).hexdigest(), sid
         (msg,) = agent_gateway.read(
             "mail.message", [m["note"].message_id], ["id", "body", "subtype_id", "res_id"]
         )

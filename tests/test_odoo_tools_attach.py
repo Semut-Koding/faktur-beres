@@ -6,7 +6,7 @@ from datetime import date
 import pytest
 
 from fake_odoo import FakeOdoo, gateway
-from faktur_beres.tools.errors import ForbiddenOperation
+from faktur_beres.tools.errors import ForbiddenOperation, VerificationFailed
 from faktur_beres.tools.odoo_tools import (
     attach_file,
     bill_note_text,
@@ -27,6 +27,9 @@ def odoo(*, attachments=(), messages=(), writable=True) -> FakeOdoo:
             "account.move/has_access": writable,
             "ir.attachment/search_read": list(attachments),
             "ir.attachment/create": [9],
+            "ir.attachment/read": [
+                {"id": 9, "checksum": SHA1, "res_model": "account.move", "res_id": 42}
+            ],
             "mail.message/search_read": list(messages),
             "account.move/message_post": [11],
             "account.move/fields_get": {"l10n_id_kode_transaksi": {"type": "selection"}},
@@ -81,3 +84,26 @@ def test_nsfp_field_and_note_text() -> None:
     assert "NSFP 04002600007215090, tanggal 2026-10-25" in text
     assert "(berkas f.pdf)" in text and "tidak memposting" in text
     assert "NSFP" not in bill_note_text("X", None, None, None)
+
+
+@pytest.mark.parametrize(
+    "stored",
+    [
+        {"id": 9, "checksum": "0" * 40, "res_model": "account.move", "res_id": 42},
+        {"id": 9, "checksum": SHA1, "res_model": "account.move", "res_id": 43},
+        {"id": 9, "checksum": SHA1, "res_model": "purchase.order", "res_id": 42},
+    ],
+)
+def test_attachment_stored_differently_fails_verification(stored: dict) -> None:
+    fake = odoo()
+    fake.answers["ir.attachment/read"] = [stored]
+    with pytest.raises(VerificationFailed) as exc:
+        attach_file(gateway(fake), 42, "faktur.pdf", CONTENT, "application/pdf")
+    assert exc.value.kind == "verification_failed"
+
+
+def test_attachment_that_cannot_be_read_back_fails_verification() -> None:
+    fake = odoo()
+    fake.answers["ir.attachment/read"] = []
+    with pytest.raises(VerificationFailed):
+        attach_file(gateway(fake), 42, "faktur.pdf", CONTENT, "application/pdf")
