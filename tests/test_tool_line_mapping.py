@@ -33,6 +33,7 @@ def all_refs(invoice) -> list[tuple[int, str | None]]:
     return [(n, f"R{n}") for n in range(1, len(invoice.lines) + 1)]
 
 
+@pytest.mark.aturan("BR-07")
 def test_lines_without_codes_are_mapped() -> None:
     invoice, po, lines = kth06()
     assert all(m.status == "no_match" for m in lines.matches)
@@ -44,6 +45,7 @@ def test_lines_without_codes_are_mapped() -> None:
     assert any("dipetakan LLM" in f.message for f in mapped.findings)
 
 
+@pytest.mark.aturan("BR-07")
 def test_no_price_or_quantity_is_sent() -> None:
     invoice, po, lines = kth06()
     llm = ScriptedLlm([answer(*all_refs(invoice))])
@@ -71,6 +73,7 @@ def test_a_scenario_without_unmapped_lines_never_calls_the_llm() -> None:
     assert llm.requests == []
 
 
+@pytest.mark.aturan("BR-07")
 def test_ambiguous_lines_are_never_sent() -> None:
     invoice, po, lines = kth06()
     ambiguous = LinesResult(
@@ -87,6 +90,7 @@ def test_null_is_allowed() -> None:
     assert map_lines(invoice, po, lines, llm=llm).mapping == {}
 
 
+@pytest.mark.aturan("BR-07")
 @pytest.mark.parametrize(
     "bad",
     [
@@ -110,6 +114,7 @@ def test_a_second_good_answer_is_used() -> None:
     assert len(map_lines(invoice, po, lines, llm=llm).mapping) == 2
 
 
+@pytest.mark.aturan("BR-07")
 def test_domain_refuses_a_mapping_to_a_line_outside_the_po() -> None:
     invoice, po, _ = kth06()
     mapped = match_lines(invoice, po, POLICY, llm_mapping={1: 999_999})

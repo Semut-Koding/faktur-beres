@@ -4,9 +4,10 @@ Inputs are ``InvoiceData``, ERP records, and ``PolicyConfig``; outputs are typed
 values with evidence. No rule reads the ERP, a file, or the clock itself.
 """
 
-#: The rules computed by code (M2, M3). Every one must have at least one unit test marked
+#: The rules computed by code (M2, M3, M4a). Every one must have at least one unit test marked
 #: ``@pytest.mark.aturan("BR-xx")`` (tests/test_traceability.py).
 CODE_RULES: tuple[str, ...] = (
+    "BR-01",
     "BR-02",
     "BR-03",
     "BR-04",
@@ -24,6 +25,8 @@ CODE_RULES: tuple[str, ...] = (
     "BR-16",
     "BR-17",
     "BR-18",
+    "BR-19",
+    "BR-21",
     "BR-22",
     "BR-23",
     "BR-24",

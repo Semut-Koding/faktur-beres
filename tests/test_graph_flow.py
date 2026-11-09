@@ -89,6 +89,7 @@ def state_of(h: Harness, invoice_id: str) -> dict[str, Any]:
 # --- intake ---------------------------------------------------------------------------------
 
 
+@pytest.mark.aturan("BR-01")
 def test_a_refused_file_makes_no_thread(tmp_path: Path) -> None:
     h, _ = start(tmp_path, "COC-01")
     before = len(h.store.invoices)
@@ -97,6 +98,7 @@ def test_a_refused_file_makes_no_thread(tmp_path: Path) -> None:
     assert len(h.store.invoices) == before
 
 
+@pytest.mark.aturan("BR-01")
 def test_the_same_file_reuses_the_reading_without_the_llm(tmp_path: Path) -> None:
     invoice, fragments = documents("COC-01")
     reads: list[int] = []
@@ -114,6 +116,7 @@ def test_the_same_file_reuses_the_reading_without_the_llm(tmp_path: Path) -> Non
     assert [r.name for r in h.store.kinds(AuditKind.GUARD) if r.name == "berkas_sama"]
 
 
+@pytest.mark.aturan("BR-01")
 def test_stored_files_carry_no_scenario_name(tmp_path: Path) -> None:
     h, invoice_id = start(tmp_path, "COC-01")
     assert h.store.get(invoice_id).stored_path == f"{invoice_id}/asli.pdf"
@@ -122,6 +125,7 @@ def test_stored_files_carry_no_scenario_name(tmp_path: Path) -> None:
 # --- route A --------------------------------------------------------------------------------
 
 
+@pytest.mark.aturan("BR-18")
 def test_route_a_makes_one_draft_with_attachment_and_note(tmp_path: Path) -> None:
     h, invoice_id = start(tmp_path, "COC-01")
     stop = h.runner.run(invoice_id)
@@ -132,6 +136,7 @@ def test_route_a_makes_one_draft_with_attachment_and_note(tmp_path: Path) -> Non
     assert {r["status"].value for r in h.store.action_rows.values()} == {"done"}
 
 
+@pytest.mark.aturan("BR-27")
 def test_an_unavailable_odoo_is_retried_and_then_fails(tmp_path: Path) -> None:
     errors: list[Exception] = [Unavailable("x") for _ in range(3)]
     h, invoice_id = start(tmp_path, "COC-01", bills=FakeBills(errors=errors))
@@ -148,6 +153,7 @@ def test_a_short_outage_is_retried_inside_the_node(tmp_path: Path) -> None:
     assert len(h.bills.created) == 1
 
 
+@pytest.mark.aturan("BR-22")
 def test_finished_actions_are_not_repeated_on_retry(tmp_path: Path) -> None:
     class NoteFails(FakeBills):
         def post_note(self, bill_id: int, text: str, key: str) -> Any:
@@ -164,6 +170,7 @@ def test_finished_actions_are_not_repeated_on_retry(tmp_path: Path) -> None:
     assert (len(bills.created), len(bills.attachments), len(bills.notes)) == (1, 1, 1)
 
 
+@pytest.mark.aturan("BR-27")
 def test_access_denied_fails_and_is_a_security_event(tmp_path: Path) -> None:
     bills = FakeBills(errors=[AccessDenied("ditolak")])
     h, invoice_id = start(tmp_path, "COC-01", bills=bills)
@@ -171,6 +178,7 @@ def test_access_denied_fails_and_is_a_security_event(tmp_path: Path) -> None:
     assert h.store.kinds(AuditKind.SECURITY)
 
 
+@pytest.mark.aturan("BR-18")
 def test_a_failed_verification_goes_to_route_c_without_approval_on_offer(tmp_path: Path) -> None:
     h, invoice_id = start(tmp_path, "COC-01", bills=FakeBills(verified=False))
     stop = h.runner.run(invoice_id)
@@ -186,6 +194,7 @@ def test_a_failed_verification_goes_to_route_c_without_approval_on_offer(tmp_pat
 # --- route B --------------------------------------------------------------------------------
 
 
+@pytest.mark.aturan("BR-19")
 def test_route_b_sends_one_clarification_to_the_vendor_address(tmp_path: Path) -> None:
     h, invoice_id = start(tmp_path, "HRG-04")
     stop = h.runner.run(invoice_id)
@@ -197,6 +206,7 @@ def test_route_b_sends_one_clarification_to_the_vendor_address(tmp_path: Path) -
     assert "Harga satuan" in mail.body and "HRG-04" not in mail.body
 
 
+@pytest.mark.aturan("BR-19")
 def test_a_certain_duplicate_gets_a_notice_and_closes(tmp_path: Path) -> None:
     h, invoice_id = start(tmp_path, "DUP-01")
     stop = h.runner.run(invoice_id)
@@ -205,6 +215,7 @@ def test_a_certain_duplicate_gets_a_notice_and_closes(tmp_path: Path) -> None:
     assert "Pemberitahuan" in mail.subject and "tidak perlu dibalas" in mail.body
 
 
+@pytest.mark.aturan("BR-22")
 def test_a_retry_does_not_send_a_second_email(tmp_path: Path) -> None:
     h, invoice_id = start(tmp_path, "HRG-04")
     original = h.mailer.send
@@ -222,6 +233,7 @@ def test_a_retry_does_not_send_a_second_email(tmp_path: Path) -> None:
     assert len(h.mailer.sent) == 1
 
 
+@pytest.mark.aturan("BR-25")
 def test_vendor_without_billing_address_fails_without_sending(tmp_path: Path) -> None:
     h, invoice_id = start(tmp_path, "HRG-04")
     original = h.deps.reader.vendors_by_vat
@@ -238,6 +250,7 @@ def test_vendor_without_billing_address_fails_without_sending(tmp_path: Path) ->
 # --- route C --------------------------------------------------------------------------------
 
 
+@pytest.mark.aturan("BR-21")
 def test_route_c_stops_with_the_evidence_pack_and_no_action(tmp_path: Path) -> None:
     h, invoice_id = start(tmp_path, "COC-04")
     stop = h.runner.run(invoice_id)
@@ -250,6 +263,7 @@ def test_route_c_stops_with_the_evidence_pack_and_no_action(tmp_path: Path) -> N
     assert approval.evidence["policy_quotes"] == []
 
 
+@pytest.mark.aturan("BR-22")
 def test_approving_makes_one_draft_even_when_sent_twice(tmp_path: Path) -> None:
     h, invoice_id = start(tmp_path, "COC-04")
     h.runner.run(invoice_id)
@@ -272,6 +286,7 @@ def test_rejecting_closes_without_any_action(tmp_path: Path) -> None:
     assert h.bills.created == [] and h.mailer.sent == []
 
 
+@pytest.mark.aturan("BR-19")
 def test_clarifying_emails_the_vendor_with_the_approver_note(tmp_path: Path) -> None:
     h, invoice_id = start(tmp_path, "COC-04")
     h.runner.run(invoice_id)
@@ -284,6 +299,7 @@ def test_clarifying_emails_the_vendor_with_the_approver_note(tmp_path: Path) -> 
     assert h.bills.created == []
 
 
+@pytest.mark.aturan("BR-21")
 def test_an_unregistered_vendor_cannot_be_asked(tmp_path: Path) -> None:
     h, invoice_id = start(tmp_path, "NPO-05")
     stop = h.runner.run(invoice_id)
@@ -308,6 +324,7 @@ def test_a_long_note_is_refused(tmp_path: Path) -> None:
         h.runner.decide(invoice_id, Decision.REJECT, decided_by="u", note="x" * 501)
 
 
+@pytest.mark.aturan("BR-25")
 def test_injected_address_in_the_document_is_never_used(tmp_path: Path) -> None:
     h, invoice_id = start(tmp_path, "INJ-02")
     stop = h.runner.run(invoice_id)
@@ -339,6 +356,7 @@ def test_an_unreadable_document_goes_to_route_c_with_its_attempts(tmp_path: Path
     assert approval is not None and Decision.APPROVE.value not in approval.options
 
 
+@pytest.mark.aturan("BR-27")
 def test_an_unavailable_llm_fails_and_continues_on_retry(tmp_path: Path) -> None:
     invoice, fragments = documents("COC-01")
     results: list[Any] = [LlmUnavailable("habis"), good(invoice, fragments)]
@@ -360,6 +378,7 @@ def _review(status: ReviewStatus) -> ReviewOutcome:
     return ReviewOutcome(InjectionReview(status=status, injection=injection), ())
 
 
+@pytest.mark.aturan("BR-27")
 def test_route_a_waits_for_layer_two_and_retry_runs_it_again(tmp_path: Path) -> None:
     answers = [_review(ReviewStatus.UNAVAILABLE), _review(ReviewStatus.OK)]
     h, invoice_id = start(tmp_path, "COC-01", reviewer=lambda _f: answers.pop(0))
@@ -429,6 +448,7 @@ def _kth06_mapping(invoice: Any, po: Any, lines: Any) -> LineMappingOutcome:
     )
 
 
+@pytest.mark.aturan("BR-07")
 def test_an_llm_mapping_lets_lines_without_codes_become_a_draft(tmp_path: Path) -> None:
     h, invoice_id = start(tmp_path, "KTH-06", line_mapper=_kth06_mapping)
     stop = h.runner.run(invoice_id)

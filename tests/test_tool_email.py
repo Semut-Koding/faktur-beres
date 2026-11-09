@@ -57,6 +57,7 @@ def send(box: Box, target: str = VENDOR) -> bool:
     return send_checked(box, mail(target), vendor_emails=[VENDOR], internal_domain="arunika.test")
 
 
+@pytest.mark.aturan("BR-19")
 def test_subject_carries_the_thread_reference_and_number() -> None:
     assert mail().subject == "[FB-000123] Klarifikasi faktur INV/1"
 
@@ -65,6 +66,7 @@ def test_message_id_is_deterministic() -> None:
     assert mail().message_id == message_id_for(KEY) == mail().message_id
 
 
+@pytest.mark.aturan("BR-25")
 @pytest.mark.parametrize(
     "address",
     ["audit@pemeriksa-eksternal.test", "a@vendor.test, b@vendor.test", "tidak-valid"],
@@ -76,10 +78,12 @@ def test_other_addresses_are_refused(address: str) -> None:
     assert box.seen == []
 
 
+@pytest.mark.aturan("BR-25")
 def test_internal_address_is_allowed() -> None:
     assert send(Box(), "finance@arunika.test") is True
 
 
+@pytest.mark.aturan("BR-22")
 def test_a_message_that_exists_is_not_sent_again() -> None:
     box = Box()
     assert send(box) is True
@@ -92,6 +96,7 @@ def test_a_message_not_read_back_is_an_error() -> None:
         send(Box(keeps=False))
 
 
+@pytest.mark.aturan("BR-19")
 def test_one_section_per_reason_b_and_digits_are_masked() -> None:
     body = clarification_body(
         invoice_number="INV/1", findings=[PRICE, TAX, NEW, NOTE], approver_note=None

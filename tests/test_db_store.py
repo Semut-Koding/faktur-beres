@@ -106,6 +106,7 @@ def test_invoice_ids_come_from_the_sequence(store: Store) -> None:
     )
 
 
+@pytest.mark.aturan("BR-23")
 def test_status_changes_follow_the_table_and_are_audited(store: Store) -> None:
     invoice_id = store.create_invoice(NEW)
     store.set_status(invoice_id, InvoiceStatus.PROCESSING, node="intake")
@@ -126,6 +127,7 @@ def test_failed_keeps_the_message_until_it_is_retried(store: Store) -> None:
     assert store.get(invoice_id).failure_message is None
 
 
+@pytest.mark.aturan("BR-22")
 def test_an_action_key_is_unique_and_a_done_action_stays_done(store: Store) -> None:
     invoice_id = store.create_invoice(NEW)
     key = "k" * 64
@@ -139,6 +141,7 @@ def test_an_action_key_is_unique_and_a_done_action_stays_done(store: Store) -> N
     assert len(store.actions(invoice_id)) == 1
 
 
+@pytest.mark.aturan("BR-22")
 def test_the_database_refuses_a_second_row_with_the_same_key(store: Store, engine: Engine) -> None:
     invoice_id = store.create_invoice(NEW)
     row = {
@@ -210,6 +213,7 @@ def test_registry_leaves_out_the_invoice_itself_and_other_vendors(store: Store) 
     assert registry.other_invoices(8, exclude_invoice_id=None) == []
 
 
+@pytest.mark.aturan("BR-23")
 def test_audit_masks_parameters(store: Store) -> None:
     invoice_id = store.create_invoice(NEW)
     store.audit(
