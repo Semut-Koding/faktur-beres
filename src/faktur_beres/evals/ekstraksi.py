@@ -760,7 +760,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (PathRefused, ValueError, LlmConfigError) as exc:
         print(f"GALAT: {exc}", file=sys.stderr)
         return 2
-    audit_log.attach(state.run)
+    handler = audit_log.attach(state.run)
     print(
         f"run {state.run}: {len(docs)} dokumen, model {state.models}, "
         f"penilai {'ya' if state.review else 'tidak'}, cache {'ya' if state.cache else 'tidak'}"
@@ -773,6 +773,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     except LlmConfigError as exc:
         print(f"GALAT konfigurasi LLM: {exc}", file=sys.stderr)
         return 2
+    finally:
+        audit_log.detach(handler)
     print_summary(state)
     print(f"\nhasil: {path.relative_to(REPO_ROOT)}")
     return 3 if state.stopped else 0

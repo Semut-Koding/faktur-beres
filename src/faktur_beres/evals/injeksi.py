@@ -272,13 +272,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(str(exc), file=sys.stderr)
         return 2
     phrase_set, digest = load_set(path)
-    audit_log.attach(f"injeksi-{digest[:12]}")
+    handler = None if args.lapis1 else audit_log.attach(f"injeksi-{digest[:12]}")
     try:
         llm = None if args.lapis1 else gemini_client(get_settings(), use_cache=args.pakai_cache)
         report = evaluate(phrase_set, digest, llm=llm)
     except LlmError as exc:
         print(f"GALAT {exc.kind}: {exc}", file=sys.stderr)
         return 2
+    finally:
+        audit_log.detach(handler)
     print_report(report)
     target = args.json or default_target(path, report.mode)
     target.parent.mkdir(parents=True, exist_ok=True)

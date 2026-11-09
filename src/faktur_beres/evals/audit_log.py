@@ -3,6 +3,8 @@
 ``GeminiClient`` logs one ``llm_call`` record per attempt on the ``faktur_beres.llm`` logger
 (BR-23). The evaluation tools append those records as JSON lines to ``eval/hasil/audit-llm.jsonl``
 (local, not committed), so failed attempts are kept too and the use of each model can be counted.
+The handler is attached only while a tool really calls the LLM, and removed afterwards, so tests
+that run a tool's ``main`` never write to the real file.
 The daily quota of the Gemini API resets at midnight Pacific time, 15.00 WIB: ``python -m
 faktur_beres.evals.audit_log`` prints the requests per model since the last reset.
 """
@@ -45,6 +47,12 @@ def attach(run: str, path: Path = AUDIT_PATH) -> logging.Handler:
     if LOGGER.getEffectiveLevel() > logging.INFO:
         LOGGER.setLevel(logging.INFO)
     return handler
+
+
+def detach(handler: logging.Handler | None) -> None:
+    if handler is not None:
+        LOGGER.removeHandler(handler)
+        handler.close()
 
 
 def last_reset(now: datetime) -> datetime:

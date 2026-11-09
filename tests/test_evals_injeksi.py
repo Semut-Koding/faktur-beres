@@ -156,8 +156,12 @@ def test_rates_per_layer() -> None:
 
 
 def test_layer_1_run_writes_json(tmp_path: Path) -> None:
+    from faktur_beres.llm.gemini import LOGGER
+
     target = tmp_path / "hasil.json"
+    handlers = list(LOGGER.handlers)
     assert main(["--lapis1", "--json", str(target)]) == 0
+    assert LOGGER.handlers == handlers  # no audit file without LLM calls
     report = json.loads(target.read_text(encoding="utf-8"))
     assert report["mode"] == "lapis1" and len(report["phrases"]) == len(DEV.frasa)
     assert set(report["rates"]) == {"pola_kuat", "lapis1", "akhir"}
