@@ -101,6 +101,10 @@ Sepuluh dokumen tetap (foto DUP-05 dan HRG-01, pindaian DUP-03 dan HRG-05, PDF s
 
 Flash 3.8 berhenti di COC-01 setelah empat kali timeout 120 detik. Diagnosis dengan batas waktu 300 detik: 503 setelah 7,7 detik, lalu berhasil setelah 194,5 detik. Aturan banding terpenuhi: akurasi Flash-Lite (100%) tidak mungkin lebih dari 2 poin di bawah Flash. Keputusan model ada di [ADR-0008](../docs/adr/0008-gemini-sdk-model-kuota-cache-data.md).
 
+### Ekstraksi v2 (10 November 2026)
+
+`extraction-v2` menambah aturan bahwa nomor urut baris bukan kode barang. Run segar terarah `20261109-233957` memakai KTH-06 dan 10 dokumen banding, dibanding run M3 `20261109-150210` pada dokumen yang sama: field kritis tidak ada yang turun, dan kedua `kode` baris KTH-06 kini `null` (v1 mengisinya dengan nomor urut). Semua field pada 11 dokumen benar.
+
 ### Run segar penuh (9 November 2026)
 
 Run `20261109-150210` membaca 64 dokumen dengan kedua peran memakai `gemini-3.5-flash-lite`, penilai lapis 2 aktif, dan tanpa cache. Totalnya 123 panggilan, biaya setara USD 0,156, dalam 20,5 menit.
@@ -126,6 +130,44 @@ Ada tiga kesalahan field:
 - **KTH-06 (dua field):** nomor baris terbaca sebagai kode produk pada tabel tanpa kode.
 
 Pembacaan ulang BR-04 terjadi pada 4 dokumen (HRG-03, HRG-05, PJK-03, KTH-03), dan semuanya konsisten pada pembacaan kedua. Empat jawaban 503 pulih lewat retry. Ekstraksi foto dan pindaian paling lama 68–100 detik per panggilan.
+
+## Evaluasi graph
+
+`npm run eval:graph` menjalankan graph sungguhan (Odoo, basis data aplikasi, Mailpit) untuk setiap skenario. Sebelum setiap skenario, Odoo, basis data aplikasi, dan pesan Mailpit direset. Harness hanya memberi agent berkas dan masukan simulasi (keputusan approver). Penilainya sama dengan `eval:orakel` (SPEC §15.4); larangan `tagihan_terposting` dan `ubah_data_master` diperiksa langsung di Odoo. Sampai M4b, skenario B yang punya `balasan_vendor` dinilai sampai pertama berhenti dan ditandai "menunggu M4b".
+
+```bash
+npm run eval:graph -- --ekstraksi orakel   # LLM hanya untuk perencana dan pemetaan baris
+npm run eval:graph                         # seluruh agent, segar
+npm run eval:graph -- --id NPO-01 --ekstraksi orakel --tanpa-llm
+```
+
+Opsi lain: `--set faktur|ketahanan`, `--penilai nyala|mati`, `--pakai-cache`, `--tanpa-reset`, `--lanjut RUN`, `--maks-panggilan N`. Hasil ditulis ke `eval/hasil/graph/<run>.json` setelah setiap skenario.
+
+**Mode orakel (10 November 2026, run `20261109-234324`).** Ekstraksi orakel, penilai lapis 2 mati.
+
+| Set | Pertama berhenti | Status akhir | Menunggu M4b |
+|---|---|---|---|
+| 40 faktur | 40/40 | 27/27 | 13 |
+| Ketahanan | 13/13 | 13/13 | 0 |
+
+Panggilan LLM: 8 `gemini-3.5-flash-lite` (7 perencana, 1 pemetaan baris KTH-06), biaya setara USD 0,0037.
+
+## Evaluasi perencana
+
+`npm run eval:perencana` menjalankan perencana `identify` pada 8 kasus dengan ERP dari dataset. NPO-01 dan NPO-02 seperti tercetak; COC-01, COC-02, DUP-04, REK-04, HRG-04, dan QTY-01 dengan nomor PO dihapus. Jawaban yang diharapkan dihitung BR-06 saat run, bukan dari label.
+
+**Hasil (10 November 2026, run `20261109-234102`).** 8/8 usulan sama dengan BR-06, 26 panggilan model, 31 eksekusi alat, tanpa penolakan guard. Perencana bersifat penasihat: BR-06 tetap memutuskan.
+
+| Kasus | Usulan | BR-06 | Panggilan model | Eksekusi alat | Detik |
+|---|---|---|---|---|---|
+| NPO-01 | P00033 | P00033 | 3 | 3 | 11,0 |
+| NPO-02 | tidak ada | tidak ada | 4 | 6 | 19,8 |
+| COC-01 (PO dihapus) | P00015 | P00015 | 3 | 3 | 15,7 |
+| COC-02 (PO dihapus) | P00017 | P00017 | 3 | 3 | 17,2 |
+| DUP-04 (PO dihapus) | P00032 | P00032 | 3 | 3 | 11,8 |
+| REK-04 (PO dihapus) | P00046 | P00046 | 3 | 3 | 14,9 |
+| HRG-04 (PO dihapus) | tidak ada | tidak ada | 3 | 3 | 14,9 |
+| QTY-01 (PO dihapus) | tidak ada | tidak ada | 4 | 4 | 19,7 |
 
 ## Set uji ketahanan
 
