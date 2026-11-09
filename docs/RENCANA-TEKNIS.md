@@ -139,21 +139,25 @@ faktur-beres/            # nama folder repo (lihat README)
 ├─ tests/                # pytest
 ├─ data/
 │  ├─ seed/dataset.yaml  # sumber tunggal data sintetis (SPEC §9.4)
-│  └─ kebijakan/
-│     └─ parameter.yaml  # konfigurasi kebijakan SPEC §15.5 (M2); SOP AP dan kontrak sintetis untuk RAG menyusul (M4)
+│  ├─ kebijakan/
+│  │  └─ parameter.yaml  # konfigurasi kebijakan SPEC §15.5 (M2); SOP AP dan kontrak sintetis untuk RAG menyusul (M4)
+│  └─ llm/
+│     └─ harga.yaml      # harga Gemini per 1 juta token untuk biaya setara (M3)
 ├─ eval/
 │  ├─ skenario/          # label 40 skenario (M1, hasil generator, di-commit)
 │  ├─ berkas/            # faktur uji dan balasan vendor (M1, hasil generator, di-commit)
 │  ├─ DAFTAR.md          # tabel ringkas 40 skenario (hasil generator)
+│  ├─ ketahanan/         # set uji ketahanan KTH-xx: skenario/, berkas/, DAFTAR.md (M3, hasil generator, di-commit)
+│  ├─ injeksi/dev.yaml   # set frasa injeksi untuk pengembangan BR-15 (M3, ditulis tangan)
 │  ├─ README.md          # penjelasan folder (ditulis tangan)
-│  └─ hasil/             # hasil evaluasi orakel (M2) dan penuh (M5), tidak di-commit
+│  └─ hasil/             # hasil evaluasi orakel (M2), injeksi dan ekstraksi (M3), dan penuh (M5), tidak di-commit
 ├─ web/                  # dashboard React + Vite (M5), workspace npm
 ├─ infra/
 │  ├─ odoo/odoo.conf     # konfigurasi Odoo lokal (tanpa rahasia)
 │  ├─ odoo/addons/       # addon faktur_beres_agent: grup dan hak user agent (M2), tanpa logika agent
 │  ├─ odoo/shell/        # skrip ORM untuk `odoo shell` (bootstrap odoo:init)
 │  └─ scripts/           # skrip shell untuk Podman: init, snapshot, reset, tunggu layanan, tes integrasi
-├─ var/                  # berkas runtime lokal, mis. var/berkas/ (tidak di-commit)
+├─ var/                  # berkas runtime lokal, mis. var/berkas/ dan cache LLM var/cache/llm/ (tidak di-commit)
 ├─ docs/
 ├─ compose.yaml
 ├─ pyproject.toml, uv.lock, .python-version
@@ -176,13 +180,18 @@ Semua dijalankan dari akar repo.
 | Periksa isi Odoo sama dengan dataset dan kebutuhan skenario | `npm run odoo:check` | M0 |
 | Simpan kondisi seed / kembalikan Odoo ke kondisi itu | `npm run odoo:snapshot` / `npm run odoo:reset` | M0 |
 | Lint, cek tipe, dan tes unit (tes integrasi tidak ikut) | `npm run check` (gabungan `npm run lint`, `npm run typecheck`, dan `npm test`) | M0, cek tipe sejak M2 |
-| Cek tipe mypy `--strict` untuk paket `domain`, `tools`, dan `evals` | `npm run typecheck` | M2 |
+| Cek tipe mypy `--strict` untuk paket `domain`, `tools`, dan `evals` (M2), serta `llm` dan `extraction` (M3) | `npm run typecheck` | M2 |
 | Pastikan tidak ada nilai rahasia di berkas yang akan di-commit | `npm run guard:secrets` | M0 |
 | Buat faktur uji, label, dan balasan vendor (tulis ulang `eval/skenario/`, `eval/berkas/`, `eval/DAFTAR.md`) | `npm run gen:faktur` | M1 |
-| Pastikan berkas di `eval/` identik byte per byte dengan keluaran generator (SHA-256) | `npm run gen:periksa` | M1 |
+| Buat set uji ketahanan (tulis ulang `eval/ketahanan/`) | `npm run gen:ketahanan` | M3 |
+| Pastikan 40 skenario dan set ketahanan sama **isinya** dengan keluaran generator: PDF per halaman (ukuran, teks, render 50 DPI), gambar per piksel, label tanpa nilai `sha256` (nilai itu tetap harus sama dengan hash berkas); `-- --byte` membandingkan byte | `npm run gen:periksa` | M1, isi sejak M3 |
 | Evaluasi orakel 40 skenario: aturan deterministik pada `kebenaran_dokumen` label, ERP dari dataset; hasil JSON di `eval/hasil/` | `npm run eval:orakel` | M2 |
 | Evaluasi orakel dengan ERP dari Odoo hasil seed lewat user agent (baca saja; hasil harus sama dengan mode luring) | `npm run eval:orakel -- --odoo` | M2 |
 | Tes integrasi terhadap Odoo dengan key agent (`pytest -m integrasi`), dengan `odoo:reset` sebelum dan sesudahnya | `npm run test:integrasi` | M2 |
+| Daftar model Gemini yang mendukung `generateContent` untuk key ini; `-- --uji` mengirim satu permintaan kecil berkeluaran terstruktur ke setiap model terkonfigurasi | `npm run llm:model` | M3 |
+| Tes smoke Gemini (`pytest -m llm`, satu panggilan per model; dilewati tanpa `GEMINI_API_KEY`) | `npm run test:llm` | M3 |
+| Evaluasi injeksi dua lapis pada set frasa (`--lapis1` tanpa LLM, `--berkas` untuk set lain, `--pakai-cache`) | `npm run eval:injeksi` | M3 |
+| Evaluasi ekstraksi tiga kelompok (`faktur`, `balasan`, `ketahanan`): akurasi per field dan rantai ekstraksi → aturan, dengan `--set`, `--id`, `--model`, `--banding`, `--tanpa-penilai`, `--maks-panggilan`, `--lanjut`, `--pakai-cache` | `npm run eval:ekstraksi` | M3 |
 | Jalankan API dan dashboard untuk pengembangan | `npm run dev:api` / `npm run dev:web` | M4 / M5 |
 | Evaluasi 40 skenario × 3 | `npm run eval` | M5 |
 | Tambah dependensi Python | `uv add <paket>` atau `uv add --dev <paket>` | |
@@ -273,6 +282,7 @@ Aturan:
 - **Pengaman status:** override `account.move.write` menolak `state` di nilai yang ditulis user grup agent di luar `sudo` (`AccessError`). Aturan rekaman diperiksa sebelum `write`, sehingga tanpa pengaman ini `button_cancel` pada draft milik agent sendiri lolos.
 - **Matriks hak** diperiksa `odoo:check` lewat `has_access` (tingkat ACL pada recordset kosong dan tingkat aturan pada record seed), dan penolakannya dibuktikan `npm run test:integrasi` (24 kasus). Hasil yang perlu dicatat: `button_draft` pada draft ditolak Odoo dengan `UserError` 422 karena hanya entri terposting atau batal yang bisa di-reset; `create` dengan `state` posted ditolak `UserError` 422 dari pemeriksaan bawaan `account.move.create`; `button_validate` pada penerimaan yang sudah selesai tidak berbuat apa-apa (Odoo menyaring yang `done`), sedangkan pada penerimaan terbuka ditolak 403.
 - **Key agent tanpa `sudo()`:** `env["res.users.apikeys"].with_user(agent)._generate(...)`, sehingga Odoo menerapkan `api_key_duration` grup. Key agent diputar sekali lewat jalur ini pada 7 November 2026 (key lama buatan `sudo` dihapus) dan berlaku sampai 5 Februari 2027. Key admin tidak berubah (dibuat dengan `sudo`, berlaku sampai 3 Februari 2027).
+- **Hak baca `res.bank` (M3):** agent membaca bank terdaftar (`id`, `name`, `bic`) untuk BR-12. Haknya datang dari grup bawaan tanpa mengubah addon; `odoo:check` memeriksa baris matriksnya (69 pemeriksaan).
 - **Gateway:** kode agent hanya bicara dengan Odoo lewat `AgentOdooGateway`, dengan daftar field per model, context `lang`/`tz`, dan galat bertipe. Lampiran berkas asli dibuat dengan context `image_no_postprocess`: tes integrasi menemukan Odoo mengecilkan foto 1500×2000 px dan meng-encode ulang JPEG-nya, sehingga checksum berkas berubah.
 - **Draft tagihan** dibuat dalam satu `create`: kepala `move_type`, `partner_id`, `currency_id`, `fiscal_position_id` (bila ada), `invoice_origin`, `invoice_payment_term_id`, `ref`, `invoice_date`, `partner_bank_id`; baris (perintah `[0, 0, {...}]` di `invoice_line_ids`) `display_type` product, `product_id`, `product_uom_id`, `tax_ids`, `purchase_line_id`, `name`, `quantity`, `price_unit`. Odoo mengisi sendiri tanggal akuntansi dan baris pajak; nomor draft tetap kosong sampai diposting. `qty_invoiced` baris PO bertambah saat draft dibuat (field terhitung yang dihitung `sudo`).
 - **NSFP:** tagihan vendor tidak punya field NSFP. Field `l10n_id_efaktur_coretax` di `account.move` hanya berlaku untuk `out_invoice` (`_compute_l10n_id_coretax_efaktur_available`), jadi NSFP dan tanggal faktur pajak ditulis di catatan chatter draft (`odoo_tools.bill_note_text`).
