@@ -61,6 +61,7 @@ from faktur_beres.domain.rules.injection import (
     has_strong_pattern,
     judge_injection,
 )
+from faktur_beres.evals import audit_log
 from faktur_beres.evals.dataset_erp import DatasetErpReader
 from faktur_beres.evals.ketahanan import robustness_intake
 from faktur_beres.evals.labels import (
@@ -549,7 +550,12 @@ def run_documents(
                 doc, llm=llm, reader=reader, policy=policy, review=state.review
             )
         except LlmUnavailable as exc:
-            state.stopped = f"LLM tidak tersedia pada {doc.id}: {exc}"
+            attempts = ", ".join(
+                f"{c.model} {c.error_kind.value if c.error_kind else c.status.value}"
+                f"{f' {c.http_status}' if c.http_status else ''} {c.duration_ms} ms"
+                for c in exc.calls
+            )
+            state.stopped = f"LLM tidak tersedia pada {doc.id}: {exc} [{attempts}]"
             break
         state.documents.append(result)
         calls += result.calls
@@ -743,6 +749,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (PathRefused, ValueError, LlmConfigError) as exc:
         print(f"GALAT: {exc}", file=sys.stderr)
         return 2
+    audit_log.attach(state.run)
     print(
         f"run {state.run}: {len(docs)} dokumen, model {state.models}, "
         f"penilai {'ya' if state.review else 'tidak'}, cache {'ya' if state.cache else 'tidak'}"

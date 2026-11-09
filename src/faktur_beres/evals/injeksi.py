@@ -36,6 +36,7 @@ from faktur_beres.domain.rules.injection import (
     judge_injection,
     scan_text,
 )
+from faktur_beres.evals import audit_log
 from faktur_beres.evals.paths import PathRefused, checked_path
 from faktur_beres.llm.contracts import CacheUse, LlmCallRecord, LlmError, StructuredLlm
 from faktur_beres.llm.cost import total_cost
@@ -271,6 +272,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(str(exc), file=sys.stderr)
         return 2
     phrase_set, digest = load_set(path)
+    audit_log.attach(f"injeksi-{digest[:12]}")
     try:
         llm = None if args.lapis1 else gemini_client(get_settings(), use_cache=args.pakai_cache)
         report = evaluate(phrase_set, digest, llm=llm)
