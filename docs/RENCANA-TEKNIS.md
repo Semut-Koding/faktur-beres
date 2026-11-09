@@ -364,6 +364,11 @@ Dashboard di Vercel. API, Odoo, dan basis data di server yang ditentukan di M6, 
 - **Model Gemini (M3, ADR-0008)** dipilih per peran dan lewat uji banding, karena kuota tier gratis per model kecil dan berbeda-beda.
 - **`gen:periksa` (M3)** membandingkan isi berkas (halaman PDF dan piksel gambar), karena keluaran kompresi zlib bisa berbeda antar-mesin walaupun isinya sama.
 
+### Masukan dari M3 untuk M4 (9 November 2026)
+- **Peran cadangan LLM.** Di tier gratis, peran utama dan kuat sama-sama memakai Flash-Lite, karena Flash 3.8 menjawab 503 dan butuh sekitar 195 detik per dokumen (ADR-0008). Selama kedua peran sama, tidak ada model cadangan, dan gangguan Flash-Lite membuat faktur menunggu sesuai BR-27. M4 menambah peran cadangan yang terpisah dari peran kuat, dengan batas waktu sendiri dan model yang kuotanya terpisah.
+- **Label email pembeli (M4.0).** Kebenaran label 40 skenario memuat email pembeli, padahal PDF dan gambar tidak mencetaknya; hanya UBL yang memuatnya. `eval:ekstraksi` menilai field itu hanya pada UBL. Label diperbaiki di M4.0 dengan persetujuan pemilik.
+- **Thought signature.** Gemini 3 mewajibkan *thought signature* dikembalikan pada percakapan multi-giliran dengan function calling (ADR-0008).
+
 ---
 
 ## 7. Risiko dan mitigasi
@@ -371,7 +376,8 @@ Dashboard di Vercel. API, Odoo, dan basis data di server yang ditentukan di M6, 
 | Risiko | Mitigasi |
 |---|---|
 | Kuota atau biaya Gemini habis | Cache ekstraksi per hash berkas, model cadangan, evaluasi tidak dijalankan paralel berlebihan |
-| Kuota tier gratis Gemini kecil dan berbeda per model (Flash sekitar 20 permintaan per hari) | Model per peran: Flash-Lite untuk pembacaan pertama dan penilai injeksi, Flash hanya untuk pembacaan ulang dan cadangan (ADR-0008); throttle per model dari RPM; 429 per hari menandai model habis dan beralih ke cadangan; `eval:ekstraksi --lanjut` untuk run yang terputus; panggilan dalam jumlah banyak hanya setelah izin pemilik |
+| Kuota tier gratis Gemini kecil dan berbeda per model (Flash 20 permintaan per hari, Flash-Lite 500) | Kedua peran memakai Flash-Lite di tier gratis (ADR-0008); throttle per model dari RPM; 429 per hari menandai model habis; jendela kuota direset 15.00 WIB; `eval:ekstraksi --lanjut` untuk run yang terputus; panggilan dalam jumlah banyak hanya setelah izin pemilik |
+| Tidak ada model cadangan selama peran utama dan kuat memakai model yang sama | Gangguan Flash-Lite menjadi `LlmUnavailable` (BR-27): run evaluasi berhenti dan dilanjutkan dengan `--lanjut`. M4 menambah peran cadangan yang terpisah dari peran kuat, dengan batas waktu sendiri dan model berkuota terpisah (ADR-0008) |
 | Nama field Odoo 19 berbeda dari versi lama | Verifikasi `fields_get` di M0, satu modul klien, catatan field di §4.4 |
 | Image Odoo berubah diam-diam | Tag bertanggal, naik versi secara sengaja |
 | Bentrok dengan DombaTek (port, data, sumber daya) | Proyek compose dan port terpisah, aturan di CLAUDE.md, pemeriksaan awal di setiap tugas |
