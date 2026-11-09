@@ -30,7 +30,7 @@ Path repo berada di bawah `.../02 - Proyek Pribadi/02 - Kompetisi/...` dan menga
 ## Data dan rahasia
 - **Semua data sintetis.** Jangan pernah memasukkan faktur, nama perusahaan, NPWP, rekening, email, atau data orang yang nyata, termasuk sebagai contoh di tes atau dokumen. Sumber data tunggal: [data/seed/dataset.yaml](data/seed/dataset.yaml).
 - Tier gratis Gemini dapat memakai data untuk peningkatan produk; karena itu hanya data sintetis yang boleh dikirim ke LLM.
-- **Label evaluasi tidak boleh bocor ke agent.** ID skenario, kategori, dan jawaban yang diharapkan tidak boleh muncul di Odoo, di berkas faktur, di dokumen kebijakan untuk RAG, atau di data apa pun yang dibaca agent saat berjalan. Label hanya ada di `eval/skenario/`.
+- **Label evaluasi tidak boleh bocor ke agent.** ID skenario, kategori, dan jawaban yang diharapkan tidak boleh muncul di Odoo, di berkas faktur, di dokumen kebijakan untuk RAG, atau di data apa pun yang dibaca agent saat berjalan. Label hanya ada di `eval/skenario/`, `eval/ketahanan/skenario/`, dan `eval/injeksi/`.
 - `.env` tidak pernah di-commit. Jangan menampilkan isi rahasia (API key, sandi) di laporan, log, atau keluaran perintah; tulis `***`. Jalankan `npm run guard:secrets` sebelum commit dan push.
 
 ## Dokumen nyata dan berkas pribadi
