@@ -44,10 +44,11 @@ class Settings(BaseSettings):
 
     # LLM (filled in by the owner from M3 onwards)
     gemini_api_key: SecretStr | None = None
-    # Model per role (M3.2): primary reads documents and reviews injection; strong re-reads (BR-04)
-    # and is the fallback. Final choice in ADR-0008 (M3.7).
+    # Model per role (ADR-0008): primary reads documents and reviews injection; strong re-reads
+    # (BR-04) and is the fallback. Both Flash-Lite on the free tier; strong is the setting for a
+    # stronger model when its quota allows.
     gemini_model_primary: str = "gemini-3.5-flash-lite"
-    gemini_model_strong: str = "gemini-3.8-flash"
+    gemini_model_strong: str = "gemini-3.5-flash-lite"
     gemini_rpm_primary: int = 5
     gemini_rpm_strong: int = 5
     gemini_timeout_seconds: int = 120
