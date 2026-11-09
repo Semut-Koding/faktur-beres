@@ -293,6 +293,15 @@ class Store:
                     )
                 )
 
+    def update_reasons(self, invoice_id: str, reasons: Sequence[str], *, route: Route) -> None:
+        """A reason found after the decision, e.g. ``validation_failed`` from the bill action."""
+        with self._session() as session:
+            session.execute(
+                update(Invoice)
+                .where(Invoice.invoice_id == invoice_id)
+                .values(reasons=list(reasons), route=route.value)
+            )
+
     # --- BR-11 registry -------------------------------------------------------------------------
 
     def registered(self, vendor_id: int, *, exclude: str | None) -> list[RegisteredInvoice]:

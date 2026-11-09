@@ -68,6 +68,7 @@ files = [
     "src/faktur_beres/llm",
     "src/faktur_beres/extraction",
     "src/faktur_beres/db",
+    "src/faktur_beres/graph",
 ]
 
 [tool.pydantic-mypy]
