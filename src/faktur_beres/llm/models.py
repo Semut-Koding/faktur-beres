@@ -3,9 +3,9 @@
 Without options it lists the models from ``client.models.list()`` that support ``generateContent``:
 name, version, token limits, and whether the name marks a stable model or a preview, experimental
 or alias one (those are never configured, M3.2). ``--uji`` sends one small structured request,
-without any document, to each configured model (``GEMINI_MODEL_PRIMARY`` and
-``GEMINI_MODEL_STRONG``) and prints OK or the error. Error texts pass through ``redact`` first, so
-the API key is never printed.
+without any document, through ``GeminiClient`` to each configured model
+(``GEMINI_MODEL_PRIMARY`` and ``GEMINI_MODEL_STRONG``) and prints OK or the error. Error texts
+pass through ``redact`` first, so the API key is never printed.
 """
 
 import argparse
@@ -13,25 +13,27 @@ import sys
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 
-from google import genai
 from google.genai import errors, types
-from pydantic import BaseModel, ValidationError
+from pydantic import BaseModel
 
 from faktur_beres.config import Settings, get_settings
+from faktur_beres.llm.contracts import LlmError, LlmRequest, ModelRole, TextPart
+from faktur_beres.llm.gemini import GeminiClient, SdkGenerate, rpm_by_model, sdk_client
 
-API_VERSION = "v1beta"  # written out: SDK 3.x changes the default to v1 (M3.2)
 GENERATE_ACTION = "generateContent"
 UNSTABLE_PARTS = frozenset({"preview", "exp", "experimental", "latest"})
-SMOKE_PROMPT = 'Kembalikan JSON {"status": "ok"}.'
-SMOKE_MAX_OUTPUT_TOKENS = 1024
+SMOKE_REQUEST = LlmRequest(
+    purpose="smoke_test",
+    role=ModelRole.PRIMARY,
+    prompt_version="smoke-v1",
+    system_instruction="Jawab hanya dengan JSON yang sesuai skema.",
+    parts=(TextPart(text='Kembalikan {"status": "ok"}.'),),
+    max_output_tokens=1024,
+)
 
 
 class SmokeReply(BaseModel):
     status: str
-
-
-class SmokeFailed(Exception):
-    """The model answered, but not with a complete reply that matches the schema."""
 
 
 @dataclass(frozen=True)
@@ -79,46 +81,27 @@ def configured_models(settings: Settings) -> dict[str, str]:
     return {"primary": settings.gemini_model_primary, "strong": settings.gemini_model_strong}
 
 
-def make_client(settings: Settings) -> genai.Client:
-    """A client with an explicit API version, the configured timeout and no SDK retries."""
-    if settings.gemini_api_key is None:
-        raise SystemExit("GEMINI_API_KEY kosong: isi di .env (jangan ditempel di chat).")
-    return genai.Client(
-        api_key=settings.gemini_api_key.get_secret_value(),
-        http_options=types.HttpOptions(
-            api_version=API_VERSION,
-            timeout=settings.gemini_timeout_seconds * 1000,
-            retry_options=types.HttpRetryOptions(attempts=1),
-        ),
-    )
-
-
-def smoke_test(client: genai.Client, model: str) -> None:
-    """One structured request without a document; raises when the reply is not a valid one."""
-    response = client.models.generate_content(
-        model=model,
-        contents=SMOKE_PROMPT,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json",
-            response_json_schema=SmokeReply.model_json_schema(),
-            max_output_tokens=SMOKE_MAX_OUTPUT_TOKENS,
-            thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.LOW),
-        ),
-    )
-    candidate = response.candidates[0] if response.candidates else None
-    finish = candidate.finish_reason if candidate else None
-    if finish != types.FinishReason.STOP:
-        raise SmokeFailed(f"finish_reason {finish}")
-    try:
-        SmokeReply.model_validate_json(response.text or "")
-    except ValidationError as exc:
-        raise SmokeFailed("keluaran tidak sesuai skema") from exc
-
-
 def describe_error(exc: Exception, secret: str | None) -> str:
     if isinstance(exc, errors.APIError):
         return redact(f"{exc.code} {exc.status}: {exc.message}", secret)
+    if isinstance(exc, LlmError):
+        attempts = ", ".join(
+            f"{c.error_kind or c.status}{f' {c.http_status}' if c.http_status else ''}"
+            for c in exc.calls
+        )
+        return redact(f"{exc.kind}: {exc} [{attempts}]", secret)
     return redact(f"{type(exc).__name__}: {exc}", secret)
+
+
+def smoke_test(settings: Settings, model: str) -> None:
+    """One small structured request through ``GeminiClient`` (retry included, no fallback)."""
+    client = GeminiClient(
+        SdkGenerate(sdk_client(settings)),
+        primary=model,
+        strong=model,
+        rpm={model: rpm_by_model(settings).get(model, 5)},
+    )
+    client.generate(SMOKE_REQUEST, SmokeReply)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
@@ -132,8 +115,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     args = parser.parse_args(argv)
     settings = get_settings()
-    client = make_client(settings)
     secret = settings.gemini_api_key.get_secret_value() if settings.gemini_api_key else None
+    try:
+        client = sdk_client(settings)
+    except LlmError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
 
     if not args.uji:
         try:
@@ -153,7 +140,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             failed += 1
             continue
         try:
-            smoke_test(client, model)
+            smoke_test(settings, model)
         except Exception as exc:
             print(f"{role:<8} {model}: GALAT {describe_error(exc, secret)}")
             failed += 1
