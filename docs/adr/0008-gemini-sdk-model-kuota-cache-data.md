@@ -71,6 +71,9 @@
    Alat CLI ekstraksi menolak path di luar repo; pengecualiannya hanya `eval:injeksi --berkas`, untuk set tertutup perencana. Semua alat yang mengirim ke LLM menolak path dengan komponen `_privat` atau `privat`, dan nama berkas tidak pernah dikirim. Prompt tidak memuat label maupun data ERP (diperiksa tes). Prompt disimpan sebagai berkas berversi, dan versi yang sudah ada dikunci tes sidik.
 9. **Catatan untuk M4.** Gemini 3 mewajibkan *thought signature* dikembalikan pada percakapan multi-giliran dengan function calling. Graph M4 harus meneruskan bagian jawaban model apa adanya, termasuk `thought_signature`, bukan hanya teksnya.
 
+## Catatan implementasi (M4a, 10 November 2026)
+Peran cadangan yang direncanakan di sini diterapkan di M4a dengan `gemini-3.6-flash`; rincian dan batasnya ada di [ADR-0010](0010-llm-di-graph.md).
+
 ## Konsekuensi
 - Semua panggilan M3 memakai kuota Flash-Lite (500 per hari). Run besar dijadwalkan menurut jendela kuota 15.00 WIB dan bisa dilanjutkan (`eval:ekstraksi --lanjut`).
 - Selama kedua peran memakai model yang sama, tidak ada model cadangan. Gangguan Flash-Lite menghentikan run evaluasi, dan di M4 membuat faktur menunggu sesuai BR-27, sampai peran cadangan M4 ada.
