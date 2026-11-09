@@ -9,4 +9,4 @@
 | [deploy/lokal-podman.md](deploy/lokal-podman.md) | Menjalankan stack lokal dengan Podman rootless, berdampingan dengan stack DombaTek di mesin yang sama |
 | [tugas/](tugas/README.md) | Cara kerja pemilik, Claude, dan Claude Code; prompt tugas per milestone; format laporan |
 
-Direncanakan: `deploy/demo-publik.md` (M6). SOP AP dan kontrak vendor sintetis untuk RAG disimpan sebagai data di `data/kebijakan/` (M4), bukan di folder dokumentasi ini.
+Direncanakan: `deploy/demo-publik.md` (M6). Konfigurasi kebijakan ada di `data/kebijakan/parameter.yaml` (sejak M2). SOP AP dan kontrak vendor sintetis untuk RAG akan disimpan di folder yang sama (M4), bukan di folder dokumentasi ini.
