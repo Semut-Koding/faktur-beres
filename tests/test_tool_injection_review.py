@@ -136,7 +136,7 @@ def test_text_is_split_into_at_most_four_calls() -> None:
 
 def test_a_yes_in_one_call_wins_over_an_unavailable_one() -> None:
     fragments = [
-        TextFragment(source=TextSource.NOTE, text="b" * (CHARS_PER_CALL - 5)),
+        TextFragment(source=TextSource.NOTE, text="b" * CHARS_PER_CALL),  # fills call 1
         TextFragment(source=TextSource.HIDDEN_TEXT, text=ATTACK),
     ]
     llm = ScriptedLlm([LlmUnavailable("sibuk"), answer(True, (2, ATTACK))])
@@ -147,3 +147,24 @@ def test_nothing_to_review() -> None:
     llm = ScriptedLlm([])
     review = review_injection([], llm=llm).review
     assert (review.status, review.injection, llm.requests) == (ReviewStatus.OK, False, [])
+
+
+@pytest.mark.parametrize(("count", "size"), [(6, 6_000), (7, 5_001), (4, 10_000), (40, 1_000)])
+def test_text_within_the_limit_never_needs_more_than_four_calls(count: int, size: int) -> None:
+    fragments = [TextFragment(source=TextSource.NOTE, text="w" * size) for _ in range(count)]
+    llm = ScriptedLlm([answer(False)] * 4)
+    outcome = review_injection(fragments, llm=llm)
+    assert outcome.review.status is ReviewStatus.OK and len(llm.requests) <= 4
+    sent = sum(text_of(r).count("w") for r in llm.requests)
+    assert sent == count * size  # every character goes out once
+
+
+def test_a_fragment_cut_at_a_call_boundary_keeps_its_number_and_its_quote() -> None:
+    head = TextFragment(source=TextSource.PDF_TEXT_LAYER, text="h" * (CHARS_PER_CALL - 20))
+    tail = TextFragment(source=TextSource.HIDDEN_TEXT, text="x" * 30 + " " + ATTACK, where="hal 2")
+    llm = ScriptedLlm([answer(False), answer(True, (2, ATTACK))])
+    review = review_injection([head, tail], llm=llm).review
+    first, second = (text_of(r) for r in llm.requests)
+    assert " 2 sumber=hidden_text" in first and " 2 sumber=hidden_text" in second
+    assert ATTACK not in first and ATTACK in second
+    assert review.says_injection and review.quotes[0].where == "hal 2"

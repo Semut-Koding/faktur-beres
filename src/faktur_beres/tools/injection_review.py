@@ -5,7 +5,8 @@ Input: every free-text fragment of one document, merged as ``analyse()`` merges 
 label, no other extracted value. Each fragment is wrapped in delimiters that carry a random nonce,
 new for every call; code makes sure the nonce does not occur in the text.
 
-Limits: 40,000 characters, split into at most four calls of 10,000. Above that the status is
+Limits: 40,000 characters, split into at most four calls: every call is filled up to 10,000
+characters, cutting a fragment at the call boundary when needed. Above that the status is
 ``too_long`` and no call is made.
 
 Output of the model: ``{"injection": bool, "quotes": [{"fragment": int, "text": str}]}``, at most
@@ -80,25 +81,33 @@ class ReviewOutcome:
     calls: tuple[LlmCallRecord, ...]
 
 
-def _pieces(fragments: Sequence[TextFragment]) -> list[_Piece]:
-    pieces = []
-    for number, fragment in enumerate(fragments, start=1):
-        text = mask_text(fragment.text)
-        for start in range(0, len(text), CHARS_PER_CALL):
-            pieces.append(_Piece(number, fragment, text[start : start + CHARS_PER_CALL]))
-    return pieces
+def _masked(fragments: Sequence[TextFragment]) -> list[tuple[int, TextFragment, str]]:
+    return [
+        (number, fragment, mask_text(fragment.text))
+        for number, fragment in enumerate(fragments, start=1)
+    ]
 
 
-def _batches(pieces: Sequence[_Piece]) -> list[list[_Piece]]:
-    batches: list[list[_Piece]] = []
-    size = 0
-    for piece in pieces:
-        if not batches or size + len(piece.text) > CHARS_PER_CALL:
-            batches.append([])
-            size = 0
-        batches[-1].append(piece)
-        size += len(piece.text)
-    return batches
+def _batches(masked: Sequence[tuple[int, TextFragment, str]]) -> list[list[_Piece]]:
+    """Fill every call up to ``CHARS_PER_CALL``; a fragment may be cut at a call boundary.
+
+    Filling each call keeps text of at most ``MAX_CHARS`` within ``MAX_CALLS`` calls whatever the
+    fragment sizes. A cut fragment keeps its number in both calls, and a quote is checked against
+    the part of the fragment its call carried.
+    """
+    batches: list[list[_Piece]] = [[]]
+    room = CHARS_PER_CALL
+    for number, fragment, text in masked:
+        start = 0
+        while start < len(text):
+            if room == 0:
+                batches.append([])
+                room = CHARS_PER_CALL
+            part = text[start : start + room]
+            batches[-1].append(_Piece(number, fragment, part))
+            start += len(part)
+            room -= len(part)
+    return [batch for batch in batches if batch]
 
 
 def _fresh_nonce(texts: Sequence[str], make: Callable[[], str]) -> str:
@@ -159,16 +168,17 @@ def review_injection(
     make_nonce: Callable[[], str] = lambda: secrets.token_hex(8),
 ) -> ReviewOutcome:
     """Ask the reviewer about every fragment; never raises for an unavailable or bad answer."""
-    pieces = _pieces(fragments)
-    if sum(len(piece.text) for piece in pieces) > MAX_CHARS:
+    masked = _masked(fragments)
+    if sum(len(text) for _, _, text in masked) > MAX_CHARS:
         return ReviewOutcome(InjectionReview(status=ReviewStatus.TOO_LONG), ())
-    if not pieces:
+    batches = _batches(masked)
+    if not batches:
         return ReviewOutcome(InjectionReview(status=ReviewStatus.OK, injection=False), ())
     prompt = prompt or load_prompt(PROMPT_PACKAGE, PROMPT_VERSION)
     calls: list[LlmCallRecord] = []
     quotes: list[ReviewQuote] = []
     statuses: list[ReviewStatus] = []
-    for batch in _batches(pieces):
+    for batch in batches:
         status = ReviewStatus.INVALID
         for _ in range(2):  # a yes without a verified quote is asked once more
             nonce = _fresh_nonce([piece.text for piece in batch], make_nonce)
