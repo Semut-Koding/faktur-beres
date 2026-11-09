@@ -45,6 +45,49 @@ Evaluasi orakel ([SPEC §12.1](../docs/SPEC.md#121-metode)) menjalankan aturan d
 
 **Arti hasilnya.** Targetnya 40/40 di kedua mode, dan mode `--odoo` harus memberi hasil yang sama dengan mode luring (hal itu juga diperiksa). Orakel adalah batas atas evaluasi penuh (M5): agent yang sesungguhnya bisa kalah karena ekstraksi atau keputusan LLM, tetapi tidak boleh kalah karena aturan. Bila orakel gagal, yang salah adalah aturan, dataset, atau label, bukan ekstraksi. Tabel 40 baris tampil di terminal, dan rinciannya (alasan, langkah simulasi, tagihan rencana, hasil setiap pemeriksaan) ditulis ke `eval/hasil/orakel-luring.json` atau `eval/hasil/orakel-odoo.json`. Kode keluar bukan nol bila ada skenario yang gagal. `npm run check` ikut menjalankan mode luring (`tests/test_orakel.py`).
 
+## Evaluasi ekstraksi
+
+`npm run eval:ekstraksi` mengukur pembacaan dokumen oleh Gemini dan parser UBL, lalu rantai ekstraksi → aturan. Kelompoknya `faktur` (40 faktur), `balasan` (11 lampiran balasan), dan `ketahanan` (set uji ketahanan), dan hasilnya dilaporkan terpisah per kelompok dan per format (PDF teks, PDF pindaian, foto, gambar pindaian, UBL). Untuk setiap dokumen:
+
+1. `extract_invoice` membaca berkas: UBL oleh kode, PDF dan gambar oleh Gemini dengan pembacaan ulang BR-04;
+2. fragmen dari hasil ekstraksi ditambah email dari label untuk kanal email, atau teks balasan untuk lampiran balasan, sama seperti masukan yang diterima agent;
+3. penilai injeksi lapis 2 berjalan, kecuali pola kuat sudah memutuskan atau `--tanpa-penilai` diberikan;
+4. `analyse()` berjalan dengan pembaca dataset dan konteks intake yang sama dengan orakel;
+5. hasilnya dibandingkan dengan kebenaran (per field), dengan orakel (aturan atas kebenaran), dan dengan harapan label. Lampiran balasan dibandingkan dengan analisis orakel atas kebenaran balasan yang sama.
+
+Aturan perbandingan field:
+
+| Jenis field | Cara membandingkan |
+|---|---|
+| Uang dan kuantitas | `Decimal` sama persis |
+| Tanggal | Sama |
+| Nomor faktur, nomor PO, NPWP, NSFP, rekening, dan kode produk | Setelah normalisasi aturan masing-masing |
+| Nama, deskripsi, alamat, bank, dan satuan | `normalize_name` |
+| Email | `normalize_email` |
+| Catatan | Setiap catatan kebenaran harus ditemukan di gabungan `notes` dan `other_text` |
+| Baris | Dipasangkan menurut urutan; baris yang hilang atau berlebih dihitung salah |
+
+Field kritis adalah field yang dipakai aturan: nomor dan tanggal faktur, nomor PO, nama, NPWP, dan email penjual, NPWP pembeli, NSFP, nomor dan bank rekening, setiap field baris, subtotal, DPP nilai lain, PPN, dan total. Metriknya:
+
+- akurasi per field;
+- dokumen dengan semua field kritis benar;
+- statistik BR-04;
+- rantai yang sama dengan orakel dan dengan harapan;
+- C5 pada dokumen injeksi dan di dokumen lain;
+- token, biaya setara, latensi (median dan p95), panggilan per model, dan pemakaian cache.
+
+Setiap kesalahan field dicatat dengan dokumen, field, kebenaran, dan hasil baca.
+
+```bash
+npm run eval:ekstraksi                        # ketiga kelompok, model per peran, dengan penilai
+npm run eval:ekstraksi -- --set ketahanan     # satu kelompok (bisa berulang)
+npm run eval:ekstraksi -- --id COC-01         # dokumen tertentu (bisa berulang)
+npm run eval:ekstraksi -- --banding --model kuat   # uji banding: 10 dokumen tetap, satu model, tanpa penilai
+npm run eval:ekstraksi -- --lanjut RUN        # lanjutkan run yang terputus (kuota habis, --maks-panggilan)
+```
+
+Hasil setiap run ditulis ke `eval/hasil/ekstraksi/<run>.json` setelah setiap dokumen, sehingga run yang terputus bisa dilanjutkan. Cache mati, kecuali dengan `--pakai-cache` untuk pengembangan; jawaban dari cache ditandai. Alat ini hanya membaca berkas di dalam repo, dan menolak path dengan komponen `_privat` atau `privat`. Nama berkas tidak dikirim ke LLM. Panggilan dalam jumlah banyak hanya dijalankan setelah pemilik setuju (kuota tier gratis).
+
 ## Set uji ketahanan
 
 `ketahanan/` berisi 13 dokumen sintetis yang meniru ciri umum faktur lapangan (RENCANA §6, masukan tinjauan M1). Set ini dinilai terpisah dari 40 skenario dan dari metrik utama. Ciri yang dicakup:
