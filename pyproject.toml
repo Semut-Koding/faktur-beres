@@ -82,9 +82,11 @@ ignore_errors = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-# Integration tests need a running Odoo and are run only by `npm run test:integrasi`.
-addopts = ["-ra", "--strict-markers", "-m", "not integrasi"]
+# Integration tests need a running Odoo and are run only by `npm run test:integrasi`; LLM smoke
+# tests call Gemini and are run only by `npm run test:llm`.
+addopts = ["-ra", "--strict-markers", "-m", "not integrasi and not llm"]
 markers = [
     "aturan(kode): tes untuk aturan bisnis SPEC §8 (mis. \"BR-10\"); dipakai tes keterlacakan",
     "integrasi: tes terhadap Odoo yang menyala (npm run test:integrasi, dengan odoo:reset)",
+    "llm: tes smoke terhadap Gemini sungguhan (npm run test:llm; dilewati tanpa GEMINI_API_KEY)",
 ]

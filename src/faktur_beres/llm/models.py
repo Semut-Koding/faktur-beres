@@ -17,8 +17,10 @@ from google.genai import errors, types
 from pydantic import BaseModel
 
 from faktur_beres.config import Settings, get_settings
-from faktur_beres.llm.contracts import LlmError, LlmRequest, ModelRole, TextPart
+from faktur_beres.llm.contracts import LlmError, LlmRequest, LlmResult, ModelRole, TextPart
+from faktur_beres.llm.cost import load_prices
 from faktur_beres.llm.gemini import GeminiClient, SdkGenerate, rpm_by_model, sdk_client
+from faktur_beres.llm.pacing import DEFAULT_RPM
 
 GENERATE_ACTION = "generateContent"
 UNSTABLE_PARTS = frozenset({"preview", "exp", "experimental", "latest"})
@@ -93,15 +95,16 @@ def describe_error(exc: Exception, secret: str | None) -> str:
     return redact(f"{type(exc).__name__}: {exc}", secret)
 
 
-def smoke_test(settings: Settings, model: str) -> None:
+def smoke_test(settings: Settings, model: str) -> LlmResult[SmokeReply]:
     """One small structured request through ``GeminiClient`` (retry included, no fallback)."""
     client = GeminiClient(
         SdkGenerate(sdk_client(settings)),
         primary=model,
         strong=model,
-        rpm={model: rpm_by_model(settings).get(model, 5)},
+        rpm={model: rpm_by_model(settings).get(model, DEFAULT_RPM)},
+        prices=load_prices(),
     )
-    client.generate(SMOKE_REQUEST, SmokeReply)
+    return client.generate(SMOKE_REQUEST, SmokeReply)
 
 
 def main(argv: Sequence[str] | None = None) -> int:
