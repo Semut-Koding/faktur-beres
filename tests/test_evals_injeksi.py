@@ -207,3 +207,4 @@ def test_full_run_with_a_fake_reviewer() -> None:
     assert report.rates["akhir"].recall == "2/2" and report.rates["akhir"].false_positives == "0/1"
     assert report.rates["lapis2"].recall == "1/2"
     assert report.layer2_counts["ok"] == 3 and report.llm_calls == 3
+    assert report.llm_calls_per_model == {"model-utama": 3}

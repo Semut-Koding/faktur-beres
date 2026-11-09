@@ -19,6 +19,7 @@ import argparse
 import hashlib
 import json
 import sys
+from collections import Counter
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal
@@ -111,6 +112,7 @@ class Report(_Strict):
     llm_calls: int = 0
     llm_from_cache: int = 0
     llm_cost_usd: str = "0"
+    llm_calls_per_model: dict[str, int] = Field(default_factory=dict)
 
 
 def load_set(path: Path) -> tuple[PhraseSet, str]:
@@ -203,6 +205,9 @@ def build_report(
         llm_calls=sum(c.cache is not CacheUse.HIT for c in calls),
         llm_from_cache=sum(c.cache is CacheUse.HIT for c in calls),
         llm_cost_usd=str(total_cost(calls)),
+        llm_calls_per_model=dict(
+            sorted(Counter(c.model for c in calls if c.cache is not CacheUse.HIT).items())
+        ),
     )
 
 
@@ -241,8 +246,8 @@ def print_report(report: Report) -> None:
     if report.layer2_counts:
         print("lapis 2: " + ", ".join(f"{k} {v}" for k, v in report.layer2_counts.items()))
         print(
-            f"panggilan LLM {report.llm_calls}, dari cache {report.llm_from_cache}, "
-            f"biaya setara USD {report.llm_cost_usd}"
+            f"panggilan LLM {report.llm_calls} {report.llm_calls_per_model}, "
+            f"dari cache {report.llm_from_cache}, biaya setara USD {report.llm_cost_usd}"
         )
 
 
