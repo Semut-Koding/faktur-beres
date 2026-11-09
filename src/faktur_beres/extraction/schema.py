@@ -43,7 +43,9 @@ class ExtractedBankAccount(_Extracted):
 
 
 class ExtractedLine(_Extracted):
-    vendor_code: Text | None = Field(description="Kode barang dari penjual")
+    vendor_code: Text | None = Field(
+        description="Kode barang atau SKU yang tercetak; nomor urut baris bukan kode barang"
+    )
     description: Text | None = Field(description="Nama atau deskripsi barang/jasa")
     quantity: Text | None = Field(description="Kuantitas seperti tercetak")
     unit: Text | None = Field(description="Satuan seperti tercetak")

@@ -60,7 +60,7 @@ from faktur_beres.llm.cost import total_cost
 from faktur_beres.llm.prompts import Prompt, load_prompt
 
 PROMPT_PACKAGE = "faktur_beres.extraction"
-PROMPT_VERSION = "extraction-v1"
+PROMPT_VERSION = "extraction-v2"
 MAX_READINGS = 3
 MAX_OUTPUT_TOKENS = 16384
 DOCUMENT_MIME: dict[FileKind, DocumentMime] = {

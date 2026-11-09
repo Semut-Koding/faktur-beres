@@ -1,0 +1,4 @@
+Pembacaan sebelumnya atas berkas yang sama bermasalah pada field berikut:
+{fields}
+
+Baca ulang berkas dengan teliti. Salin field-field itu persis seperti tercetak, karakter demi karakter. Jangan menghitung atau membetulkan nilai supaya sesuai: bila nilai tercetak memang tidak sesuai satu sama lain, salin apa adanya. Field lain diisi seperti biasa.

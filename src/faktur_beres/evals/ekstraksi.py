@@ -76,6 +76,7 @@ from faktur_beres.evals.labels import (
 )
 from faktur_beres.evals.paths import PathRefused, checked_path
 from faktur_beres.extraction.outcome import ExtractionOutcome
+from faktur_beres.extraction.reading import PROMPT_VERSION as EXTRACTION_PROMPT
 from faktur_beres.generator.label_schema import DocumentTruth
 from faktur_beres.llm.contracts import (
     CacheUse,
@@ -87,6 +88,7 @@ from faktur_beres.llm.contracts import (
 from faktur_beres.llm.cost import total_cost
 from faktur_beres.llm.gemini import gemini_client
 from faktur_beres.tools.extract_invoice import extract_invoice
+from faktur_beres.tools.injection_review import PROMPT_VERSION as REVIEW_PROMPT
 from faktur_beres.tools.injection_review import review_injection
 
 Group = Literal["faktur", "balasan", "ketahanan"]
@@ -738,7 +740,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             updated=now,
             mode="banding" if args.banding else "penuh",
             models=models,
-            prompt_versions={"ekstraksi": "extraction-v1", "penilai": "injection-review-v1"},
+            prompt_versions={"ekstraksi": EXTRACTION_PROMPT, "penilai": REVIEW_PROMPT},
             review=not (args.tanpa_penilai or args.banding),
             cache=args.pakai_cache and not args.banding,
             groups=groups,

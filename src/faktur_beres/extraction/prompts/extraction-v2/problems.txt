@@ -1,0 +1,7 @@
+missing_required: kosong, padahal field ini wajib ada
+unreadable: angka atau tanggal tidak terbaca
+ambiguous: gaya angka tidak jelas (titik dan koma sebagai pemisah ribuan atau desimal)
+arithmetic: tidak sesuai dengan angka lain di dokumen
+npwp_format: format NPWP tidak valid
+nsfp_format: format NSFP tidak valid
+schema: keluaran tidak sesuai skema
