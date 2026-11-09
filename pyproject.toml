@@ -5,14 +5,19 @@ description = "AI agent yang menuntaskan exception faktur pemasok di proses acco
 readme = "README.md"
 requires-python = ">=3.13,<3.14"
 dependencies = [
+    "alembic>=1.13",
     "google-genai>=2.34,<3",
     "httpx>=0.28.1",
+    "langgraph>=1.0.10",
+    "langgraph-checkpoint-postgres>=2",
     "lxml>=6.1.3",
+    "psycopg[binary,pool]>=3.2",
     "pydantic>=2.14.3",
     "pydantic-settings>=2.16.2",
     "pypdfium2>=5.14.0,<5.15",
     "python-stdnum>=2.2",
     "pyyaml>=6.0.3",
+    "sqlalchemy>=2.0",
 ]
 
 [dependency-groups]
