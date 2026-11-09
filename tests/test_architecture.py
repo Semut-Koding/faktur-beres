@@ -1,9 +1,9 @@
 """Agent code stays apart from evaluation code (M2 hard constraints, ADR-0007).
 
-``faktur_beres.domain`` and ``faktur_beres.tools`` do not import the evaluation, generator,
-dataset, or seed packages, do not name the ``eval/`` or ``data/seed`` paths, and never use the admin
-key. Checked statically (imports, string constants other than docstrings, attribute names) and by
-importing the packages in a fresh interpreter.
+``faktur_beres.domain``, ``faktur_beres.tools`` and ``faktur_beres.llm`` do not import the
+evaluation, generator, dataset, or seed packages, do not name the ``eval/`` or ``data/seed`` paths,
+and never use the admin key. Checked statically (imports, string constants other than docstrings,
+attribute names) and by importing the packages in a fresh interpreter.
 """
 
 import ast
@@ -15,7 +15,7 @@ import pytest
 
 from faktur_beres.config import REPO_ROOT
 
-AGENT_PACKAGES = ("domain", "tools")
+AGENT_PACKAGES = ("domain", "tools", "llm")
 FORBIDDEN_IMPORTS = (
     "faktur_beres.evals",
     "faktur_beres.generator",

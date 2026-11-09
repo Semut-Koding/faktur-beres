@@ -53,8 +53,13 @@ mypy_path = "src"
 strict = true
 warn_unreachable = true
 plugins = ["pydantic.mypy"]
-# `npm run typecheck`: the packages added in M2. Agent code and evaluation code are checked strictly.
-files = ["src/faktur_beres/domain", "src/faktur_beres/tools", "src/faktur_beres/evals"]
+# `npm run typecheck`: the packages added in M2 and M3. Agent code and evaluation code are checked strictly.
+files = [
+    "src/faktur_beres/domain",
+    "src/faktur_beres/tools",
+    "src/faktur_beres/evals",
+    "src/faktur_beres/llm",
+]
 
 [tool.pydantic-mypy]
 init_forbid_extra = true
