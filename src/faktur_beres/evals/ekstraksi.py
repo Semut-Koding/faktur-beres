@@ -255,8 +255,14 @@ def _tax_id(value: str) -> object:
     return tax_id_digits(value) or "".join(value.split())
 
 
-def compare_fields(truth: InvoiceData, read: InvoiceData | None) -> list[FieldCheck]:
-    """Every field of the truth against the reading (all wrong when nothing was read)."""
+def compare_fields(
+    truth: InvoiceData, read: InvoiceData | None, *, buyer_email: bool = True
+) -> list[FieldCheck]:
+    """Every field of the truth against the reading (all wrong when nothing was read).
+
+    ``buyer_email=False`` leaves out ``pembeli.email``: the generators print the buyer's e-mail only
+    in UBL, never on a PDF or an image, although the label truth always carries it.
+    """
     checks: list[FieldCheck] = []
 
     def add(path: str, t: object, r: object, key: Callable[[Any], object]) -> None:
@@ -285,9 +291,13 @@ def compare_fields(truth: InvoiceData, read: InvoiceData | None) -> list[FieldCh
             r_party and r_party.address,
             normalize_name,
         )
-        add(
-            f"{prefix}.email", t_party and t_party.email, r_party and r_party.email, normalize_email
-        )
+        if prefix == "penjual" or buyer_email:
+            add(
+                f"{prefix}.email",
+                t_party and t_party.email,
+                r_party and r_party.email,
+                normalize_email,
+            )
     add("nsfp", truth.nsfp, r and r.nsfp, _tax_id)
     add("tanggal_faktur_pajak", truth.tax_invoice_date, r and r.tax_invoice_date, _identity)
     t_bank, r_bank = truth.bank_account, r and r.bank_account
@@ -452,7 +462,8 @@ def evaluate_document(
     free_texts = [clean_text(f.text) for f in outcome.fragments if f.source in FREE_TEXT_SOURCES]
     if invoice is not None:
         free_texts += list(invoice.notes)
-    checks = compare_fields(truth_invoice, invoice) + compare_notes(doc.truth.catatan, free_texts)
+    checks = compare_fields(truth_invoice, invoice, buyer_email=doc.format == "UBL")
+    checks += compare_notes(doc.truth.catatan, free_texts)
     return DocResult(
         id=doc.id,
         group=doc.group,
