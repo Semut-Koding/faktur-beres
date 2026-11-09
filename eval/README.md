@@ -90,6 +90,17 @@ npm run eval:ekstraksi -- --lanjut RUN        # lanjutkan run yang terputus (kuo
 
 Hasil setiap run ditulis ke `eval/hasil/ekstraksi/<run>.json` setelah setiap dokumen, sehingga run yang terputus bisa dilanjutkan. Cache mati, kecuali dengan `--pakai-cache` untuk pengembangan; jawaban dari cache ditandai. Alat ini hanya membaca berkas di dalam repo, dan menolak path dengan komponen `_privat` atau `privat`. Nama berkas tidak dikirim ke LLM. Panggilan dalam jumlah banyak hanya dijalankan setelah pemilik setuju (kuota tier gratis).
 
+### Uji banding model (9 November 2026)
+
+Sepuluh dokumen tetap (foto DUP-05 dan HRG-01, pindaian DUP-03 dan HRG-05, PDF satu baris COC-01 dan COC-04, PDF beberapa baris COC-02 dan DUP-01, lampiran balasan HRG-04 dan HRG-03). Setiap model dijalankan sendirian dan segar, tanpa penilai (`--banding --model ...`).
+
+| Model | Dokumen | Akurasi field kritis | Dokumen sempurna | Panggilan | Dibaca ulang | Token masuk / keluar | Latensi median / maks | Biaya setara |
+|---|---|---|---|---|---|---|---|---|
+| `gemini-3.5-flash-lite` | 10 | 100% (224/224) | 10/10 | 11 | 1 | 16.097 / 7.207 | 3,8 / 12,0 detik | USD 0,023 |
+| `gemini-3.8-flash` | 0 dari 10 | — | — | 4 percobaan | — | — | — | — |
+
+Flash 3.8 berhenti di COC-01 setelah empat kali timeout 120 detik. Diagnosis dengan batas waktu 300 detik: 503 setelah 7,7 detik, lalu berhasil setelah 194,5 detik. Aturan banding terpenuhi: akurasi Flash-Lite (100%) tidak mungkin lebih dari 2 poin di bawah Flash. Keputusan model ada di [ADR-0008](../docs/adr/0008-gemini-sdk-model-kuota-cache-data.md).
+
 ## Set uji ketahanan
 
 `ketahanan/` berisi 13 dokumen sintetis yang meniru ciri umum faktur lapangan (RENCANA §6, masukan tinjauan M1). Set ini dinilai terpisah dari 40 skenario dan dari metrik utama. Ciri yang dicakup:
