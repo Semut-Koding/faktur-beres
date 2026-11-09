@@ -22,14 +22,17 @@ it. Creating an attachment adds ``image_no_postprocess``, because Odoo otherwise
 above 1920 px and re-encodes them (``ir.attachment._postprocess_contents``), and the original
 invoice file must be kept as received. Odoo errors become typed tool errors; only reads are retried
 (by the client). Each call is logged as one structured record (model, method, masked parameters per
-BR-24, duration, status) on the ``faktur_beres.tools.odoo`` logger; storing it in ``audit_log`` is
-M4.
+BR-24, duration, status) on the ``faktur_beres.tools.odoo`` logger; file contents are logged as
+size and SHA-256 only, and so are texts longer than 1.000 characters. Storing the record in
+``audit_log`` is M4.
 
 Odoo still enforces the rights on its side (addon ``faktur_beres_agent``); the gateway is the second
 fence, not the only one.
 """
 
 import base64
+import binascii
+import hashlib
 import logging
 import re
 import time
@@ -193,11 +196,40 @@ CALL_PARAMETERS: Mapping[str, frozenset[str]] = MappingProxyType(
         "search_count": frozenset({"domain"}),
     }
 )
+#: Text values longer than this are logged as their length and SHA-256 only.
+LOG_TEXT_LIMIT = 1000
 _ORDER_TERM = re.compile(r"^\s*([a-z_][a-z0-9_]*)(?:\s+(asc|desc))?\s*$", re.IGNORECASE)
 
 
 def _forbid(message: str, model: str, method: str) -> ForbiddenOperation:
     return ForbiddenOperation(message, model=model, method=method)
+
+
+def _file_summary(datas: str) -> dict[str, Any]:
+    try:
+        raw = base64.b64decode(datas, validate=True)
+    except (binascii.Error, ValueError):
+        raw = datas.encode("utf-8")
+    return {"bytes": len(raw), "sha256": hashlib.sha256(raw).hexdigest()}
+
+
+def summarize_params(value: Any, key: str | None = None) -> Any:
+    """Parameters for the log: file contents and long texts become size and SHA-256 only."""
+    if isinstance(value, Mapping):
+        return {k: summarize_params(v, str(k)) for k, v in value.items()}
+    if isinstance(value, list | tuple):
+        return [summarize_params(v, key) for v in value]
+    if isinstance(value, str):
+        if key == "datas":
+            return _file_summary(value)
+        if len(value) > LOG_TEXT_LIMIT:
+            return {"chars": len(value), "sha256": hashlib.sha256(value.encode()).hexdigest()}
+    return value
+
+
+def log_params(params: Mapping[str, Any]) -> Any:
+    """What the log keeps of the parameters: summarised (no file content), then masked (BR-24)."""
+    return mask_params(summarize_params(params))
 
 
 class AgentOdooGateway:
@@ -319,7 +351,7 @@ class AgentOdooGateway:
             entry = {
                 "model": model,
                 "method": method,
-                "params": mask_params(kwargs),
+                "params": log_params(kwargs),
                 "duration_ms": round((time.monotonic() - started) * 1000, 1),
                 "status": status,
                 "error": error,

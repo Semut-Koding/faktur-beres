@@ -271,3 +271,31 @@ def test_typed_search_read_checks_order_too() -> None:
     with pytest.raises(ForbiddenOperation):
         gateway(fake).search_read("account.move", [], ["id"], order="needed_terms")
     assert fake.requests == []
+
+
+def test_log_keeps_size_and_hash_of_files_not_their_content(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    import hashlib
+    import json as jsonlib
+
+    content = bytes(range(256)) * 1200  # 300 KB
+    fake = agent_draft()
+    with caplog.at_level(logging.INFO, logger="faktur_beres.tools.odoo"):
+        gateway(fake).create_attachment(42, "faktur.pdf", content, "application/pdf")
+    (record,) = [
+        r for r in caplog.records if getattr(r, "odoo_call", {}).get("model") == "ir.attachment"
+    ]
+    logged = jsonlib.dumps(record.odoo_call)
+    assert len(logged) < 2048
+    datas = record.odoo_call["params"]["vals_list"][0]["datas"]
+    assert datas == {"bytes": 307200, "sha256": hashlib.sha256(content).hexdigest()}
+
+
+def test_long_texts_are_logged_as_length_and_hash() -> None:
+    from faktur_beres.tools.odoo_gateway import log_params
+
+    body = "catatan " * 200  # 1.600 characters
+    logged = log_params({"ids": [42], "body": body, "short": "rek 5450717927"})
+    assert logged["body"]["chars"] == len(body) and len(logged["body"]["sha256"]) == 64
+    assert logged["short"] == "rek ******7927"  # short texts are still masked (BR-24)

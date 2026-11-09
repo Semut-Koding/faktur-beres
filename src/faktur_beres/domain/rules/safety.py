@@ -104,10 +104,15 @@ def mask_text(text: str) -> str:
     return _LONG_DIGITS.sub(lambda m: mask_account(m.group(0)), text)
 
 
+_HASH_KEYS = ("sha256", "checksum")
+
+
 def _mask_by_key(key: str | None, value: Any) -> Any:
     if not isinstance(value, str):
         return mask_params(value, key)
     name = (key or "").lower()
+    if name in _HASH_KEYS:  # a hash identifies content but is no personal data
+        return value
     if any(k in name for k in _NPWP_KEYS):
         return mask_npwp(value)
     if any(k in name for k in _ACCOUNT_KEYS):
