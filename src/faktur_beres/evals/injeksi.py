@@ -26,10 +26,20 @@ from typing import Literal
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from faktur_beres.config import REPO_ROOT
-from faktur_beres.domain.invoice import TextSource
-from faktur_beres.domain.rules.injection import scan_text
+from faktur_beres.config import REPO_ROOT, get_settings
+from faktur_beres.domain.invoice import TextFragment, TextSource
+from faktur_beres.domain.reasons import ReasonCode
+from faktur_beres.domain.rules.injection import (
+    InjectionReview,
+    ReviewStatus,
+    judge_injection,
+    scan_text,
+)
 from faktur_beres.evals.paths import PathRefused, checked_path
+from faktur_beres.llm.contracts import CacheUse, LlmCallRecord, LlmError, StructuredLlm
+from faktur_beres.llm.cost import total_cost
+from faktur_beres.llm.gemini import gemini_client
+from faktur_beres.tools.injection_review import review_injection
 
 DEV_SET = REPO_ROOT / "eval" / "injeksi" / "dev.yaml"
 RESULT_DIR = REPO_ROOT / "eval" / "hasil"
@@ -98,6 +108,9 @@ class Report(_Strict):
     phrases: tuple[PhraseResult, ...]
     rates: dict[str, Rate]
     layer2_counts: dict[str, int]
+    llm_calls: int = 0
+    llm_from_cache: int = 0
+    llm_cost_usd: str = "0"
 
 
 def load_set(path: Path) -> tuple[PhraseSet, str]:
@@ -105,20 +118,43 @@ def load_set(path: Path) -> tuple[PhraseSet, str]:
     return PhraseSet.model_validate(yaml.safe_load(raw)), hashlib.sha256(raw).hexdigest()
 
 
-def judge_layer1(phrase: Phrase) -> PhraseResult:
-    """Layer 1 only; ``--lapis1`` treats every pattern hit as C5 (no reviewer to clear it)."""
+def _basis(tier: str | None, review: InjectionReview | None) -> str:
+    if tier == "strong":
+        return "pola_kuat"
+    if review is not None and review.says_injection:
+        return "lapis2_ya"
+    if review is not None and review.status is ReviewStatus.TOO_LONG:
+        return "terlalu_panjang"
+    if tier is None:
+        return "tanpa_pola"
+    if review is None:
+        return "pola_lemah_tanpa_lapis2"
+    if review.status is ReviewStatus.OK:
+        return "pola_lemah_lapis2_tidak"
+    return "pola_lemah_gagal_aman"
+
+
+def judge_phrase(
+    phrase: Phrase, review: InjectionReview | None, *, from_cache: bool = False
+) -> PhraseResult:
+    """One phrase as a document with one fragment; the final decision is ``judge_injection``."""
+    fragment = TextFragment(source=phrase.sumber, text=phrase.teks)
     hits = scan_text(phrase.teks)
-    names = tuple(pattern.name for pattern, _ in hits)
     tiers = {pattern.tier for pattern, _ in hits}
     tier = "strong" if "strong" in tiers else ("weak" if tiers else None)
+    judgement = judge_injection([fragment], review)
     return PhraseResult(
         id=phrase.id,
         label=phrase.label,
         sumber=phrase.sumber,
         layer1_tier=tier,
-        layer1_patterns=names,
-        final=bool(hits),
-        basis="pola_lapis1" if hits else "tanpa_pola",
+        layer1_patterns=tuple(pattern.name for pattern, _ in hits),
+        layer2_status=review.status.value if review is not None else None,
+        layer2_answer=review.injection if review is not None else None,
+        layer2_quotes=tuple(q.text for q in review.quotes) if review is not None else (),
+        from_cache=from_cache,
+        final=any(f.reason is ReasonCode.PROMPT_INJECTION for f in judgement.findings),
+        basis=_basis(tier, review),
     )
 
 
@@ -143,7 +179,12 @@ def rate(results: Sequence[PhraseResult], flagged: str) -> Rate:
 
 
 def build_report(
-    phrase_set: PhraseSet, digest: str, results: Sequence[PhraseResult], *, lapis1: bool
+    phrase_set: PhraseSet,
+    digest: str,
+    results: Sequence[PhraseResult],
+    *,
+    lapis1: bool,
+    calls: Sequence[LlmCallRecord] = (),
 ) -> Report:
     groups = ["pola_kuat", "lapis1", "akhir"]
     if not lapis1:
@@ -159,7 +200,26 @@ def build_report(
         phrases=tuple(results),
         rates={group: rate(results, group) for group in groups},
         layer2_counts={} if lapis1 else counts,
+        llm_calls=sum(c.cache is not CacheUse.HIT for c in calls),
+        llm_from_cache=sum(c.cache is CacheUse.HIT for c in calls),
+        llm_cost_usd=str(total_cost(calls)),
     )
+
+
+def evaluate(phrase_set: PhraseSet, digest: str, *, llm: StructuredLlm | None) -> Report:
+    """Judge every phrase; without an LLM only layer 1 runs (``--lapis1``)."""
+    calls: list[LlmCallRecord] = []
+    results = []
+    for phrase in phrase_set.frasa:
+        if llm is None:
+            results.append(judge_phrase(phrase, None))
+            continue
+        fragment = TextFragment(source=phrase.sumber, text=phrase.teks)
+        outcome = review_injection([fragment], llm=llm)
+        calls += outcome.calls
+        cached = any(c.cache is CacheUse.HIT for c in outcome.calls)
+        results.append(judge_phrase(phrase, outcome.review, from_cache=cached))
+    return build_report(phrase_set, digest, results, lapis1=llm is None, calls=calls)
 
 
 def print_report(report: Report) -> None:
@@ -180,6 +240,10 @@ def print_report(report: Report) -> None:
         )
     if report.layer2_counts:
         print("lapis 2: " + ", ".join(f"{k} {v}" for k, v in report.layer2_counts.items()))
+        print(
+            f"panggilan LLM {report.llm_calls}, dari cache {report.llm_from_cache}, "
+            f"biaya setara USD {report.llm_cost_usd}"
+        )
 
 
 def default_target(set_path: Path, mode: str) -> Path:
@@ -202,11 +266,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(str(exc), file=sys.stderr)
         return 2
     phrase_set, digest = load_set(path)
-    if not args.lapis1:
-        print("lapis 2 belum tersedia; jalankan dengan --lapis1", file=sys.stderr)
+    try:
+        llm = None if args.lapis1 else gemini_client(get_settings(), use_cache=args.pakai_cache)
+        report = evaluate(phrase_set, digest, llm=llm)
+    except LlmError as exc:
+        print(f"GALAT {exc.kind}: {exc}", file=sys.stderr)
         return 2
-    results = [judge_layer1(phrase) for phrase in phrase_set.frasa]
-    report = build_report(phrase_set, digest, results, lapis1=args.lapis1)
     print_report(report)
     target = args.json or default_target(path, report.mode)
     target.parent.mkdir(parents=True, exist_ok=True)
