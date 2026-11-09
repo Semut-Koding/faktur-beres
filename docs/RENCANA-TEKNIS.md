@@ -371,12 +371,14 @@ Dashboard di Vercel. API, Odoo, dan basis data di server yang ditentukan di M6, 
 | Risiko | Mitigasi |
 |---|---|
 | Kuota atau biaya Gemini habis | Cache ekstraksi per hash berkas, model cadangan, evaluasi tidak dijalankan paralel berlebihan |
+| Kuota tier gratis Gemini kecil dan berbeda per model (Flash sekitar 20 permintaan per hari) | Model per peran: Flash-Lite untuk pembacaan pertama dan penilai injeksi, Flash hanya untuk pembacaan ulang dan cadangan (ADR-0008); throttle per model dari RPM; 429 per hari menandai model habis dan beralih ke cadangan; `eval:ekstraksi --lanjut` untuk run yang terputus; panggilan dalam jumlah banyak hanya setelah izin pemilik |
 | Nama field Odoo 19 berbeda dari versi lama | Verifikasi `fields_get` di M0, satu modul klien, catatan field di §4.4 |
 | Image Odoo berubah diam-diam | Tag bertanggal, naik versi secara sengaja |
 | Bentrok dengan DombaTek (port, data, sumber daya) | Proyek compose dan port terpisah, aturan di CLAUDE.md, pemeriksaan awal di setiap tugas |
 | Path repo mengandung spasi | Semua path dikutip; diuji di M0 |
 | Folder repo di bawah `Drive` ikut tersinkron | **Ditutup (6 Nov 2026): folder lokal, tidak tersinkron.** Mount jaringan atau FUSE tetap dihindari (diperiksa M0) |
-| Hasil LLM tidak deterministik | Temperature rendah, skema ketat, metrik pass^3 |
+| Keluaran LLM bervariasi antar-run | Skema ketat dan validasi kode, pembacaan ulang BR-04 yang menerima nilai hanya bila dua pembacaan konsisten, temperature dibiarkan bawaan sesuai saran Gemini 3, evaluasi tanpa cache, metrik pass^3 (M5) |
+| Instruksi di gambar yang meminta pembaca tidak menyalinnya | Penilai injeksi hanya melihat teks hasil baca, jadi instruksi yang tidak disalin tidak pernah dinilai. Prompt ekstraksi meminta semua teks bebas disalin; set ketahanan (KTH-13) mengukur keterbatasan ini; mitigasi lanjutan dipertimbangkan di M6 |
 | Label evaluasi bocor ke agent | Aturan di CLAUDE.md dan ADR-0007, tes yang memastikan data Odoo dan berkas faktur tidak memuat ID skenario |
 | Demo publik disalahgunakan | Kode akses, batas laju, dan reset berkala (M6) |
 | Hak user agent di M0 masih terlalu luas | **Ditutup (7 Nov 2026):** grup khusus `faktur_beres_agent.group_agent` tanpa hapus dan posting, aturan rekaman hanya untuk draft tagihan vendor buatan agent, pengaman perubahan status, dan `AgentOdooGateway`; diperiksa `odoo:check` dan dibuktikan `test:integrasi` (§4.4) |
