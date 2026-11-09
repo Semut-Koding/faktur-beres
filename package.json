@@ -31,6 +31,8 @@
     "test:integrasi": "bash infra/scripts/test-integrasi.sh",
     "test:llm": "uv run python -m pytest -m llm -p no:cacheprovider",
     "check": "npm run lint && npm run typecheck && npm test",
+    "db:migrate": "uv run python -m faktur_beres.db migrasi",
+    "db:reset": "uv run python -m faktur_beres.db reset",
     "guard:secrets": "uv run python -m faktur_beres.devtools.guard_secrets"
   }
 }
