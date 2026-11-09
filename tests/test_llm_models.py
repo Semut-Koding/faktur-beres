@@ -58,6 +58,7 @@ def test_configured_models_default_to_the_stable_candidates() -> None:
     assert configured_models(settings) == {
         "primary": "gemini-3.5-flash-lite",
         "strong": "gemini-3.5-flash-lite",
+        "fallback": "gemini-3.6-flash",
     }
     assert settings.gemini_rpm_primary == settings.gemini_rpm_strong == 5
     assert settings.gemini_timeout_seconds == 120

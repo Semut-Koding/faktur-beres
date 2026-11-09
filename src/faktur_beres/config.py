@@ -49,9 +49,13 @@ class Settings(BaseSettings):
     # stronger model when its quota allows.
     gemini_model_primary: str = "gemini-3.5-flash-lite"
     gemini_model_strong: str = "gemini-3.5-flash-lite"
+    gemini_model_fallback: str = "gemini-3.6-flash"
     gemini_rpm_primary: int = 5
     gemini_rpm_strong: int = 5
-    gemini_timeout_seconds: int = 120
+    gemini_rpm_fallback: int = 4
+    gemini_timeout_seconds: int = 120  # a request with a document, primary and strong models
+    gemini_timeout_fallback_seconds: int = 180  # a request with a document, fallback model
+    gemini_timeout_text_seconds: int = 60  # a request without a document, every model
     llm_cache_dir: str = "var/cache/llm"  # relative to the repository root
 
 

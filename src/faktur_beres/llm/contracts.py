@@ -10,7 +10,7 @@ a log line that formats a request shows the purpose and the MIME types, not the 
 
 import hashlib
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
@@ -31,6 +31,8 @@ class ModelRole(StrEnum):
 
     PRIMARY = "primary"  # reads documents on the first try and reviews injection (layer 2)
     STRONG = "strong"  # re-reads (BR-04) and is the fallback of the primary model
+    # Last in every chain, with a small daily quota. Only smoke and comparison runs ask for it.
+    FALLBACK = "fallback"
 
 
 class ThinkingLevel(StrEnum):
@@ -73,6 +75,7 @@ class LlmRequest(_Input):
     parts: tuple[Part, ...] = Field(min_length=1)
     thinking_level: ThinkingLevel = ThinkingLevel.LOW
     max_output_tokens: int = Field(default=8192, ge=256, le=MAX_OUTPUT_TOKENS_CAP)
+    allow_fallback: bool = True  # False keeps the small quota of the fallback role out of it
 
     @property
     def has_media(self) -> bool:
@@ -112,6 +115,90 @@ def request_key(
         "schema_sha256": sha256_hex(canonical_json(schema.model_json_schema())),
         "system_instruction_sha256": sha256_hex(request.system_instruction),
         "inputs": inputs,
+        "generation": dict(generation),
+    }
+    return sha256_hex(canonical_json(material))
+
+
+@dataclass(frozen=True)
+class ToolSpec:
+    """A function the model may call; its parameters are the fields of ``schema``."""
+
+    name: str
+    description: str
+    schema: type[BaseModel]
+
+
+@dataclass(frozen=True)
+class ToolReply:
+    """What a tool returns to the model. ``terminal`` ends the conversation."""
+
+    result: Mapping[str, object]
+    terminal: bool = False
+
+
+class ToolSession(Protocol):
+    """Runs validated calls for one conversation; a model switch starts a new session."""
+
+    def call(self, name: str, args: BaseModel) -> ToolReply: ...
+
+
+class ToolBudget(_Input):
+    """Limits over the whole run: every request to a model and every tool execution counts."""
+
+    model_calls: int = Field(ge=1)
+    tool_runs: int = Field(ge=0)
+
+
+class ToolEventStatus(StrEnum):
+    RUN = "run"
+    UNKNOWN_FUNCTION = "unknown_function"
+    INVALID_ARGS = "invalid_args"
+
+
+@dataclass(frozen=True)
+class ToolEvent:
+    """One function call the model made: run, or refused before running."""
+
+    name: str
+    status: ToolEventStatus
+
+
+class ToolRunStatus(StrEnum):
+    FINISHED = "finished"  # a tool replied ``terminal``
+    BUDGET_EXHAUSTED = "budget_exhausted"
+
+
+@dataclass(frozen=True)
+class ToolRunResult[S: ToolSession]:
+    status: ToolRunStatus
+    session: S
+    model: str | None
+    model_calls: int
+    tool_runs: int
+    events: tuple[ToolEvent, ...]
+    calls: tuple["LlmCallRecord", ...]
+
+
+def tool_turn_key(
+    model: str,
+    request: LlmRequest,
+    tools: Sequence[ToolSpec],
+    history: Sequence[object],
+    generation: Mapping[str, object],
+) -> str:
+    """Cache and audit key of one turn: the declarations and the whole history, as hashes."""
+    declarations = [
+        {"name": t.name, "description": t.description, "schema": t.schema.model_json_schema()}
+        for t in tools
+    ]
+    material = {
+        "model": model,
+        "purpose": request.purpose,
+        "prompt_version": request.prompt_version,
+        "system_instruction_sha256": sha256_hex(request.system_instruction),
+        "declarations_sha256": sha256_hex(canonical_json(declarations)),
+        "history_sha256": sha256_hex(canonical_json(list(history))),
         "generation": dict(generation),
     }
     return sha256_hex(canonical_json(material))
@@ -206,4 +293,16 @@ class LlmConfigError(LlmError):
 class StructuredLlm(Protocol):
     def generate[T: BaseModel](self, request: LlmRequest, schema: type[T]) -> LlmResult[T]:
         """Return a value of ``schema`` or raise an ``LlmError``."""
+        ...
+
+
+class ToolCallingLlm(Protocol):
+    def run_tools[S: ToolSession](
+        self,
+        request: LlmRequest,
+        tools: Sequence[ToolSpec],
+        new_session: Callable[[], S],
+        budget: ToolBudget,
+    ) -> ToolRunResult[S]:
+        """Run a function-calling conversation until a tool ends it or the budget is spent."""
         ...

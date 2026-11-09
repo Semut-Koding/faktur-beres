@@ -430,7 +430,11 @@ def test_rpm_per_model() -> None:
         gemini_rpm_primary=15,
         gemini_rpm_strong=5,
     )
-    assert rpm_by_model(settings) == {"gemini-3.5-flash-lite": 15, "gemini-3.8-flash": 5}
+    assert rpm_by_model(settings) == {
+        "gemini-3.5-flash-lite": 15,
+        "gemini-3.8-flash": 5,
+        "gemini-3.6-flash": 4,
+    }
     same = Settings(_env_file=None, gemini_rpm_primary=15, gemini_rpm_strong=5)
     assert same.gemini_model_strong == same.gemini_model_primary  # the default: one model
-    assert rpm_by_model(same) == {"gemini-3.5-flash-lite": 5}
+    assert rpm_by_model(same) == {"gemini-3.5-flash-lite": 5, "gemini-3.6-flash": 4}

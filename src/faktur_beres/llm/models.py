@@ -4,8 +4,8 @@ Without options it lists the models from ``client.models.list()`` that support `
 name, version, token limits, and whether the name marks a stable model or a preview, experimental
 or alias one (those are never configured, M3.2). ``--uji`` sends one small structured request,
 without any document, through ``GeminiClient`` to each configured model
-(``GEMINI_MODEL_PRIMARY`` and ``GEMINI_MODEL_STRONG``) and prints OK or the error. Error texts
-pass through ``redact`` first, so the API key is never printed.
+(``GEMINI_MODEL_PRIMARY``, ``GEMINI_MODEL_STRONG`` and ``GEMINI_MODEL_FALLBACK``) and prints OK or
+the error. Error texts pass through ``redact`` first, so the API key is never printed.
 """
 
 import argparse
@@ -19,7 +19,13 @@ from pydantic import BaseModel
 from faktur_beres.config import Settings, get_settings
 from faktur_beres.llm.contracts import LlmError, LlmRequest, LlmResult, ModelRole, TextPart
 from faktur_beres.llm.cost import load_prices
-from faktur_beres.llm.gemini import GeminiClient, SdkGenerate, rpm_by_model, sdk_client
+from faktur_beres.llm.gemini import (
+    GeminiClient,
+    SdkGenerate,
+    rpm_by_model,
+    sdk_client,
+    timeouts_from,
+)
 from faktur_beres.llm.pacing import DEFAULT_RPM
 
 GENERATE_ACTION = "generateContent"
@@ -80,7 +86,11 @@ def redact(text: str, secret: str | None) -> str:
 
 
 def configured_models(settings: Settings) -> dict[str, str]:
-    return {"primary": settings.gemini_model_primary, "strong": settings.gemini_model_strong}
+    return {
+        "primary": settings.gemini_model_primary,
+        "strong": settings.gemini_model_strong,
+        "fallback": settings.gemini_model_fallback,
+    }
 
 
 def describe_error(exc: Exception, secret: str | None) -> str:
@@ -103,6 +113,7 @@ def smoke_test(settings: Settings, model: str) -> LlmResult[SmokeReply]:
         strong=model,
         rpm={model: rpm_by_model(settings).get(model, DEFAULT_RPM)},
         prices=load_prices(),
+        timeouts=timeouts_from(settings),
     )
     return client.generate(SMOKE_REQUEST, SmokeReply)
 

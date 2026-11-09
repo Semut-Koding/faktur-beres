@@ -52,7 +52,7 @@ Outcome = types.GenerateContentResponse | BaseException
 @dataclass
 class Sent:
     model: str
-    contents: types.Content
+    contents: types.Content | list[types.Content]
     config: types.GenerateContentConfig
 
 
@@ -66,8 +66,13 @@ class ScriptedGenerate:
     sent: list[Sent] = field(default_factory=list)
 
     def __call__(
-        self, *, model: str, contents: types.Content, config: types.GenerateContentConfig
+        self,
+        *,
+        model: str,
+        contents: types.Content | list[types.Content],
+        config: types.GenerateContentConfig,
     ) -> types.GenerateContentResponse:
+        contents = list(contents) if isinstance(contents, list) else contents
         self.sent.append(Sent(model, contents, config))
         if self.clock is not None:
             self.clock.ns += self.latency_ms * NS_PER_MS
