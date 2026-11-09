@@ -16,7 +16,7 @@ import pytest
 
 from faktur_beres.config import REPO_ROOT
 
-AGENT_PACKAGES = ("domain", "tools", "llm", "extraction")
+AGENT_PACKAGES = ("domain", "tools", "llm", "extraction", "db", "graph")
 FORBIDDEN_IMPORTS = (
     "faktur_beres.evals",
     "faktur_beres.generator",
@@ -109,7 +109,8 @@ def test_importing_agent_code_loads_no_evaluation_code() -> None:
         "faktur_beres." + ".".join(p.relative_to(PACKAGE_DIR).with_suffix("").parts)
         for p in agent_files()
     ]
-    modules = [m.removesuffix(".__init__") for m in modules]
+    # Alembic's environment and revisions run only inside Alembic; they are checked statically.
+    modules = [m.removesuffix(".__init__") for m in modules if ".migrations." not in m]
     code = (
         "import importlib, sys\n"
         f"for m in {modules!r}: importlib.import_module(m)\n"

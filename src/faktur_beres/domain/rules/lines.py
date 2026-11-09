@@ -11,7 +11,10 @@
   ``quantity_variance``. Printed units are not converted. Quantities of the bills found as
   duplicates (BR-11) are not counted as invoiced, so one delivery is not counted twice.
 
-Line matching runs only once the PO is established (BR-06).
+Line matching runs only once the PO is established (BR-06). A free description the code cannot map
+may be mapped by the LLM (``tools.line_mapping``): this module has no LLM, it takes the mapping that
+code has already validated, and still checks that the PO line exists and is the only line of its
+product.
 """
 
 import re
@@ -45,7 +48,7 @@ _TRAILING_BRACKETS = re.compile(r"\s*[\(\[][^\)\]]*[\)\]]\s*$")
 class LineMatch(DomainModel):
     line: int  # 1-based position on the invoice
     status: Literal["matched", "no_match", "ambiguous"]
-    method: Literal["vendor_code", "internal_code", "name"] | None = None
+    method: Literal["vendor_code", "internal_code", "name", "llm"] | None = None
     po_line_id: int | None = None
     product_id: int | None = None
     candidate_line_ids: tuple[int, ...] = ()
@@ -208,22 +211,56 @@ def check_quantity(
     )
 
 
+def _mapped_by_llm(
+    index: int, match: LineMatch, po: PurchaseOrderRecord, mapping: Mapping[int, int]
+) -> LineMatch:
+    """Apply a validated LLM mapping to a line the code found no counterpart for (BR-07)."""
+    po_line_id = mapping.get(index)
+    if match.status != "no_match" or po_line_id is None:
+        return match
+    chosen = [pl for pl in po.lines if pl.id == po_line_id]
+    if len(chosen) != 1 or sum(pl.product_id == chosen[0].product_id for pl in po.lines) != 1:
+        return match
+    return LineMatch(
+        line=index,
+        status="matched",
+        method="llm",
+        po_line_id=chosen[0].id,
+        product_id=chosen[0].product_id,
+    )
+
+
 def match_lines(
     invoice: InvoiceData,
     po: PurchaseOrderRecord,
     policy: PolicyConfig,
     *,
     excluded_by_line: Mapping[int, Decimal] | None = None,
+    llm_mapping: Mapping[int, int] | None = None,
 ) -> LinesResult:
-    """BR-07 to BR-09 for every invoice line against the established PO."""
+    """BR-07 to BR-09 for every invoice line against the established PO.
+
+    ``llm_mapping`` maps invoice line numbers to PO line ids, already validated by the caller.
+    """
     excluded_by_line = excluded_by_line or {}
+    llm_mapping = llm_mapping or {}
     by_id = {pl.id: pl for pl in po.lines}
     used: dict[int, Decimal] = defaultdict(Decimal)
     matches: list[LineMatch] = []
     findings: list[Finding] = []
     for index, line in enumerate(invoice.lines, start=1):
-        match = map_line(index, line, po)
+        match = _mapped_by_llm(index, line_match := map_line(index, line, po), po, llm_mapping)
         matches.append(match)
+        if match is not line_match and match.po_line_id is not None:
+            findings.append(
+                Finding(
+                    rule=RULE_MAPPING,
+                    message=(
+                        f"Baris {index} dipetakan LLM: '{line.description}' → "
+                        f"{by_id[match.po_line_id].product_name}."
+                    ),
+                )
+            )
         if match.status != "matched" or match.po_line_id is None:
             problem: Literal["no_match", "ambiguous"] = (
                 "ambiguous" if match.status == "ambiguous" else "no_match"

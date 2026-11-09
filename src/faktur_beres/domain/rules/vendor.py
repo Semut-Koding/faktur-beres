@@ -42,6 +42,7 @@ class VendorStatus(StrEnum):
     NOT_REGISTERED = "not_registered"
     AMBIGUOUS = "ambiguous"
     CONFLICT = "conflict"
+    UNREAD = "unread"  # the document could not be read, so no identification was attempted
 
 
 class VendorIdentification(DomainModel):
