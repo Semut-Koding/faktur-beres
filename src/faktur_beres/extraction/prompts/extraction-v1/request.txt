@@ -1,0 +1,1 @@
+Salin isi faktur pada berkas terlampir ke JSON sesuai skema.
