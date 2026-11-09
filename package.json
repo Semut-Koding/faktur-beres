@@ -21,6 +21,7 @@
     "gen:faktur": "uv run python -m faktur_beres.generator tulis",
     "gen:periksa": "uv run python -m faktur_beres.generator periksa",
     "eval:orakel": "uv run python -m faktur_beres.evals.orakel",
+    "eval:injeksi": "uv run python -m faktur_beres.evals.injeksi",
     "llm:model": "uv run python -m faktur_beres.llm.models",
     "lint": "uv run ruff check . && uv run ruff format --check .",
     "typecheck": "uv run mypy --strict",

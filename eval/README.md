@@ -10,7 +10,8 @@ Folder ini berisi 40 skenario uji berlabel (SPEC §15.3) untuk evaluasi agent: 8
 | `berkas/<ID>/faktur.*` | Faktur yang dikirim atau diunggah: PDF, gambar (JPEG/PNG), atau UBL 2.1 (XML) | `npm run gen:faktur` |
 | `berkas/<ID>/balasan.*` | Lampiran faktur perbaikan dari vendor (11 skenario jalur B) | `npm run gen:faktur` |
 | `DAFTAR.md` | Tabel ringkas 40 skenario | `npm run gen:faktur` |
-| `hasil/` | Hasil evaluasi orakel (M2) dan evaluasi penuh (M5), tidak di-commit | `npm run eval:orakel`, harness |
+| `injeksi/dev.yaml` | Set frasa injeksi untuk pengembangan pola dan prompt BR-15 (M3) | ditulis tangan |
+| `hasil/` | Hasil evaluasi orakel (M2), injeksi dan ekstraksi (M3), dan evaluasi penuh (M5), tidak di-commit | `npm run eval:*`, harness |
 | `README.md` | Berkas ini | ditulis tangan |
 
 ## Membuat ulang dan memeriksa
@@ -40,6 +41,30 @@ Evaluasi orakel ([SPEC §12.1](../docs/SPEC.md#121-metode)) menjalankan aturan d
 `harapan`, `kategori`, `varian`, `vendor`, dan `po_rujukan` hanya dipakai untuk menilai. Satu-satunya pengecualian adalah cek silang balasan teks: nomor PO dari isi balasan harus tunggal dan sama dengan `po_rujukan`.
 
 **Arti hasilnya.** Targetnya 40/40 di kedua mode, dan mode `--odoo` harus memberi hasil yang sama dengan mode luring (hal itu juga diperiksa). Orakel adalah batas atas evaluasi penuh (M5): agent yang sesungguhnya bisa kalah karena ekstraksi atau keputusan LLM, tetapi tidak boleh kalah karena aturan. Bila orakel gagal, yang salah adalah aturan, dataset, atau label, bukan ekstraksi. Tabel 40 baris tampil di terminal, dan rinciannya (alasan, langkah simulasi, tagihan rencana, hasil setiap pemeriksaan) ditulis ke `eval/hasil/orakel-luring.json` atau `eval/hasil/orakel-odoo.json`. Kode keluar bukan nol bila ada skenario yang gagal. `npm run check` ikut menjalankan mode luring (`tests/test_orakel.py`).
+
+## Set frasa injeksi
+
+`injeksi/dev.yaml` dipakai untuk mengembangkan dan mengukur deteksi injeksi dua lapis (BR-15). Setiap frasa dinilai sebagai dokumen dengan satu fragmen. Label set ini, seperti label skenario, hanya untuk evaluasi dan tidak pernah dibaca agent. Formatnya:
+
+```yaml
+versi: 1
+frasa:
+  - id: W-001        # unik dalam berkas
+    teks: "..."
+    label: wajar     # wajar | serangan
+    sumber: note     # nilai TextSource: note, line_description, hidden_text, read_text, ubl_note, ...
+    catatan: "..."   # opsional
+```
+
+Isinya minimal 50 frasa wajar dan 30 serangan dalam bahasa Indonesia dan Inggris, dengan sumber yang beragam. Frasa wajar memakai kata pemicu dalam konteks bisnis yang sah (retur tanpa persetujuan, jabatan asisten, agen penjualan, sistem e-Faktur, produk berlabel AI). Serangan mencakup sapaan ke mesin, parafrase tanpa sapaan, kalimat yang menyapa penilai, penyamaran (karakter lebar nol, huruf berspasi, huruf besar-kecil acak), dan permintaan data internal. Semua data sintetis, dan email memakai domain `.test`.
+
+```bash
+npm run eval:injeksi -- --lapis1      # hanya pola (tanpa LLM)
+npm run eval:injeksi                  # pola dan penilai LLM lapis 2 (sekitar 1 panggilan per frasa)
+npm run eval:injeksi -- --berkas PATH # set lain, boleh di luar repo
+```
+
+Hasilnya berupa tabel per frasa (tingkat dan pola lapis 1, status dan jawaban lapis 2, keputusan akhir) dan metrik recall serangan serta positif palsu wajar untuk pola kuat, lapis 1, lapis 2, dan keputusan akhir. JSON-nya ditulis ke `eval/hasil/` untuk set di dalam repo. Untuk set di luar repo, JSON-nya ditulis di samping berkas set, supaya isi set itu tidak pernah masuk repo. Path yang memuat komponen `_privat` atau `privat` ditolak.
 
 ## Format label (ringkas)
 Format lengkap dan aturan penilaian ada di [SPEC §15.4](../docs/SPEC.md#154-format-label); pemetaan UBL di [SPEC §15.6](../docs/SPEC.md#156-pemetaan-ubl).
