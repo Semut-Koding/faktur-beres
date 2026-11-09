@@ -7,7 +7,6 @@ on empty recordsets, record-rule level on seed records). Nothing is created, del
 the refusals themselves are exercised by ``npm run test:integrasi``.
 """
 
-import ast
 import re
 import sys
 from collections import Counter
@@ -15,8 +14,9 @@ from collections.abc import Callable, Iterable
 from datetime import datetime, timedelta
 from typing import Any
 
-from faktur_beres.config import REPO_ROOT, Settings
+from faktur_beres.config import Settings
 from faktur_beres.dataset import Dataset, get_dataset
+from faktur_beres.devtools.addon import ADDON, manifest_version
 from faktur_beres.odoo import OdooClient, OdooError
 from faktur_beres.seed.common import SeedError, XmlIds, admin_client, m2o_id
 from faktur_beres.seed.init import AGENT_GROUPS, API_KEY_DAYS, access_params
@@ -51,8 +51,7 @@ LEAK_FIELDS = {
     "account.tax": ["name", "description", "invoice_label"],
     "mail.message": ["subject", "body"],
 }
-AGENT_ADDON = "faktur_beres_agent"
-AGENT_MANIFEST = REPO_ROOT / "infra" / "odoo" / "addons" / AGENT_ADDON / "__manifest__.py"
+AGENT_ADDON = ADDON
 INBOX_GROUP = "mail.group_mail_notification_type_inbox"
 #: Groups that would give the agent posting rights or rules over all vendor bills (M2.1).
 FORBIDDEN_AGENT_GROUPS = (
@@ -99,11 +98,6 @@ AGENT_RULE_CLOSED = {
     "account.move": "buat dan ubah hanya draft in_invoice buatan agent",
     "account.move.line": "buat dan ubah hanya di draft itu",
 }
-
-
-def manifest_version(path=AGENT_MANIFEST) -> str:
-    """The addon version written in the repository (installed one must be the same)."""
-    return ast.literal_eval(path.read_text(encoding="utf-8"))["version"]
 
 
 def judge_operations(allowed: Iterable[str], expected: Iterable[str]) -> tuple[str, bool]:
