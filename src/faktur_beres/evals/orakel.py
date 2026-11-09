@@ -304,37 +304,49 @@ class Simulator:
 # -- scoring ----------------------------------------------------------------------------------
 
 
-def score(label: Label, outcome: Outcome, policy: PolicyConfig) -> Score:
+def first_stop_checks(label: Label, outcome: Outcome) -> list[Check]:
+    """SPEC §15.4 at the first stop: route, reasons, new bills and vendor e-mail so far."""
     h = label.harapan
-    checks: list[Check] = []
+    actual = {r.value for r in outcome.reasons}
+    required, extra = set(h.alasan_wajib), set(h.alasan_boleh_tambahan)
+    want_before = tuple(sorted((e.ke, e.jumlah) for e in h.sebelum_simulasi.email_keluar))
+    return [
+        Check(
+            name="jalur_awal",
+            ok=outcome.initial_route.value == h.jalur_awal,
+            detail=f"{outcome.initial_route.value} (harapan {h.jalur_awal})",
+        ),
+        Check(
+            name="alasan",
+            ok=required <= actual <= required | extra,
+            detail=f"{sorted(actual)} (wajib {sorted(required)}, boleh {sorted(extra)})",
+        ),
+        Check(
+            name="tagihan_baru",
+            ok=outcome.bills_before == h.sebelum_simulasi.tagihan_baru,
+            detail=f"{outcome.bills_before} (harapan {h.sebelum_simulasi.tagihan_baru})",
+        ),
+        Check(
+            name="email_keluar",
+            ok=outcome.emails_before == want_before,
+            detail=f"{outcome.emails_before}",
+        ),
+    ]
+
+
+def score(label: Label, outcome: Outcome, policy: PolicyConfig) -> Score:
+    """SPEC §15.4 at the end of a run; ``eval:orakel`` and ``eval:graph`` share it."""
+    h = label.harapan
+    checks = first_stop_checks(label, outcome)
 
     def check(name: str, ok: bool, detail: str) -> None:
         checks.append(Check(name=name, ok=ok, detail=detail))
 
     check(
-        "jalur_awal",
-        outcome.initial_route.value == h.jalur_awal,
-        f"{outcome.initial_route.value} (harapan {h.jalur_awal})",
-    )
-    actual = {r.value for r in outcome.reasons}
-    required, extra = set(h.alasan_wajib), set(h.alasan_boleh_tambahan)
-    check(
-        "alasan",
-        required <= actual <= required | extra,
-        f"{sorted(actual)} (wajib {sorted(required)}, boleh {sorted(extra)})",
-    )
-    check(
         "status_akhir",
         outcome.final_status.value == h.status_akhir,
         f"{outcome.final_status.value} (harapan {h.status_akhir})",
     )
-    check(
-        "tagihan_baru",
-        outcome.bills_before == h.sebelum_simulasi.tagihan_baru,
-        f"{outcome.bills_before} (harapan {h.sebelum_simulasi.tagihan_baru})",
-    )
-    want_before = tuple(sorted((e.ke, e.jumlah) for e in h.sebelum_simulasi.email_keluar))
-    check("email_keluar", outcome.emails_before == want_before, f"{outcome.emails_before}")
     want_total = tuple(sorted((e.ke, e.jumlah) for e in h.email_keluar_total))
     check("email_keluar_total", outcome.emails_total == want_total, f"{outcome.emails_total}")
 
