@@ -97,7 +97,7 @@
 - MVP memakai satu proses API yang menjalankan graph di latar. Karena state ada di PostgreSQL, worker bisa dipisah dan ditambah tanpa mengubah graph.
 
 ### 3.4 Keterlacakan aturan
-Setiap aturan yang dihitung kode punya tes bertanda `@pytest.mark.aturan("BR-xx")`. Daftar aturannya adalah konstanta `faktur_beres.domain.rules.CODE_RULES`, dan `tests/test_traceability.py` memastikan tiap BR di daftar itu punya minimal satu tes. Jumlah di bawah dihitung saat M3 selesai (9 November 2026): fungsi tes, dan kasus setelah parametrisasi. Seluruhnya ada 1.104 kasus tes unit, ditambah 13 tes integrasi dan 2 tes smoke LLM.
+Setiap aturan yang dihitung kode punya tes bertanda `@pytest.mark.aturan("BR-xx")`. Daftar aturannya adalah konstanta `faktur_beres.domain.rules.CODE_RULES`, dan `tests/test_traceability.py` memastikan tiap BR di daftar itu punya minimal satu tes. Jumlah di bawah dihitung saat M3 selesai (9 November 2026): fungsi tes, dan kasus setelah parametrisasi. Seluruhnya ada 1.112 kasus tes unit, ditambah 13 tes integrasi dan 2 tes smoke LLM.
 
 | BR | Fungsi atau modul | Berkas tes | Tes (kasus) |
 |---|---|---|---|
@@ -114,7 +114,7 @@ Setiap aturan yang dihitung kode punya tes bertanda `@pytest.mark.aturan("BR-xx"
 | BR-12 | `rules/bank.py`: `check_bank_account` (nama bank dibandingkan dengan bank terdaftar); `normalize.bank_name_key` | `test_rule_bank.py` | 9 (14) |
 | BR-13 | `rules/policy_checks.py`: `check_threshold` | `test_rule_policy_checks.py` | 1 (4) |
 | BR-14 | `rules/policy_checks.py`: `check_new_vendor` | `test_rule_policy_checks.py` | 3 (3) |
-| BR-15 | `rules/injection.py`: `PATTERNS` kuat dan lemah, `judge_injection`, `document_fragments`; `tools/injection_review.py` (lapis kedua) | `test_rule_injection.py`, `test_rule_injection_layers.py`, `test_tool_injection_review.py` | 34 (92) |
+| BR-15 | `rules/injection.py`: `PATTERNS` kuat dan lemah, `judge_injection`, `document_fragments`; `tools/injection_review.py` (lapis kedua) | `test_rule_injection.py`, `test_rule_injection_layers.py`, `test_tool_injection_review.py` | 36 (97) |
 | BR-16 | `rules/routing.py`: `priority_route`, `initial_status` | `test_rule_routing.py` | 2 (6) |
 | BR-17 | `rules/routing.py`: `allowed_routes`, `default_route`, `guard_route` | `test_rule_routing.py` | 4 (15) |
 | BR-18 | `rules/bill_plan.py`: `plan_bill`, `BillPlan`; `tools/odoo_tools.py`: `create_draft_bill`, `verify_bill` | `test_rule_bill_plan.py` (+ `test_odoo_tools_draft.py`, `test_integrasi_draft.py`) | 5 (5) |
