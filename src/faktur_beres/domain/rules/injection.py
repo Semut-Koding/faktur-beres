@@ -303,34 +303,181 @@ def scan_text(text: str) -> list[tuple[InjectionPattern, re.Match[str]]]:
     return [(p, m) for p, rx in _COMPILED if (m := rx.search(cleaned))]
 
 
-def scan_fragments(fragments: Iterable[TextFragment]) -> tuple[Finding, ...]:
-    """One ``prompt_injection`` finding per fragment that matches any pattern."""
+def _hits(fragment: TextFragment) -> list[tuple[InjectionPattern, re.Match[str]]]:
+    return scan_text(fragment.text)
+
+
+def has_strong_pattern(fragments: Iterable[TextFragment]) -> bool:
+    """True when layer 1 alone already decides C5; the caller may skip the reviewer then."""
+    return any(p.tier == "strong" for f in fragments for p, _ in _hits(f))
+
+
+def _layer1_finding(
+    fragment: TextFragment,
+    hits: Sequence[tuple[InjectionPattern, re.Match[str]]],
+    *,
+    reason: ReasonCode | None,
+    review_status: str | None,
+    verdict: str,
+) -> Finding:
+    cleaned = clean_text(fragment.text)
+    first = min(hits, key=lambda h: h[1].start())[1]
+    quote = _quote(cleaned, first.start(), first.end())
+    tier: Tier = "strong" if any(p.tier == "strong" for p, _ in hits) else "weak"
+    where = f" ({fragment.where})" if fragment.where else ""
+    text = "Instruksi kepada sistem" if reason is not None else "Pola lemah"
+    return Finding(
+        rule=RULE,
+        reason=reason,
+        message=f'{text} di {fragment.source.value}{where}: "{quote}" ({verdict}).',
+        evidence=InjectionEvidence(
+            source=fragment.source.value,
+            where=fragment.where,
+            patterns=tuple(p.name for p, _ in hits),
+            categories=tuple(c for c in CATEGORIES if any(p.category == c for p, _ in hits)),
+            quote=quote,
+            layer=1,
+            tier=tier,
+            review_status=review_status,
+        ),
+    )
+
+
+class InjectionJudgement(DomainModel):
+    findings: tuple[Finding, ...]
+    awaiting_review: bool = False  # no pattern and no layer-2 answer yet: route A must wait (M4)
+
+
+def judge_injection(
+    fragments: Sequence[TextFragment], review: "InjectionReview | None"
+) -> InjectionJudgement:
+    """BR-15 (SPEC 0.4): layer 1 and the layer-2 review together.
+
+    ==========================  =========================================================
+    a strong pattern            C5 (the reviewer is not needed)
+    review ok, yes              C5 with the verified quotes
+    review ok, no               weak patterns become notes
+    review unavailable/invalid  weak patterns become C5 (fail-safe); without any pattern a
+                                note, and route A waits until layer 2 succeeds
+    review too_long             C5
+    no review (None)            layer 2 was not run on purpose: weak patterns become C5
+    ==========================  =========================================================
+    """
+    status = review.status.value if review is not None else None
     findings: list[Finding] = []
+    any_pattern = False
     for fragment in fragments:
-        hits = scan_text(fragment.text)
+        hits = _hits(fragment)
         if not hits:
             continue
-        cleaned = clean_text(fragment.text)
-        first = min(hits, key=lambda h: h[1].start())[1]
-        quote = _quote(cleaned, first.start(), first.end())
-        names = tuple(p.name for p, _ in hits)
-        categories = tuple(c for c in CATEGORIES if any(p.category == c for p, _ in hits))
-        where = f" ({fragment.where})" if fragment.where else ""
+        any_pattern = True
+        if any(p.tier == "strong" for p, _ in hits):
+            findings.append(
+                _layer1_finding(
+                    fragment,
+                    hits,
+                    reason=ReasonCode.PROMPT_INJECTION,
+                    review_status=status,
+                    verdict="lapis 1, pola kuat",
+                )
+            )
+        elif review is None:
+            findings.append(
+                _layer1_finding(
+                    fragment,
+                    hits,
+                    reason=ReasonCode.PROMPT_INJECTION,
+                    review_status=None,
+                    verdict="lapis 1, pola lemah; lapis 2 tidak dijalankan",
+                )
+            )
+        elif review.status is ReviewStatus.OK and not review.injection:
+            findings.append(
+                _layer1_finding(
+                    fragment,
+                    hits,
+                    reason=None,
+                    review_status=status,
+                    verdict="lapis 2 menilai bukan injeksi",
+                )
+            )
+        else:
+            verdict = {
+                ReviewStatus.OK: "lapis 1, pola lemah; lapis 2 menilai injeksi",
+                ReviewStatus.UNAVAILABLE: "lapis 1, pola lemah; lapis 2 tidak tersedia, gagal aman",
+                ReviewStatus.INVALID: "lapis 1, pola lemah; jawaban lapis 2 tidak sah, gagal aman",
+                ReviewStatus.TOO_LONG: "lapis 1, pola lemah; teks melebihi batas lapis 2",
+            }[review.status]
+            findings.append(
+                _layer1_finding(
+                    fragment,
+                    hits,
+                    reason=ReasonCode.PROMPT_INJECTION,
+                    review_status=status,
+                    verdict=verdict,
+                )
+            )
+    awaiting = False
+    if review is not None and review.says_injection:
+        for quote in review.quotes:
+            where = f" ({quote.where})" if quote.where else ""
+            findings.append(
+                Finding(
+                    rule=RULE,
+                    reason=ReasonCode.PROMPT_INJECTION,
+                    message=(
+                        f"Penilai lapis 2 menilai ada instruksi kepada sistem di "
+                        f'{quote.source.value}{where}: "{quote.text}".'
+                    ),
+                    evidence=InjectionEvidence(
+                        source=quote.source.value,
+                        where=quote.where,
+                        patterns=(),
+                        categories=(),
+                        quote=quote.text,
+                        layer=2,
+                        review_status=status,
+                    ),
+                )
+            )
+    elif review is not None and review.status is ReviewStatus.TOO_LONG:
         findings.append(
             Finding(
                 rule=RULE,
                 reason=ReasonCode.PROMPT_INJECTION,
-                message=f'Instruksi kepada sistem di {fragment.source.value}{where}: "{quote}"',
+                message="Teks bebas dokumen melebihi batas penilaian lapis 2; dianggap injeksi.",
                 evidence=InjectionEvidence(
-                    source=fragment.source.value,
-                    where=fragment.where,
-                    patterns=names,
-                    categories=categories,
-                    quote=quote,
+                    source="dokumen",
+                    where=None,
+                    patterns=(),
+                    categories=(),
+                    quote="",
+                    layer=2,
+                    review_status=status,
                 ),
             )
         )
-    return tuple(findings)
+    elif (
+        review is not None
+        and review.status in (ReviewStatus.UNAVAILABLE, ReviewStatus.INVALID)
+        and not any_pattern
+    ):
+        awaiting = True
+        findings.append(
+            Finding(
+                rule=RULE,
+                message=(
+                    f"Penilai lapis 2 {status}; tidak ada pola injeksi. "
+                    "Jalur A menunggu lapis 2 berhasil."
+                ),
+            )
+        )
+    return InjectionJudgement(findings=tuple(findings), awaiting_review=awaiting)
+
+
+def scan_fragments(fragments: Iterable[TextFragment]) -> tuple[Finding, ...]:
+    """Layer 1 alone (no reviewer): every fragment with a pattern is ``prompt_injection``."""
+    return judge_injection(tuple(fragments), None).findings
 
 
 def invoice_fragments(invoice: InvoiceData) -> list[TextFragment]:

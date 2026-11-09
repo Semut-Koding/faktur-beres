@@ -166,12 +166,17 @@ class NewVendorEvidence(DomainModel):
 
 
 class InjectionEvidence(DomainModel):
+    """BR-15: where the instruction is, which layer found it, and what layer 2 said."""
+
     kind: Literal["injection"] = "injection"
     source: str
     where: str | None
     patterns: tuple[str, ...]
     categories: tuple[str, ...]
     quote: str
+    layer: Literal[1, 2] = 1
+    tier: Literal["strong", "weak"] | None = None  # the strongest pattern tier (layer 1)
+    review_status: str | None = None  # layer 2: ok, unavailable, invalid, too_long; None = not run
 
 
 class ExtractionEvidence(DomainModel):

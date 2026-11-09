@@ -29,7 +29,11 @@ from faktur_beres.domain.rules.arithmetic import check_arithmetic
 from faktur_beres.domain.rules.bank import check_bank_account
 from faktur_beres.domain.rules.bill_plan import BillPlan, plan_bill
 from faktur_beres.domain.rules.duplicates import DuplicateResult, find_duplicates
-from faktur_beres.domain.rules.injection import invoice_fragments, merge_fragments, scan_fragments
+from faktur_beres.domain.rules.injection import (
+    InjectionReview,
+    document_fragments,
+    judge_injection,
+)
 from faktur_beres.domain.rules.lines import LinesResult, match_lines
 from faktur_beres.domain.rules.policy_checks import check_new_vendor, check_threshold
 from faktur_beres.domain.rules.purchase_order import (
@@ -65,6 +69,9 @@ class AnalysisResult(DomainModel):
     policy: StepResult
     reasons: tuple[ReasonCode, ...]
     allowed_routes: tuple[Route, ...]
+    # BR-15: no injection pattern, and layer 2 has not answered yet (unavailable or invalid).
+    # Route A must wait until layer 2 succeeds (M4); routes B and C are not affected.
+    injection_awaiting_review: bool = False
     default_route: Route
     bill_plan: BillPlan | None
     notes: tuple[str, ...]
@@ -123,12 +130,16 @@ def analyse(
     *,
     registry: InvoiceRegistry | None = None,
     po_number_from_reply: str | None = None,
+    injection_review: InjectionReview | None = None,
 ) -> AnalysisResult:
     """Run every rule on one invoice and compute reasons, routes, and the bill plan.
 
     ``fragments`` are the free texts around the invoice (hidden text, PDF text layer, e-mail, ...);
     the invoice's own notes and line descriptions are added here. ``po_number_from_reply`` is a PO
     number the vendor gave in a text reply (F-06); BR-06 then looks that number up.
+    ``injection_review`` is the layer-2 answer of BR-15 for exactly ``document_fragments(invoice,
+    fragments)``; ``None`` means layer 2 was not run on purpose (oracle, rule tests), and weak
+    patterns then count as injection.
     """
     registry = registry or NoOtherInvoices()
 
@@ -190,9 +201,8 @@ def analyse(
         tax_findings.append(identity)
     tax = StepResult(findings=tuple(tax_findings))
 
-    injection = StepResult(
-        findings=scan_fragments(merge_fragments(fragments, invoice_fragments(invoice)))
-    )
+    judgement = judge_injection(document_fragments(invoice, fragments), injection_review)
+    injection = StepResult(findings=judgement.findings)
     policy_step = StepResult(
         findings=tuple(
             f
@@ -231,6 +241,7 @@ def analyse(
         policy=policy_step,
         reasons=reasons,
         allowed_routes=allowed,
+        injection_awaiting_review=judgement.awaiting_review,
         default_route=default_route(allowed),
         bill_plan=plan,
         notes=tuple(f.message for f in every if f.is_note),
