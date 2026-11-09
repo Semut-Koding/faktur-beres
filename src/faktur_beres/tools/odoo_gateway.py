@@ -12,13 +12,18 @@ It wraps the M0 JSON-2 client with the **agent** key and allows a short list of 
   vendor bill the agent itself created (checked through Odoo's own record rule: the agent may write
   only its own drafts, so ``has_access("write")`` answers the question).
 
-Anything else raises ``ForbiddenOperation`` before a request is sent. Every call carries the context
-``{"lang": "id_ID", "tz": "Asia/Jakarta"}``; callers cannot override it. Creating an attachment adds
-``image_no_postprocess``, because Odoo otherwise shrinks images above 1920 px and re-encodes them
-(``ir.attachment._postprocess_contents``), and the original invoice file must be kept as received.
-Odoo errors become typed tool errors; only reads are retried (by the client). Each call is logged
-as one structured record (model, method, masked parameters per BR-24, duration, status) on the
-``faktur_beres.tools.odoo`` logger; storing it in ``audit_log`` is M4.
+Anything else raises ``ForbiddenOperation`` before a request is sent. The generic ``call()`` entry
+(for tool calling in M4) only reads: ``search_read`` (``limit`` 50 by default, at most 200),
+``read`` (at most 200 ids), and ``search_count``; ``order`` may only name allowed fields. Bills,
+attachments, and notes are written only through ``odoo_tools`` (BR-18 plan, BR-22 key).
+
+Every call carries the context ``{"lang": "id_ID", "tz": "Asia/Jakarta"}``; callers cannot override
+it. Creating an attachment adds ``image_no_postprocess``, because Odoo otherwise shrinks images
+above 1920 px and re-encodes them (``ir.attachment._postprocess_contents``), and the original
+invoice file must be kept as received. Odoo errors become typed tool errors; only reads are retried
+(by the client). Each call is logged as one structured record (model, method, masked parameters per
+BR-24, duration, status) on the ``faktur_beres.tools.odoo`` logger; storing it in ``audit_log`` is
+M4.
 
 Odoo still enforces the rights on its side (addon ``faktur_beres_agent``); the gateway is the second
 fence, not the only one.
@@ -26,6 +31,7 @@ fence, not the only one.
 
 import base64
 import logging
+import re
 import time
 from collections.abc import Mapping, Sequence
 from decimal import Decimal
@@ -176,6 +182,18 @@ BILL_LINE_FIELDS: frozenset[str] = frozenset(
     }
 )
 NOTE_SUBTYPE = "mail.mt_note"
+#: Limits of the generic read-only ``call()`` entry.
+CALL_LIMIT_DEFAULT = 50
+CALL_LIMIT_MAX = 200
+CALL_READ_MAX_IDS = 200
+CALL_PARAMETERS: Mapping[str, frozenset[str]] = MappingProxyType(
+    {
+        "search_read": frozenset({"domain", "fields", "limit", "order"}),
+        "read": frozenset({"ids", "fields"}),
+        "search_count": frozenset({"domain"}),
+    }
+)
+_ORDER_TERM = re.compile(r"^\s*([a-z_][a-z0-9_]*)(?:\s+(asc|desc))?\s*$", re.IGNORECASE)
 
 
 def _forbid(message: str, model: str, method: str) -> ForbiddenOperation:
@@ -248,6 +266,14 @@ class AgentOdooGateway:
             raise _forbid(f"field tidak diizinkan untuk {model}: {', '.join(bad)}", model, method)
 
     @staticmethod
+    def _check_order(model: str, method: str, order: str) -> None:
+        """``order`` may only be ``field [asc|desc]`` terms over the model's readable fields."""
+        for term in order.split(","):
+            match = _ORDER_TERM.match(term)
+            if match is None or match.group(1) not in READ_FIELDS[model]:
+                raise _forbid(f"urutan tidak diizinkan: {order!r}", model, method)
+
+    @staticmethod
     def _check_bill_values(values: Mapping[str, Any]) -> None:
         model, method = "account.move", "create"
         unknown = sorted(set(values) - BILL_FIELDS)
@@ -316,6 +342,7 @@ class AgentOdooGateway:
         if limit is not None:
             kwargs["limit"] = limit
         if order is not None:
+            self._check_order(model, "search_read", order)
             kwargs["order"] = order
         result: list[dict[str, Any]] = self._send(model, "search_read", **kwargs)
         return result
@@ -401,31 +428,48 @@ class AgentOdooGateway:
     # -- the generic entry for tool calling (M4) --------------------------------------------------
 
     def call(self, model: str, method: str, **kwargs: Any) -> Any:
-        """Dispatch an allowed operation by name; everything else is refused without a request."""
-        allowed = {
-            "search_read": {"domain", "fields", "limit", "order"},
-            "read": {"ids", "fields"},
-            "search_count": {"domain"},
-            "create": {"vals_list"},
-        }
-        if method not in allowed or (method == "create" and model != "account.move"):
-            raise _forbid(f"operasi {model}/{method} tidak diizinkan untuk agent", model, method)
-        extra = sorted(set(kwargs) - allowed[method])
+        """The read-only entry for tool calling: ``search_read``, ``read``, ``search_count``.
+
+        Everything else, including ``create``, ``write``, ``unlink``, and action methods, is
+        refused before a request is sent. ``search_read`` returns at most ``CALL_LIMIT_MAX`` rows
+        (``CALL_LIMIT_DEFAULT`` when no limit is given) and ``read`` takes at most
+        ``CALL_READ_MAX_IDS`` ids.
+        """
+        if method not in CALL_PARAMETERS:
+            raise _forbid(
+                f"operasi {model}/{method} tidak diizinkan: pintu call() hanya membaca",
+                model,
+                method,
+            )
+        extra = sorted(set(kwargs) - CALL_PARAMETERS[method])
         if extra:
             raise _forbid(f"parameter tidak diizinkan: {', '.join(extra)}", model, method)
         if method == "search_read":
+            limit = kwargs.get("limit", CALL_LIMIT_DEFAULT)
+            if (
+                isinstance(limit, bool)
+                or not isinstance(limit, int)
+                or not 1 <= limit <= CALL_LIMIT_MAX
+            ):
+                raise _forbid(
+                    f"limit harus 1 sampai {CALL_LIMIT_MAX}, bukan {limit!r}", model, method
+                )
             return self.search_read(
                 model,
                 kwargs.get("domain", []),
                 kwargs.get("fields", ()),
-                limit=kwargs.get("limit"),
+                limit=limit,
                 order=kwargs.get("order"),
             )
         if method == "read":
-            return self.read(model, kwargs.get("ids", ()), kwargs.get("fields", ()))
-        if method == "search_count":
-            return self.search_count(model, kwargs.get("domain", []))
-        vals = kwargs.get("vals_list")
-        if not isinstance(vals, list) or len(vals) != 1 or not isinstance(vals[0], Mapping):
-            raise _forbid("buat tepat satu tagihan per panggilan", model, method)
-        return self.create_vendor_bill(vals[0])
+            ids = kwargs.get("ids", ())
+            if not isinstance(ids, list | tuple) or not all(
+                isinstance(i, int) and not isinstance(i, bool) for i in ids
+            ):
+                raise _forbid("ids harus daftar bilangan bulat", model, method)
+            if len(ids) > CALL_READ_MAX_IDS:
+                raise _forbid(
+                    f"read paling banyak {CALL_READ_MAX_IDS} id, bukan {len(ids)}", model, method
+                )
+            return self.read(model, ids, kwargs.get("fields", ()))
+        return self.search_count(model, kwargs.get("domain", []))

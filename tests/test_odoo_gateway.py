@@ -57,6 +57,20 @@ FORBIDDEN_CALLS = [
     ("account.move", "read", {"ids": [1], "fields": ["id", "line_ids"]}),
     ("account.move", "search_read", {"domain": [], "fields": ["id"], "context": {"lang": "en"}}),
     ("account.move", "create", {"vals_list": [bill_values(), bill_values()]}),
+    # M3.1: the generic entry only reads; bills come from create_draft_bill only.
+    ("account.move", "create", {"vals_list": [bill_values()]}),
+    ("ir.attachment", "create", {"vals_list": [{"name": "x"}]}),
+    ("account.move", "message_post", {"ids": [1], "body": "x"}),
+    ("account.move", "fields_get", {"attributes": ["type"]}),
+    ("account.move", "has_access", {"ids": [1], "operation": "write"}),
+    ("account.move", "search_read", {"domain": [], "fields": ["id"], "limit": 201}),
+    ("account.move", "search_read", {"domain": [], "fields": ["id"], "limit": 0}),
+    ("account.move", "search_read", {"domain": [], "fields": ["id"], "limit": "50"}),
+    ("account.move", "read", {"ids": list(range(1, 202)), "fields": ["id"]}),
+    ("account.move", "read", {"ids": ["1"], "fields": ["id"]}),
+    ("account.move", "search_read", {"domain": [], "fields": ["id"], "order": "line_ids desc"}),
+    ("account.move", "search_read", {"domain": [], "fields": ["id"], "order": "id; drop"}),
+    ("account.move", "search_read", {"domain": [], "fields": ["id"], "order": "id sideways"}),
 ]
 
 
@@ -236,3 +250,24 @@ def test_from_settings_needs_the_agent_key() -> None:
     settings = Settings(_env_file=None, odoo_agent_api_key=None, odoo_admin_api_key="admin-key-x")
     with pytest.raises(ToolError):
         AgentOdooGateway.from_settings(settings)
+
+
+def test_call_reads_with_default_and_maximum_limits() -> None:
+    fake = FakeOdoo({"account.move/search_read": [], "account.move/read": []})
+    gw = gateway(fake)
+    gw.call("account.move", "search_read", domain=[], fields=["id"])
+    gw.call(
+        "account.move", "search_read", domain=[], fields=["id"], limit=200, order="name desc, id"
+    )
+    gw.call("account.move", "read", ids=list(range(1, 201)), fields=["id"])
+    bodies = [b for _, b in fake.requests]
+    assert bodies[0]["limit"] == 50
+    assert (bodies[1]["limit"], bodies[1]["order"]) == (200, "name desc, id")
+    assert len(bodies[2]["ids"]) == 200
+
+
+def test_typed_search_read_checks_order_too() -> None:
+    fake = FakeOdoo()
+    with pytest.raises(ForbiddenOperation):
+        gateway(fake).search_read("account.move", [], ["id"], order="needed_terms")
+    assert fake.requests == []
