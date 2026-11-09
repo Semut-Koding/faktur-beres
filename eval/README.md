@@ -86,7 +86,7 @@ npm run eval:ekstraksi -- --banding --model kuat   # uji banding: 10 dokumen tet
 npm run eval:ekstraksi -- --lanjut RUN        # lanjutkan run yang terputus (kuota habis, --maks-panggilan)
 ```
 
-**Penyimpangan label yang diketahui.** Kebenaran label 40 skenario selalu memuat email pembeli (`ap@arunika.test`), padahal PDF dan gambar tidak mencetaknya; hanya UBL yang menuliskannya. Perencana memastikan 34 PDF berlapisan teks tidak mencetak email pembeli. Karena itu `pembeli.email` hanya dinilai pada dokumen UBL. Field ini tidak kritis. Labelnya diperbaiki di M4.0 dengan persetujuan pemilik.
+**Catatan label (10 November 2026).** Label versi 1 selalu memuat email pembeli, padahal PDF dan gambar tidak mencetaknya. Di label versi 2, `pembeli.email` hanya terisi bila renderer mencetaknya (saat ini hanya UBL) dan bernilai `null` pada PDF dan gambar; berkas dokumen tidak berubah. `eval:ekstraksi` kini menilai field itu pada semua format. Hasil run sebelum tanggal ini memakai label versi 1 dan aturan lama.
 
 Hasil setiap run ditulis ke `eval/hasil/ekstraksi/<run>.json` setelah setiap dokumen, sehingga run yang terputus bisa dilanjutkan. Cache mati, kecuali dengan `--pakai-cache` untuk pengembangan; jawaban dari cache ditandai. Alat ini hanya membaca berkas di dalam repo, dan menolak path dengan komponen `_privat` atau `privat`. Nama berkas tidak dikirim ke LLM. Panggilan dalam jumlah banyak hanya dijalankan setelah pemilik setuju (kuota tier gratis).
 

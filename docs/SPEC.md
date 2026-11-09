@@ -2,8 +2,8 @@
 
 | | |
 |---|---|
-| Versi | 0.4 (riwayat di [§16](#16-riwayat-versi)) |
-| Tanggal | 9 November 2026 |
+| Versi | 0.5 (riwayat di [§16](#16-riwayat-versi)) |
+| Tanggal | 10 November 2026 |
 | Status | Disetujui pemilik produk. Diturunkan dari proposal bagian 1–9 yang disetujui 5 November 2026. |
 | Rencana teknis | [`RENCANA-TEKNIS.md`](RENCANA-TEKNIS.md) |
 | Catatan keputusan | [`adr/`](adr/README.md) |
@@ -698,7 +698,7 @@ Satu berkas YAML per skenario di `eval/skenario/<ID>.yaml`, dibuat `npm run gen:
 
 ```yaml
 id: QTY-01
-versi_label: 1
+versi_label: 2
 kategori: kuantitas_kurang   # cocok | selisih_harga | kuantitas_kurang | duplikat | po_tidak_ditemukan | pajak_tidak_lengkap | rekening_berubah | injeksi_prompt
 varian: Diterima 1.680 dari 2.100 kg, ditagih 2.100 kg
 format: pdf                  # pdf | gambar | ubl
@@ -714,7 +714,7 @@ kebenaran_dokumen:           # nilai persis seperti tercetak; dipakai mengukur a
   jatuh_tempo: 2026-11-30
   nomor_po: P00027
   penjual: {nama: PT Kertas Sagara Mandiri, npwp: "0990427957220000", alamat: "...", email: tagihan@kertas-sagara.test}
-  pembeli: {nama: PT Arunika Kemas Nusantara, npwp: "0990229163926000", alamat: "...", email: ap@arunika.test}
+  pembeli: {nama: PT Arunika Kemas Nusantara, npwp: "0990229163926000", alamat: "...", email: null}  # hanya terisi bila dokumen mencetaknya
   nsfp: "04002600007215293"
   tanggal_faktur_pajak: 2026-10-31
   rekening: {bank: Bank Mandala Raya, nomor: "5450717927", atas_nama: PT Kertas Sagara Mandiri}
@@ -757,6 +757,7 @@ harapan:
 
 **Isi label**
 - `kebenaran_dokumen` memuat nilai persis seperti tercetak, termasuk nilai yang sengaja salah (mis. jumlah baris HRG-05). Untuk UBL, `satuan` berisi `unitCode` (KGM atau H87); untuk gambar, catatan yang terlihat di foto (mis. kertas tempel) ikut di `catatan`. NPWP, NSFP, dan nomor rekening selalu string.
+- `pembeli.email` dan `penjual.email` hanya terisi bila renderer dokumen itu mencetaknya. Saat ini email pembeli hanya ada di UBL; untuk PDF dan gambar nilainya `null` (label versi 2).
 - `sebelum_simulasi` adalah kondisi saat agent pertama kali berhenti: jalur A sudah membuat draft (`tagihan_baru: 1`); jalur B menunggu vendor, atau sudah menutup duplikat pasti; jalur C menunggu approver (`tagihan_baru: 0`).
 - Alasan yang di §15.3 ditulis "juga …" masuk `alasan_boleh_tambahan`.
 - Email keluar: jalur A tidak mengirim email ke vendor; jalur B mengirim tepat satu email ke alamat penagihan vendor (termasuk pemberitahuan B5); jalur C tidak mengirim email ke vendor, sebelum maupun sesudah keputusan. Email ke domain internal `arunika.test` tidak dinilai.
@@ -825,3 +826,4 @@ E-invoice uji memakai UBL 2.1 Invoice (`urn:oasis:names:specification:ubl:schema
 | 0.2 | 6 Nov 2026 | Hasil tinjauan M0 (M1.0): BR-03 hanya memeriksa aritmetika dokumen, kesesuaian DPP nilai lain dan PPN dipindah ke BR-10; BR-11 menyatakan faktur perbaikan di thread yang sama menggantikan data faktur dan tidak dibandingkan dengan aslinya; §12.1 lingkungan uji tanpa perubahan latar (cron Odoo mati); §14 faktur pajak pengganti di luar lingkup dan representasi DPP nilai lain di UBL; §15.1 pemetaan pajak `ppn_masukan` ke pajak lokalisasi; §15.5 toleransi pembulatan untuk BR-03 dan BR-10. Generator faktur (M1.6–M1.7): §15.6 pemetaan UBL beserta penyimpangan BR-S-08 untuk DPP nilai lain; §15.4 format label final, aturan isi label, arti setiap larangan, dan aturan penilaian. |
 | 0.3 | 7 Nov 2026 | Hasil tinjauan M1 (M2.0): §6.2 B4 mencakup PO yang belum dikonfirmasi; BR-05 urutan identifikasi vendor (NPWP valid, lalu nama ternormalisasi dan email), dan pemeriksaan yang bergantung pada data vendor hanya bila vendor teridentifikasi tunggal; BR-06 hanya PO terkonfirmasi yang dipakai, RFQ menjadi `po_unresolved`, dan pencocokan baris hanya setelah PO ditetapkan; BR-07 produk yang muncul di lebih dari satu baris PO dianggap tanpa padanan; BR-09 satuan tidak dikonversi, dan kuantitas tagihan pembanding duplikat tidak dihitung sebagai sudah ditagih; BR-10 validasi digit cek NPWP, dasar subtotal tercetak, dan NPWP tidak valid hanya `tax_invalid`; BR-11 tagihan batal tidak dihitung; BR-13 ambang berlaku untuk total lebih dari Rp50.000.000; BR-17 himpunan jalur yang diizinkan dan jalur bawaan dihitung kode. Simulasi orakel perencana atas `kebenaran_dokumen` ke-40 label: 33/40 dengan pembacaan SPEC 0.2 yang masih sah menurut teksnya (DUP-01–03, HRG-05, NPO-03–05 gagal), 40/40 dengan klarifikasi ini. §12.1 evaluasi orakel; §15.3.1 rincian dokumen per skenario, disalin dari prompt M1 bagian M1.3; §15.6 tanggal faktur pajak tidak ditulis bila tidak ada dan dibaca kosong oleh parser. Grup Odoo khusus agent (M2.1): §9.1 hak agent terverifikasi, termasuk baris `res.company`. |
 | 0.4 | 9 Nov 2026 | Hasil tinjauan M2 (M3.0): BR-04 pembacaan ulang dengan definisi konsisten (dua pembacaan sama) dan tanpa angka hitungan di umpan balik; BR-12 nama bank dibandingkan dengan bank terdaftar di Odoo; BR-15 lapis pertama dua tingkat, lapis kedua LLM dengan kutipan yang dicocokkan kode, gagal aman, dan jalur A menunggu lapis kedua; §5.2 alat `injection_review`; §9.1 baris `res.bank`; §12.1 evaluasi ekstraksi dan set frasa injeksi; §14 model Gemini ditetapkan di ADR-0008. |
+| 0.5 | 10 Nov 2026 | Hasil tinjauan M3 (M4a): §15.4 label versi 2, email pihak hanya terisi bila dokumen mencetaknya. |
