@@ -4,8 +4,9 @@
 #
 # Modul dipasang lewat CLI Odoo di kontainer sekali jalan (`compose run --rm`) saat layanan odoo
 # dihentikan. Pemeriksaan kondisi memakai kueri baca saja ke PostgreSQL milik Odoo. Addon Faktur
-# Beres (infra/odoo/addons) selalu dipasang, atau di-upgrade bila sudah terpasang, supaya grup dan
-# aturan aksesnya selalu sama dengan isi repo.
+# Beres (infra/odoo/addons) dipasang bila belum ada, dan di-upgrade hanya bila versi di
+# __manifest__.py lebih baru dari versi di database (isi addon dikunci tes sidik terhadap versinya).
+# Versi sama: Odoo tidak dihentikan.
 source "$(dirname "${BASH_SOURCE[0]}")/odoo-lib.sh"
 
 LANG_CODE="id_ID"
@@ -65,17 +66,37 @@ else
   echo "  dimuat"
 fi
 
+addon_db_version() {
+  odoo_sql "$DB" "SELECT COALESCE(latest_version, '') FROM ir_module_module WHERE name = '$ADDON'"
+}
+
 echo "== Addon $ADDON"
-stop_odoo
+manifest_version="$(uv run python -m faktur_beres.devtools.addon versi)"
 if [[ "$(module_state "$ADDON")" == "installed" ]]; then
-  odoo_cli module upgrade -d "$DB" "$ADDON"
-  action="di-upgrade"
+  db_version="$(addon_db_version)"
+  relation="$(uv run python -m faktur_beres.devtools.addon banding "$db_version")" \
+    || die "versi addon di database tidak terbaca: '$db_version'"
+  case "$relation" in
+    sama)
+      echo "  versi sama ($manifest_version), tidak di-upgrade"
+      ;;
+    lebih_baru)
+      stop_odoo
+      odoo_cli module upgrade --outdated -d "$DB" "$ADDON"
+      [[ "$(addon_db_version)" == "$manifest_version" ]] \
+        || die "addon $ADDON tidak naik ke $manifest_version; lihat $ODOO_LOG"
+      echo "  di-upgrade dari $db_version ke $manifest_version"
+      ;;
+    *)
+      die "addon $ADDON di database ($db_version) lebih baru dari repo ($manifest_version); periksa checkout repo"
+      ;;
+  esac
 else
+  stop_odoo
   odoo_cli module install -d "$DB" "$ADDON"
-  action="dipasang"
+  [[ "$(module_state "$ADDON")" == "installed" ]] || die "addon $ADDON gagal dipasang; lihat $ODOO_LOG"
+  echo "  dipasang, versi $(addon_db_version)"
 fi
-[[ "$(module_state "$ADDON")" == "installed" ]] || die "addon $ADDON gagal dipasang; lihat $ODOO_LOG"
-echo "  $action, versi $(odoo_sql "$DB" "SELECT latest_version FROM ir_module_module WHERE name = '$ADDON'")"
 
 demo="$(odoo_sql "$DB" "SELECT count(*) FROM ir_module_module WHERE demo")"
 [[ "$demo" == "0" ]] || die "ada $demo modul dengan data demo; database harus tanpa demo"
