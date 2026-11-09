@@ -1,9 +1,10 @@
 """Agent code stays apart from evaluation code (M2 hard constraints, ADR-0007).
 
-``faktur_beres.domain``, ``faktur_beres.tools`` and ``faktur_beres.llm`` do not import the
-evaluation, generator, dataset, or seed packages, do not name the ``eval/`` or ``data/seed`` paths,
-and never use the admin key. Checked statically (imports, string constants other than docstrings,
-attribute names) and by importing the packages in a fresh interpreter.
+The agent packages (``domain``, ``tools``, ``llm``, ``extraction``) do not import the evaluation,
+generator, dataset, or seed packages, do not name the ``eval/`` or ``data/seed`` paths, and never
+use the admin key. Checked statically (imports, string constants other than docstrings, attribute
+names) and by importing the packages in a fresh interpreter. ``faktur_beres.domain`` stays pure: it
+imports neither ``llm`` nor ``extraction`` nor ``tools`` (M3).
 """
 
 import ast
@@ -15,13 +16,14 @@ import pytest
 
 from faktur_beres.config import REPO_ROOT
 
-AGENT_PACKAGES = ("domain", "tools", "llm")
+AGENT_PACKAGES = ("domain", "tools", "llm", "extraction")
 FORBIDDEN_IMPORTS = (
     "faktur_beres.evals",
     "faktur_beres.generator",
     "faktur_beres.dataset",
     "faktur_beres.seed",
 )
+DOMAIN_FORBIDDEN = ("faktur_beres.llm", "faktur_beres.extraction", "faktur_beres.tools")
 FORBIDDEN_NAMES = ("odoo_admin_api_key", "admin_client", "ODOO_ADMIN_API_KEY")
 PACKAGE_DIR = REPO_ROOT / "src" / "faktur_beres"
 
@@ -90,6 +92,16 @@ def test_agent_module_is_clean(path: Path) -> None:
         if name in FORBIDDEN_NAMES
     ]
     assert bad_names == []
+
+
+@pytest.mark.parametrize(
+    "path",
+    sorted((PACKAGE_DIR / "domain").rglob("*.py")),
+    ids=lambda p: str(p.relative_to(PACKAGE_DIR)),
+)
+def test_domain_imports_no_llm_extraction_or_tools(path: Path) -> None:
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    assert [m for m in imported_modules(tree) if m.startswith(DOMAIN_FORBIDDEN)] == []
 
 
 def test_importing_agent_code_loads_no_evaluation_code() -> None:
