@@ -142,7 +142,7 @@ intake ─▶ extract ─▶ validate ──(gagal, perbaikan ≤ 2×)──▶ 
 | Node | Tugas | Dikerjakan oleh |
 |---|---|---|
 | `intake` | Menerima berkas, email, atau UBL; membuat `invoice_id`; menyimpan berkas asli dan hash SHA-256 | Kode |
-| `extract` | PDF dan gambar: ekstraksi ke skema Pydantic dengan Gemini. UBL: parsing deterministik | LLM (PDF/gambar), kode (UBL) |
+| `extract` | PDF dan gambar: ekstraksi ke skema Pydantic dengan Gemini, termasuk perulangan BR-04 di dalam alat. UBL: parsing deterministik | LLM (PDF/gambar), kode (UBL) |
 | `validate` | Validasi skema, hitung ulang angka (BR-03), format NPWP/NSFP; bila gagal, ekstraksi ulang dengan umpan balik spesifik | Kode, LLM untuk perbaikan |
 | `identify` | Identifikasi vendor dan PO. Bila nomor PO tidak ada atau tidak ditemukan, merencanakan pencarian kandidat | LLM merencanakan dan memilih alat, alat Odoo menjalankan |
 | `match` | Pencocokan tiga arah per baris, pemeriksaan pajak, duplikat, rekening, dan indikasi injeksi | Kode |
@@ -272,7 +272,7 @@ Setiap hari kerja, email rekap dikirim ke `finance@arunika.test` (BR-26).
 Harness menjalankan 40 skenario × 3 percobaan, mereset Odoo sebelum setiap percobaan, menyimulasikan balasan vendor dan keputusan approver sesuai label, lalu menilai state akhir ([§12](#12-evaluasi-dan-metrik)).
 
 ### F-10 Reset data demo
-Admin mengembalikan Odoo ke snapshot seed dengan `npm run odoo:reset`. Basis data aplikasi direset dengan perintah terpisah (M4).
+Admin mengembalikan Odoo ke snapshot seed dengan `npm run odoo:reset`. Basis data aplikasi dikosongkan dengan `npm run db:reset`; skema dan tabel versi migrasi tetap.
 
 ---
 
@@ -347,7 +347,7 @@ PostgreSQL dengan pgvector, terpisah dari database Odoo.
 | `vendor_memory` | Pola selisih per vendor | Memori jangka panjang |
 | `policy_chunks` | Potongan SOP dan kontrak beserta embedding | RAG |
 
-Tabel checkpointer dibuat oleh LangGraph. Skema rinci ditetapkan saat tabel pertama dibuat (M2–M4) lewat migrasi berversi.
+M4a membuat `invoices`, `invoice_lines`, `match_results`, `actions`, `approvals`, dan `audit_log`; `vendor_memory` dan `policy_chunks` dibuat di M4b. Tabel checkpointer dibuat oleh LangGraph dan tidak dikelola Alembic. Skema rinci ada di migrasi berversi dan [ADR-0009](adr/0009-graph-basis-data-dan-aksi.md).
 
 ### 9.3 Berkas
 Berkas faktur asli disimpan di `var/berkas/<invoice_id>/` (tidak di-commit) dan dilampirkan ke draft tagihan di Odoo. Penyimpanan untuk demo publik ditetapkan di M6.
@@ -404,6 +404,7 @@ Mitigasi mengacu pada OWASP Top 10 for Agentic Applications 2026 dan UU Nomor 27
 - Harness menyimulasikan balasan vendor dan keputusan approver sesuai label.
 - **Evaluasi orakel** (sejak M2): aturan deterministik dijalankan pada `kebenaran_dokumen` label seolah ekstraksinya sempurna, lengkap dengan simulasi balasan vendor dan keputusan approver. Data ERP diambil dari dataset (luring) atau dari Odoo hasil seed lewat user agent (baca saja). Targetnya 40/40. Hasilnya menjadi batas atas evaluasi penuh dan memisahkan kesalahan ekstraksi atau LLM dari kesalahan aturan.
 - **Evaluasi ekstraksi** (sejak M3): ekstraksi dan validasi dijalankan pada berkas 40 skenario, 11 lampiran balasan, dan set uji ketahanan. Hasilnya dibandingkan per field dengan `kebenaran_dokumen`, lalu aturan dijalankan pada hasil ekstraksi dan dibandingkan dengan evaluasi orakel. Set ketahanan dilaporkan terpisah dari metrik utama.
+- **Evaluasi graph** (sejak M4a, `npm run eval:graph`): graph sungguhan dijalankan pada setiap skenario dan dinilai dari Odoo, Mailpit, dan basis data aplikasi dengan penilai yang sama dengan evaluasi orakel. Mode orakel memakai `kebenaran_dokumen` sebagai hasil ekstraksi; mode LLM menjalankan seluruh agent. Sampai M4b, skenario yang menunggu balasan vendor dinilai pada saat pertama berhenti saja.
 - **Set frasa injeksi** (sejak M3): frasa wajar dan serangan berlabel untuk mengukur kedua lapis BR-15. Set dev ada di repo; set tertutup dipegang perencana dan dijalankan saat tinjauan.
 - Penilaian berdasarkan **state akhir** sistem, seperti metode τ-bench: tagihan di Odoo, email di Mailpit, serta status dan alasan di basis data aplikasi ([§15.4](#154-format-label)).
 
@@ -443,7 +444,7 @@ Mitigasi mengacu pada OWASP Top 10 for Agentic Applications 2026 dan UU Nomor 27
 |---|---|---|
 | Ambang persetujuan dan toleransi harga | Rp50.000.000 dan +1%, nilai demo | Bisa diubah lewat konfigurasi |
 | Kode status NSFP | Generator memakai `00`; validator hanya memeriksa panjang dan digit | M1 |
-| Model Gemini utama dan cadangan | Keluarga Flash-Lite dan Flash; peran, ID persis, dan dasar pemilihannya di ADR-0008 | M3 |
+| Model Gemini utama dan cadangan | Keluarga Flash-Lite dan Flash; peran, ID persis, dan dasar pemilihannya di ADR-0008. Peran cadangan memakai `gemini-3.6-flash` (ADR-0010) | M3, M4a |
 | Dimensi embedding RAG | Menyusul, mengikuti batas indeks pgvector | M4 |
 | Akses dashboard publik | Perlu kode akses atau batas laju agar kuota LLM tidak habis | M6 |
 | Hosting API, Odoo, dan basis data untuk demo publik | Belum ditentukan | M6 |
@@ -826,4 +827,4 @@ E-invoice uji memakai UBL 2.1 Invoice (`urn:oasis:names:specification:ubl:schema
 | 0.2 | 6 Nov 2026 | Hasil tinjauan M0 (M1.0): BR-03 hanya memeriksa aritmetika dokumen, kesesuaian DPP nilai lain dan PPN dipindah ke BR-10; BR-11 menyatakan faktur perbaikan di thread yang sama menggantikan data faktur dan tidak dibandingkan dengan aslinya; §12.1 lingkungan uji tanpa perubahan latar (cron Odoo mati); §14 faktur pajak pengganti di luar lingkup dan representasi DPP nilai lain di UBL; §15.1 pemetaan pajak `ppn_masukan` ke pajak lokalisasi; §15.5 toleransi pembulatan untuk BR-03 dan BR-10. Generator faktur (M1.6–M1.7): §15.6 pemetaan UBL beserta penyimpangan BR-S-08 untuk DPP nilai lain; §15.4 format label final, aturan isi label, arti setiap larangan, dan aturan penilaian. |
 | 0.3 | 7 Nov 2026 | Hasil tinjauan M1 (M2.0): §6.2 B4 mencakup PO yang belum dikonfirmasi; BR-05 urutan identifikasi vendor (NPWP valid, lalu nama ternormalisasi dan email), dan pemeriksaan yang bergantung pada data vendor hanya bila vendor teridentifikasi tunggal; BR-06 hanya PO terkonfirmasi yang dipakai, RFQ menjadi `po_unresolved`, dan pencocokan baris hanya setelah PO ditetapkan; BR-07 produk yang muncul di lebih dari satu baris PO dianggap tanpa padanan; BR-09 satuan tidak dikonversi, dan kuantitas tagihan pembanding duplikat tidak dihitung sebagai sudah ditagih; BR-10 validasi digit cek NPWP, dasar subtotal tercetak, dan NPWP tidak valid hanya `tax_invalid`; BR-11 tagihan batal tidak dihitung; BR-13 ambang berlaku untuk total lebih dari Rp50.000.000; BR-17 himpunan jalur yang diizinkan dan jalur bawaan dihitung kode. Simulasi orakel perencana atas `kebenaran_dokumen` ke-40 label: 33/40 dengan pembacaan SPEC 0.2 yang masih sah menurut teksnya (DUP-01–03, HRG-05, NPO-03–05 gagal), 40/40 dengan klarifikasi ini. §12.1 evaluasi orakel; §15.3.1 rincian dokumen per skenario, disalin dari prompt M1 bagian M1.3; §15.6 tanggal faktur pajak tidak ditulis bila tidak ada dan dibaca kosong oleh parser. Grup Odoo khusus agent (M2.1): §9.1 hak agent terverifikasi, termasuk baris `res.company`. |
 | 0.4 | 9 Nov 2026 | Hasil tinjauan M2 (M3.0): BR-04 pembacaan ulang dengan definisi konsisten (dua pembacaan sama) dan tanpa angka hitungan di umpan balik; BR-12 nama bank dibandingkan dengan bank terdaftar di Odoo; BR-15 lapis pertama dua tingkat, lapis kedua LLM dengan kutipan yang dicocokkan kode, gagal aman, dan jalur A menunggu lapis kedua; §5.2 alat `injection_review`; §9.1 baris `res.bank`; §12.1 evaluasi ekstraksi dan set frasa injeksi; §14 model Gemini ditetapkan di ADR-0008. |
-| 0.5 | 10 Nov 2026 | Hasil tinjauan M3 (M4a): §15.4 label versi 2, email pihak hanya terisi bila dokumen mencetaknya. |
+| 0.5 | 10 Nov 2026 | Hasil tinjauan M3 (M4a): §15.4 label versi 2, email pihak hanya terisi bila dokumen mencetaknya; §5.1 perulangan BR-04 berada di dalam alat `extract`; §9.2 tabel yang dibuat M4a dan sisanya di M4b; §12.1 evaluasi graph sejak M4a; §14 peran cadangan `gemini-3.6-flash`; F-10 `npm run db:reset`. |
