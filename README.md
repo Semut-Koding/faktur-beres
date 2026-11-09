@@ -4,7 +4,7 @@ AI agent yang menuntaskan *exception* faktur pemasok di proses *accounts payable
 
 Karya Tim **Daftar H-2 Jam** (Politeknik Negeri Subang) untuk **GTNIC 2026, kategori AI Agent**.
 
-**Status:** M2 selesai (7 November 2026): stack lokal dan data Odoo (M0), 40 skenario uji berlabel dengan berkas faktur dan balasan vendor di [`eval/`](eval/README.md) (M1), dan lapisan alat agent (M2): grup Odoo khusus agent tanpa hak hapus dan posting, aturan bisnis deterministik, `odoo_tools`, serta evaluasi orakel 40/40. Berikutnya M3 (ekstraksi Gemini dan parser UBL). Rencana lengkap ada di [RENCANA-TEKNIS §6](docs/RENCANA-TEKNIS.md#6-milestone).
+**Status:** M3 selesai (9 November 2026): stack lokal dan data Odoo (M0), 40 skenario uji berlabel dengan berkas faktur dan balasan vendor di [`eval/`](eval/README.md) (M1), lapisan alat agent dengan aturan bisnis deterministik dan evaluasi orakel 40/40 (M2), dan ekstraksi (M3): klien Gemini dengan retry, throttle, cache, dan audit; parser UBL; pembacaan ulang BR-04; deteksi injeksi dua lapis; dan set uji ketahanan. Run segar ekstraksi: akurasi field kritis 99,9% pada 40 faktur, UBL 100%. Berikutnya M4 (graph agent, email, RAG, dan API). Rencana lengkap ada di [RENCANA-TEKNIS §6](docs/RENCANA-TEKNIS.md#6-milestone).
 
 ## Prasyarat
 - Linux dengan **Podman 6 rootless** dan **podman-compose ≥ 1.6** sebagai penyedia `podman compose`. Docker Compose v2 juga bisa dipakai.
@@ -41,9 +41,19 @@ Kembalikan data Odoo ke kondisi seed kapan saja dengan `npm run odoo:reset`.
 ```bash
 npm run check          # lint, cek tipe (mypy), dan tes unit Python
 npm run guard:secrets  # pastikan tidak ada nilai rahasia di berkas yang akan di-commit
-npm run gen:periksa    # pastikan berkas uji di eval/ sama persis dengan keluaran generator
+npm run gen:periksa    # pastikan 40 skenario dan set ketahanan di eval/ sama isinya dengan keluaran generator
 npm run eval:orakel    # aturan deterministik pada 40 label (tambahkan -- --odoo untuk ERP dari Odoo)
 npm run test:integrasi # tes terhadap Odoo dengan key agent, dengan odoo:reset sebelum dan sesudahnya
+npm run eval:injeksi -- --lapis1  # deteksi injeksi lapis 1 pada set frasa dev (tanpa LLM)
+```
+
+Perintah berikut memanggil Gemini, jadi memakai kuota tier gratis. Isi `GEMINI_API_KEY` di `.env` lebih dulu. Yang dikirim hanya data sintetis dari repo ([ADR-0008](docs/adr/0008-gemini-sdk-model-kuota-cache-data.md)).
+
+```bash
+npm run llm:model -- --uji   # periksa model terkonfigurasi (satu permintaan kecil per model)
+npm run test:llm             # tes smoke Gemini
+npm run eval:ekstraksi       # akurasi ekstraksi dan rantai ke aturan, tiga kelompok (sekitar 120 panggilan)
+npm run eval:injeksi         # injeksi dua lapis pada set frasa dev (sekitar 100 panggilan)
 ```
 
 ## Demo publik
