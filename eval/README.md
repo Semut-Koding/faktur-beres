@@ -156,7 +156,7 @@ Panggilan LLM: 8 `gemini-3.5-flash-lite` (7 perencana, 1 pemetaan baris KTH-06),
 
 `npm run eval:perencana` menjalankan perencana `identify` pada 8 kasus dengan ERP dari dataset. NPO-01 dan NPO-02 seperti tercetak; COC-01, COC-02, DUP-04, REK-04, HRG-04, dan QTY-01 dengan nomor PO dihapus. Jawaban yang diharapkan dihitung BR-06 saat run, bukan dari label.
 
-**Hasil (10 November 2026, run `20261109-234102`).** 8/8 usulan sama dengan BR-06, 26 panggilan model, 31 eksekusi alat, tanpa penolakan guard. Perencana bersifat penasihat: BR-06 tetap memutuskan.
+**Hasil (10 November 2026, run `20261109-234102`).** 8/8 usulan sama dengan BR-06, 26 panggilan model, 28 eksekusi alat, tanpa penolakan guard. Perencana bersifat penasihat: BR-06 tetap memutuskan.
 
 | Kasus | Usulan | BR-06 | Panggilan model | Eksekusi alat | Detik |
 |---|---|---|---|---|---|
