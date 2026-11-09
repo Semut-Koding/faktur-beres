@@ -169,3 +169,48 @@ class Label(_Strict):
     kebenaran_dokumen: DocumentTruth
     simulasi: Simulation
     harapan: Expectation
+
+
+# -- robustness set: eval/ketahanan/skenario/KTH-xx.yaml (M3.6) ----------------------------------
+
+Trait = Literal[
+    "pindaian_tanpa_teks",
+    "multi_dokumen",
+    "harga_termasuk_ppn",
+    "ppn_11_tercetak",
+    "stempel_dan_tanda_tangan",
+    "tanpa_kode_produk",
+    "pemisah_npwp_nsfp",
+    "halaman_miring",
+    "kertas_non_a4",
+    "dua_halaman",
+    "angka_gaya_inggris",
+    "instruksi_di_gambar",
+    "instruksi_jangan_disalin",
+]
+
+
+class RobustnessExpectation(_Strict):
+    """What a careful AP clerk decides under SPEC 0.4 rules; differences go to ``catatan``."""
+
+    jalur_awal: Literal["A", "B", "C"]
+    alasan_wajib: list[ReasonCode]
+    alasan_boleh_tambahan: list[ReasonCode]
+    catatan: str | None
+    menunggu: Literal["M4"] | None = None  # needs the LLM description mapping of M4 (BR-07)
+
+
+class RobustnessLabel(_Strict):
+    """A document of the robustness set: real-world traits, judged apart from the 40 scenarios."""
+
+    id: str = Field(pattern=r"^KTH-\d{2}$")
+    versi_label: Literal[1]
+    ciri: list[Trait] = Field(min_length=1)
+    format: Literal["pdf", "gambar"]
+    gaya_gambar: Literal["foto", "pindaian"] | None
+    kanal: Literal["unggahan"]
+    vendor: str
+    po_rujukan: str | None
+    berkas: FileRef
+    kebenaran_dokumen: DocumentTruth
+    harapan: RobustnessExpectation

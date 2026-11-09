@@ -30,9 +30,16 @@ from faktur_beres.domain.invoice import (
     TextSource,
 )
 from faktur_beres.domain.normalize import normalize_email
-from faktur_beres.generator.label_schema import DocumentTruth, Label, PartyTruth, VendorReply
+from faktur_beres.generator.label_schema import (
+    DocumentTruth,
+    Label,
+    PartyTruth,
+    RobustnessLabel,
+    VendorReply,
+)
 
 LABEL_DIR = REPO_ROOT / "eval" / "skenario"
+ROBUSTNESS_DIR = REPO_ROOT / "eval" / "ketahanan" / "skenario"
 CHANNELS = {"unggahan": Channel.UPLOAD, "email": Channel.EMAIL}
 
 
@@ -46,6 +53,18 @@ def load_labels(directory: Path = LABEL_DIR) -> dict[str, Label]:
     labels = {}
     for path in sorted(directory.glob("*.yaml")):
         label = load_label(path)
+        if path.stem != label.id:
+            raise ValueError(f"{path.name} berisi label {label.id}")
+        labels[label.id] = label
+    return labels
+
+
+def load_robustness_labels(directory: Path = ROBUSTNESS_DIR) -> dict[str, RobustnessLabel]:
+    """The robustness set (M3.6) by document ID, in ID order."""
+    labels = {}
+    for path in sorted(directory.glob("*.yaml")):
+        with path.open(encoding="utf-8") as fh:
+            label = RobustnessLabel.model_validate(yaml.safe_load(fh))
         if path.stem != label.id:
             raise ValueError(f"{path.name} berisi label {label.id}")
         labels[label.id] = label
