@@ -1,0 +1,62 @@
+# Label set uji ketahanan Faktur Beres (M3.6).
+# Dibuat `npm run gen:ketahanan`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: KTH-02
+versi_label: 1
+ciri:
+- multi_dokumen
+format: pdf
+gaya_gambar: null
+kanal: unggahan
+vendor: v06
+po_rujukan: P00017
+berkas:
+  path: eval/ketahanan/berkas/KTH-02/faktur.pdf
+  nama_kirim: INV-2026-1014.pdf
+  sha256: 6dbfa813d335554e9fb821ca58d46072d1a1701fd3b23e596a98be62724b22b8
+kebenaran_dokumen:
+  nomor_faktur: INV-2026-1014
+  tanggal_faktur: 2026-10-27
+  jatuh_tempo: 2026-11-26
+  nomor_po: P00017
+  penjual:
+    nama: PT Presisi Suku Cadang Mesin
+    npwp: '0990769515376000'
+    alamat: Jl. Gaya Motor Raya No. 15, Kota Jakarta Utara, DKI Jakarta 14350
+    email: billing@presisi-sukucadang.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: '04002600007300026'
+  tanggal_faktur_pajak: 2026-10-27
+  rekening:
+    bank: Bank Mandala Raya
+    nomor: '2029942748'
+    atas_nama: PT Presisi Suku Cadang Mesin
+  baris:
+  - kode: BLK-1030
+    deskripsi: Blanket Offset 1030 x 790 mm (BLK-1030)
+    qty: 2
+    satuan: lembar
+    harga_satuan: 2450000
+    jumlah: 4900000
+  - kode: BRG-6205
+    deskripsi: Bearing 6205-2RS (BRG-6205)
+    qty: 22
+    satuan: pcs
+    harga_satuan: 95000
+    jumlah: 2090000
+  subtotal: 6990000
+  dpp_nilai_lain: 6407500
+  ppn: 768900
+  total: 7758900
+  catatan: []
+  teks_tersembunyi: []
+harapan:
+  jalur_awal: A
+  alasan_wajib: []
+  alasan_boleh_tambahan: []
+  catatan: NSFP dan tanggal faktur pajak hanya ada di halaman ringkasan faktur pajak.
+  menunggu: null

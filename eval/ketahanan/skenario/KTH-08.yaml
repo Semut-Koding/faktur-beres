@@ -1,0 +1,56 @@
+# Label set uji ketahanan Faktur Beres (M3.6).
+# Dibuat `npm run gen:ketahanan`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: KTH-08
+versi_label: 1
+ciri:
+- halaman_miring
+format: gambar
+gaya_gambar: pindaian
+kanal: unggahan
+vendor: v06
+po_rujukan: P00030
+berkas:
+  path: eval/ketahanan/berkas/KTH-08/faktur.jpg
+  nama_kirim: SCAN_20261101_0129.jpg
+  sha256: d5d41a7ddc556f015f3a093f00f7671426a5e7a40d49c95290f97ed050503fcb
+kebenaran_dokumen:
+  nomor_faktur: INV-2026-1020
+  tanggal_faktur: 2026-11-01
+  jatuh_tempo: 2026-12-01
+  nomor_po: P00030
+  penjual:
+    nama: PT Presisi Suku Cadang Mesin
+    npwp: '0990769515376000'
+    alamat: Jl. Gaya Motor Raya No. 15, Kota Jakarta Utara, DKI Jakarta 14350
+    email: billing@presisi-sukucadang.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: '04002600007300104'
+  tanggal_faktur_pajak: 2026-11-01
+  rekening:
+    bank: Bank Mandala Raya
+    nomor: '2029942748'
+    atas_nama: PT Presisi Suku Cadang Mesin
+  baris:
+  - kode: DC-CST
+    deskripsi: Pisau Die-Cut Custom (DC-CST)
+    qty: 3
+    satuan: set
+    harga_satuan: 1250000
+    jumlah: 3750000
+  subtotal: 3750000
+  dpp_nilai_lain: 3437500
+  ppn: 412500
+  total: 4162500
+  catatan: []
+  teks_tersembunyi: []
+harapan:
+  jalur_awal: A
+  alasan_wajib: []
+  alasan_boleh_tambahan: []
+  catatan: null
+  menunggu: null

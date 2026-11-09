@@ -10,6 +10,9 @@ Folder ini berisi 40 skenario uji berlabel (SPEC §15.3) untuk evaluasi agent: 8
 | `berkas/<ID>/faktur.*` | Faktur yang dikirim atau diunggah: PDF, gambar (JPEG/PNG), atau UBL 2.1 (XML) | `npm run gen:faktur` |
 | `berkas/<ID>/balasan.*` | Lampiran faktur perbaikan dari vendor (11 skenario jalur B) | `npm run gen:faktur` |
 | `DAFTAR.md` | Tabel ringkas 40 skenario | `npm run gen:faktur` |
+| `ketahanan/skenario/KTH-xx.yaml` | Label set uji ketahanan: ciri dokumen, kebenaran isi, dan jalur yang diharapkan (M3) | `npm run gen:ketahanan` |
+| `ketahanan/berkas/KTH-xx/faktur.*` | Dokumen set ketahanan: PDF atau gambar (JPEG) | `npm run gen:ketahanan` |
+| `ketahanan/DAFTAR.md` | Tabel ringkas set ketahanan | `npm run gen:ketahanan` |
 | `injeksi/dev.yaml` | Set frasa injeksi untuk pengembangan pola dan prompt BR-15 (M3) | ditulis tangan |
 | `hasil/` | Hasil evaluasi orakel (M2), injeksi dan ekstraksi (M3), dan evaluasi penuh (M5), tidak di-commit | `npm run eval:*`, harness |
 | `README.md` | Berkas ini | ditulis tangan |
@@ -41,6 +44,46 @@ Evaluasi orakel ([SPEC §12.1](../docs/SPEC.md#121-metode)) menjalankan aturan d
 `harapan`, `kategori`, `varian`, `vendor`, dan `po_rujukan` hanya dipakai untuk menilai. Satu-satunya pengecualian adalah cek silang balasan teks: nomor PO dari isi balasan harus tunggal dan sama dengan `po_rujukan`.
 
 **Arti hasilnya.** Targetnya 40/40 di kedua mode, dan mode `--odoo` harus memberi hasil yang sama dengan mode luring (hal itu juga diperiksa). Orakel adalah batas atas evaluasi penuh (M5): agent yang sesungguhnya bisa kalah karena ekstraksi atau keputusan LLM, tetapi tidak boleh kalah karena aturan. Bila orakel gagal, yang salah adalah aturan, dataset, atau label, bukan ekstraksi. Tabel 40 baris tampil di terminal, dan rinciannya (alasan, langkah simulasi, tagihan rencana, hasil setiap pemeriksaan) ditulis ke `eval/hasil/orakel-luring.json` atau `eval/hasil/orakel-odoo.json`. Kode keluar bukan nol bila ada skenario yang gagal. `npm run check` ikut menjalankan mode luring (`tests/test_orakel.py`).
+
+## Set uji ketahanan
+
+`ketahanan/` berisi 13 dokumen sintetis yang meniru ciri umum faktur lapangan (RENCANA §6, masukan tinjauan M1). Set ini dinilai terpisah dari 40 skenario dan dari metrik utama. Ciri yang dicakup:
+
+- PDF hasil pindai tanpa lapisan teks;
+- satu PDF berisi faktur, ringkasan faktur pajak buatan penjual, dan surat jalan;
+- harga termasuk PPN;
+- cetakan "PPN 11%" dengan angka 12% × DPP nilai lain;
+- stempel fiktif dan tanda tangan coretan yang menimpa teks;
+- tabel tanpa kode produk;
+- NPWP dan NSFP dengan pemisah;
+- halaman sedikit miring;
+- kertas selain A4 (Letter dan F4), termasuk faktur dua halaman;
+- angka dan nama bulan bergaya Inggris;
+- instruksi di stempel gambar, dan tulisan tangan yang meminta pembaca tidak menyalinnya. Yang kedua mengukur keterbatasan yang diketahui: penilai injeksi hanya melihat teks hasil baca.
+
+Setiap dokumen menagih sisa penerimaan sebuah PO terkonfirmasi di seed, dengan harga PO dan rekening terdaftar, serta nomor faktur dan NSFP baru. Dengan begitu, hanya ciri itu sendiri yang menentukan jalur. Sepuluh dokumen adalah *near-miss* jalur A, satu dokumen jalur B, dan dua dokumen jalur C. Semuanya berkanal unggahan. Tanda "DOKUMEN SINTETIS – UNTUK PENGUJIAN" ada di setiap halaman dan gambar. Stempel berupa lingkaran berisi nama perusahaan dari dataset, dan tanda tangan berupa kurva acak; tidak ada QR, tata letak resmi DJP, meterai, atau logo nyata.
+
+Label `KTH-xx.yaml` memakai skema `RobustnessLabel`:
+
+- `ciri`, `format`, `gaya_gambar`, dan `kanal`;
+- `vendor`, `po_rujukan`, dan `berkas`;
+- `kebenaran_dokumen`, dengan skema yang sama dengan 40 skenario;
+- `harapan`, berisi `jalur_awal`, `alasan_wajib`, `alasan_boleh_tambahan`, `catatan`, dan `menunggu`.
+
+Harapan mengikuti aturan SPEC 0.4. Bila penilaian bisnis bisa berbeda, misalnya untuk harga termasuk PPN, perbedaannya ditulis di `catatan`. `menunggu: M4` menandai dokumen yang butuh pemetaan deskripsi baris oleh LLM (BR-07); cek silang orakel melewatkan dokumen itu.
+
+```bash
+npm run gen:ketahanan   # tulis ulang ketahanan/skenario/, ketahanan/berkas/, dan ketahanan/DAFTAR.md
+npm run gen:periksa     # periksa 40 skenario dan set ketahanan sekaligus
+```
+
+Tes memeriksa beberapa hal:
+
+- label valid;
+- tidak ada ID, kunci ciri, kode alasan, atau kata jawaban di teks, metadata, dan nama kirim berkas;
+- PDF pindaian tidak punya lapisan teks;
+- dokumen non-A4 memang bukan A4;
+- cek silang orakel atas kebenaran dokumen sama dengan `harapan`.
 
 ## Set frasa injeksi
 

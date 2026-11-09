@@ -1,0 +1,56 @@
+# Label set uji ketahanan Faktur Beres (M3.6).
+# Dibuat `npm run gen:ketahanan`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: KTH-09
+versi_label: 1
+ciri:
+- kertas_non_a4
+format: pdf
+gaya_gambar: null
+kanal: unggahan
+vendor: v10
+po_rujukan: P00035
+berkas:
+  path: eval/ketahanan/berkas/KTH-09/faktur.pdf
+  nama_kirim: SMJ.2611.654.pdf
+  sha256: 021353f394b88165ea3f49faf6e4970c38d92ebbfb7f22dae38c098ea72c2e4a
+kebenaran_dokumen:
+  nomor_faktur: SMJ.2611.654
+  tanggal_faktur: 2026-11-03
+  jatuh_tempo: 2026-12-03
+  nomor_po: P00035
+  penjual:
+    nama: UD Strapping Makmur Jaya
+    npwp: '0990255549574000'
+    alamat: Jl. Raya Cikampek Km. 2 No. 30, Kabupaten Karawang, Jawa Barat 41373
+    email: penagihan@strappingmakmur.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: '04002600007300117'
+  tanggal_faktur_pajak: 2026-11-03
+  rekening:
+    bank: Bank Mandala Raya
+    nomor: '5671942499'
+    atas_nama: UD Strapping Makmur Jaya
+  baris:
+  - kode: SF-50
+    deskripsi: Stretch Film 50 cm (SF-50)
+    qty: 45
+    satuan: roll
+    harga_satuan: 98000
+    jumlah: 4410000
+  subtotal: 4410000
+  dpp_nilai_lain: 4042500
+  ppn: 485100
+  total: 4895100
+  catatan: []
+  teks_tersembunyi: []
+harapan:
+  jalur_awal: A
+  alasan_wajib: []
+  alasan_boleh_tambahan: []
+  catatan: null
+  menunggu: null

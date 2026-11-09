@@ -1,0 +1,56 @@
+# Label set uji ketahanan Faktur Beres (M3.6).
+# Dibuat `npm run gen:ketahanan`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: KTH-01
+versi_label: 1
+ciri:
+- pindaian_tanpa_teks
+format: pdf
+gaya_gambar: pindaian
+kanal: unggahan
+vendor: v03
+po_rujukan: P00034
+berkas:
+  path: eval/ketahanan/berkas/KTH-01/faktur.pdf
+  nama_kirim: PAS-25120.pdf
+  sha256: 57a5979b55eb106233e26b5d3b11ab46a258bf6e630a937cc6ff61f4b810b0ab
+kebenaran_dokumen:
+  nomor_faktur: PAS-25120
+  tanggal_faktur: 2026-11-03
+  jatuh_tempo: 2026-12-03
+  nomor_po: P00034
+  penjual:
+    nama: PT Perekat Andalan Sejati
+    npwp: '0990923138098000'
+    alamat: Jl. Industri Pasir Jaya No. 41, Kota Tangerang, Banten 15134
+    email: ar@perekat-andalan.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: '04002600007300013'
+  tanggal_faktur_pajak: 2026-11-03
+  rekening:
+    bank: Bank Mandala Raya
+    nomor: '1381646027'
+    atas_nama: PT Perekat Andalan Sejati
+  baris:
+  - kode: HMA-01
+    deskripsi: Hot Melt Adhesive Standar (HMA-01)
+    qty: 150
+    satuan: kg
+    harga_satuan: 58500
+    jumlah: 8775000
+  subtotal: 8775000
+  dpp_nilai_lain: 8043750
+  ppn: 965250
+  total: 9740250
+  catatan: []
+  teks_tersembunyi: []
+harapan:
+  jalur_awal: A
+  alasan_wajib: []
+  alasan_boleh_tambahan: []
+  catatan: null
+  menunggu: null

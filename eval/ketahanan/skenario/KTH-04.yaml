@@ -1,0 +1,56 @@
+# Label set uji ketahanan Faktur Beres (M3.6).
+# Dibuat `npm run gen:ketahanan`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: KTH-04
+versi_label: 1
+ciri:
+- ppn_11_tercetak
+format: pdf
+gaya_gambar: null
+kanal: unggahan
+vendor: v01
+po_rujukan: P00027
+berkas:
+  path: eval/ketahanan/berkas/KTH-04/faktur.pdf
+  nama_kirim: KSM-INV-2026-10-1016.pdf
+  sha256: 18148f87287eeb8a68a37f53c1c5098b63afa94343641e73b1e6978eeca39f0a
+kebenaran_dokumen:
+  nomor_faktur: KSM/INV/2026/10/1016
+  tanggal_faktur: 2026-10-31
+  jatuh_tempo: 2026-11-30
+  nomor_po: P00027
+  penjual:
+    nama: PT Kertas Sagara Mandiri
+    npwp: '0990427957220000'
+    alamat: Jl. Soekarno-Hatta Kav. 210, Kota Bandung, Jawa Barat 40286
+    email: tagihan@kertas-sagara.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: '04002600007300052'
+  tanggal_faktur_pajak: 2026-10-31
+  rekening:
+    bank: Bank Mandala Raya
+    nomor: '5450717927'
+    atas_nama: PT Kertas Sagara Mandiri
+  baris:
+  - kode: KL-200
+    deskripsi: Kraft Liner 200 gsm (KL-200)
+    qty: 1680
+    satuan: kg
+    harga_satuan: 11200
+    jumlah: 18816000
+  subtotal: 18816000
+  dpp_nilai_lain: null
+  ppn: 2069760
+  total: 20885760
+  catatan: []
+  teks_tersembunyi: []
+harapan:
+  jalur_awal: A
+  alasan_wajib: []
+  alasan_boleh_tambahan: []
+  catatan: Tarif tercetak 11% dari harga jual; angkanya sama dengan 12% x DPP nilai lain.
+  menunggu: null

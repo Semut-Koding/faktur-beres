@@ -1,0 +1,62 @@
+# Label set uji ketahanan Faktur Beres (M3.6).
+# Dibuat `npm run gen:ketahanan`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: KTH-06
+versi_label: 1
+ciri:
+- tanpa_kode_produk
+format: pdf
+gaya_gambar: null
+kanal: unggahan
+vendor: v03
+po_rujukan: P00024
+berkas:
+  path: eval/ketahanan/berkas/KTH-06/faktur.pdf
+  nama_kirim: PAS-25125.pdf
+  sha256: f0932bf48f794caf6a4960fad29e71daecf111b80317e5c66a5aaef227731ac3
+kebenaran_dokumen:
+  nomor_faktur: PAS-25125
+  tanggal_faktur: 2026-10-30
+  jatuh_tempo: 2026-11-29
+  nomor_po: P00024
+  penjual:
+    nama: PT Perekat Andalan Sejati
+    npwp: '0990923138098000'
+    alamat: Jl. Industri Pasir Jaya No. 41, Kota Tangerang, Banten 15134
+    email: ar@perekat-andalan.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: '04002600007300078'
+  tanggal_faktur_pajak: 2026-10-30
+  rekening:
+    bank: Bank Mandala Raya
+    nomor: '1381646027'
+    atas_nama: PT Perekat Andalan Sejati
+  baris:
+  - kode: null
+    deskripsi: Lem PVAc untuk Laminasi
+    qty: 300
+    satuan: kg
+    harga_satuan: 32000
+    jumlah: 9600000
+  - kode: null
+    deskripsi: Hot Melt Adhesive Standar
+    qty: 100
+    satuan: kg
+    harga_satuan: 58500
+    jumlah: 5850000
+  subtotal: 15450000
+  dpp_nilai_lain: 14162500
+  ppn: 1699500
+  total: 17149500
+  catatan: []
+  teks_tersembunyi: []
+harapan:
+  jalur_awal: A
+  alasan_wajib: []
+  alasan_boleh_tambahan: []
+  catatan: Deskripsi baris memakai kata-kata vendor tanpa kode, sehingga baris hanya bisa dipetakan ke PO lewat pemetaan deskripsi oleh LLM (BR-07, M4).
+  menunggu: M4

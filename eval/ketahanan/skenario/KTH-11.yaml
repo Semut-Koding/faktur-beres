@@ -1,0 +1,56 @@
+# Label set uji ketahanan Faktur Beres (M3.6).
+# Dibuat `npm run gen:ketahanan`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: KTH-11
+versi_label: 1
+ciri:
+- angka_gaya_inggris
+format: pdf
+gaya_gambar: null
+kanal: unggahan
+vendor: v04
+po_rujukan: P00018
+berkas:
+  path: eval/ketahanan/berkas/KTH-11/faktur.pdf
+  nama_kirim: CFP-INV-26-00929.pdf
+  sha256: 701fb482df83b0d71c568148cbdc271043f36f8d40d977d93b7b5a3ff38afac0
+kebenaran_dokumen:
+  nomor_faktur: CFP-INV-26-00929
+  tanggal_faktur: 2026-10-28
+  jatuh_tempo: 2026-11-27
+  nomor_po: P00018
+  penjual:
+    nama: PT Cakrawala Film Plastik
+    npwp: '0990848459946000'
+    alamat: Jl. Jababeka Raya Blok F No. 9, Kabupaten Bekasi, Jawa Barat 17530
+    email: einvoice@cakrawala-film.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: '04002600007300143'
+  tanggal_faktur_pajak: 2026-10-28
+  rekening:
+    bank: Bank Kirana Digital
+    nomor: '5199311603'
+    atas_nama: PT Cakrawala Film Plastik
+  baris:
+  - kode: BOPP-D20
+    deskripsi: Film BOPP Doff 20 mikron (BOPP-D20)
+    qty: 600
+    satuan: kg
+    harga_satuan: 44500
+    jumlah: 26700000
+  subtotal: 26700000
+  dpp_nilai_lain: 24475000
+  ppn: 2937000
+  total: 29637000
+  catatan: []
+  teks_tersembunyi: []
+harapan:
+  jalur_awal: A
+  alasan_wajib: []
+  alasan_boleh_tambahan: []
+  catatan: null
+  menunggu: null

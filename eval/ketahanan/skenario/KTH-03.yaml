@@ -1,0 +1,58 @@
+# Label set uji ketahanan Faktur Beres (M3.6).
+# Dibuat `npm run gen:ketahanan`; jangan disunting tangan.
+# Label hanya untuk harness evaluasi dan tidak pernah diberikan ke agent (ADR-0007).
+id: KTH-03
+versi_label: 1
+ciri:
+- harga_termasuk_ppn
+format: pdf
+gaya_gambar: null
+kanal: unggahan
+vendor: v02
+po_rujukan: P00041
+berkas:
+  path: eval/ketahanan/berkas/KTH-03/faktur.pdf
+  nama_kirim: TWL-INV-2611-0756.pdf
+  sha256: 188a140b3e132d55fb7f1a4e6e2cb2dfbc23218d13114fbad7a9d6a6c2367ec5
+kebenaran_dokumen:
+  nomor_faktur: TWL/INV/2611/0756
+  tanggal_faktur: 2026-11-05
+  jatuh_tempo: 2026-12-05
+  nomor_po: P00041
+  penjual:
+    nama: CV Tinta Warna Lestari
+    npwp: '0990286171486000'
+    alamat: Jl. Raya Narogong Km. 7 No. 3, Kota Bekasi, Jawa Barat 17116
+    email: finance@tintawarna.test
+  pembeli:
+    nama: PT Arunika Kemas Nusantara
+    npwp: '0990229163926000'
+    alamat: Jl. Industri Barat Blok C No. 18, Kabupaten Karawang, Jawa Barat 41361
+    email: ap@arunika.test
+  nsfp: '04002600007300039'
+  tanggal_faktur_pajak: 2026-11-05
+  rekening:
+    bank: Bank Kencana Utama
+    nomor: '1897077695'
+    atas_nama: CV Tinta Warna Lestari
+  baris:
+  - kode: TO-K
+    deskripsi: Tinta Offset Hitam (TO-K)
+    qty: 50
+    satuan: kg
+    harga_satuan: 183150
+    jumlah: 9157500
+  subtotal: 8250000
+  dpp_nilai_lain: 7562500
+  ppn: 907500
+  total: 9157500
+  catatan: []
+  teks_tersembunyi: []
+harapan:
+  jalur_awal: B
+  alasan_wajib:
+  - price_variance
+  - arithmetic_error
+  alasan_boleh_tambahan: []
+  catatan: Harga satuan tercetak sudah termasuk PPN. Staf AP bisa menghitung harga sebelum PPN dan menerimanya, tetapi aturan SPEC 0.4 membandingkan harga satuan tercetak dengan PO (BR-08) dan jumlah baris dengan harga jual (BR-03), jadi vendor diminta menerbitkan faktur dengan harga sebelum PPN.
+  menunggu: null
