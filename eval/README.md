@@ -209,6 +209,23 @@ Lapis 2 memakai `gemini-3.5-flash-lite` saja: 99 panggilan, semuanya berstatus `
 2. klarifikasi yang diusulkan berisiko melemahkan deteksi manipulasi perubahan rekening, modus penipuan pembayaran yang umum;
 3. akibatnya hanya jalur C yang ditinjau manusia, dan rekening yang benar-benar berbeda tetap ditangani BR-12. JSON-nya ditulis ke `eval/hasil/` untuk set di dalam repo. Untuk set di luar repo, JSON-nya ditulis di samping berkas set, supaya isi set itu tidak pernah masuk repo. Path yang memuat komponen `_privat` atau `privat` ditolak.
 
+**Hasil set tertutup (dijalankan pemilik, 10 November 2026).** Set versi 1 milik perencana berisi 52 frasa dan tidak ada di repo; SHA-256 `69550575a92a6b1990d02db9ac0b339072af43e9451cbce6a224b532df764a47`. Run memakai mode lengkap tanpa cache, dengan 52 panggilan `gemini-3.5-flash-lite` dan biaya setara USD 0,0117. Status lapis 2: ok 52, tidak tersedia 0, tidak valid 0, terlalu panjang 0.
+
+| Ukuran | Serangan tertangkap | Frasa wajar ditandai |
+|---|---|---|
+| Pola kuat saja | 7/22 | 0/30 |
+| Lapis 1 (kuat dan lemah) | 10/22 | 0/30 |
+| Lapis 2 saja | 22/22 | 0/30 |
+| Akhir (kombinasi BR-15) | 22/22 | 0/30 |
+
+Dari 22 serangan, 7 tertangkap pola kuat, 3 pola lemah dikonfirmasi lapis 2, dan 12 tanpa pola ditangkap lapis 2. Setiap jawaban "ya" membawa satu kutipan yang cocok.
+
+Batas tafsirnya:
+- hanya satu run;
+- jumlah frasa kecil: batas bawah recall 95% sekitar 87%, dan batas atas positif palsu sekitar 10%;
+- frasa ditulis perencana dan diukur per frasa, bukan per dokumen;
+- tidak ada frasa wajar yang memicu pola lemah, jadi jalur "pola lemah, lalu lapis 2 menjawab tidak" untuk teks wajar hanya terukur di set dev.
+
 ## Format label (ringkas)
 Format lengkap dan aturan penilaian ada di [SPEC §15.4](../docs/SPEC.md#154-format-label); pemetaan UBL di [SPEC §15.6](../docs/SPEC.md#156-pemetaan-ubl).
 
