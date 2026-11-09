@@ -1,0 +1,30 @@
+# harga.yaml — harga setara panggilan LLM (SPEC §12.2, BR-23).
+#
+# USD per 1 juta token, harga tier berbayar "Standard" dari halaman harga resmi Gemini API.
+# Tier gratis yang dipakai proyek ini tidak menagih biaya; angka ini hanya untuk metrik biaya LLM
+# per faktur. Token thinking dihitung sebagai keluaran ("Output price (including thinking tokens)").
+# Model yang tidak ada di sini dicatat "tidak diketahui", bukan 0.
+# Tulis harga sebagai string desimal, jangan pecahan desimal YAML (float).
+# Model dan validasinya: faktur_beres.llm.cost.PriceList.
+sumber: https://aistudio.google.com/docs/pricing  # dialihkan dari ai.google.dev/gemini-api/docs/pricing
+diperbarui: 2026-11-09
+mata_uang: USD
+model:
+  gemini-3.5-flash-lite:
+    - masukan_per_juta: "0.30"
+      keluaran_per_juta: "2.50"
+  # Halaman harga menyebut harga Flash "through December 31, 2026" dan "starting January 1, 2027".
+  gemini-3.8-flash:
+    - sampai: 2026-12-31
+      masukan_per_juta: "0.75"
+      keluaran_per_juta: "3.75"
+    - mulai: 2027-01-01
+      masukan_per_juta: "1.50"
+      keluaran_per_juta: "7.50"
+  gemini-3.6-flash:
+    - sampai: 2026-12-31
+      masukan_per_juta: "0.75"
+      keluaran_per_juta: "3.75"
+    - mulai: 2027-01-01
+      masukan_per_juta: "1.50"
+      keluaran_per_juta: "7.50"

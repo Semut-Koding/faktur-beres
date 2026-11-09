@@ -22,6 +22,12 @@ Errors. The SDK's own retry is off and every attempt is one audit record (BR-23)
 
 Fallback chain: primary → strong for the primary role, strong → primary for the strong role. When
 neither answers: ``LlmUnavailable`` (BR-27). Requests are sequential: one lock per client.
+
+Audit (BR-23): every attempt and every cache hit is one ``LlmCallRecord``, logged on the
+``faktur_beres.llm`` logger with ``extra={"llm_call": ...}`` and returned to the caller, in the
+result or in the error. It carries the equivalent cost at the paid-tier price
+(``faktur_beres.llm.cost``). The cache (``faktur_beres.llm.cache``) is used only when the client is
+given one, and only valid answers are stored.
 """
 
 import logging
@@ -31,6 +37,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import ROUND_CEILING, Decimal, InvalidOperation
+from pathlib import Path
 from typing import Protocol
 
 import httpx
@@ -38,9 +45,11 @@ from google import genai
 from google.genai import errors, types
 from pydantic import BaseModel, ValidationError
 
-from faktur_beres.config import Settings
+from faktur_beres.config import REPO_ROOT, Settings
+from faktur_beres.llm.cache import CacheEntry, LlmCache
 from faktur_beres.llm.contracts import (
     KEY_SHOWN,
+    UNKNOWN_COST,
     BlobPart,
     CacheUse,
     CallStatus,
@@ -55,6 +64,7 @@ from faktur_beres.llm.contracts import (
     ThinkingLevel,
     request_key,
 )
+from faktur_beres.llm.cost import Cost, PriceList, load_prices
 from faktur_beres.llm.pacing import NS_PER_MS, Clock, SystemClock, Throttle, backoff_ms, jitter_ms
 
 API_VERSION = "v1beta"  # written out: SDK 3.x changes the default to v1 (M3.2)
@@ -63,6 +73,7 @@ MAX_RETRIES = 3  # per model: quota per minute, server errors, timeouts
 MAX_INVALID_RETRIES = 1
 MAX_WAIT_MS = 120_000  # a longer RetryInfo wait goes to the fallback model instead
 HTTP_LOGGERS = ("httpx", "httpcore", "google_genai")
+LOGGER = logging.getLogger("faktur_beres.llm")
 
 THINKING = {
     ThinkingLevel.LOW: types.ThinkingLevel.LOW,
@@ -125,12 +136,20 @@ def rpm_by_model(settings: Settings) -> dict[str, int]:
     return rpm
 
 
-def gemini_client(settings: Settings) -> "GeminiClient":
+def cache_dir(settings: Settings) -> Path:
+    path = Path(settings.llm_cache_dir)
+    return path if path.is_absolute() else REPO_ROOT / path
+
+
+def gemini_client(settings: Settings, *, use_cache: bool = False) -> "GeminiClient":
+    """The agent's client; the cache only when the caller asks for it (``--pakai-cache``)."""
     return GeminiClient(
         SdkGenerate(sdk_client(settings)),
         primary=settings.gemini_model_primary,
         strong=settings.gemini_model_strong,
         rpm=rpm_by_model(settings),
+        cache=LlmCache(cache_dir(settings)) if use_cache else None,
+        prices=load_prices(),
     )
 
 
@@ -295,6 +314,7 @@ class _Target:
         cache: CacheUse,
         failure: Failure | None = None,
         reading: Reading | None = None,
+        cost: Cost = None,
         ok: bool,
     ) -> LlmCallRecord:
         if ok:
@@ -323,6 +343,7 @@ class _Target:
             output_tokens=reading.output_tokens if reading is not None else None,
             thinking_tokens=reading.thinking_tokens if reading is not None else None,
             total_tokens=reading.total_tokens if reading is not None else None,
+            cost_usd=cost,
         )
 
 
@@ -338,8 +359,14 @@ class GeminiClient:
         rpm: Mapping[str, int],
         clock: Clock | None = None,
         rng: random.Random | None = None,
+        cache: LlmCache | None = None,
+        prices: PriceList | None = None,
+        logger: logging.Logger = LOGGER,
     ) -> None:
         self._generate = generate
+        self._cache = cache
+        self._prices = prices
+        self._logger = logger
         self._models = {ModelRole.PRIMARY: primary, ModelRole.STRONG: strong}
         self._clock = clock or SystemClock()
         self._rng = rng or random.Random()
@@ -371,7 +398,28 @@ class GeminiClient:
             )
 
     def _note(self, calls: list[LlmCallRecord], record: LlmCallRecord) -> None:
+        """Keep the record for the caller and log it (BR-23); it holds no content and no key."""
         calls.append(record)
+        self._logger.info(
+            "llm %s %s percobaan %d: %s",
+            record.purpose,
+            record.model,
+            record.attempt,
+            record.error_kind or ("cache" if record.cache is CacheUse.HIT else record.status),
+            extra={"llm_call": record.model_dump(mode="json")},
+        )
+
+    def _cost(self, model: str, at: datetime, reading: Reading) -> Cost:
+        if self._prices is None:
+            reported = (reading.input_tokens, reading.output_tokens, reading.thinking_tokens)
+            return UNKNOWN_COST if any(t is not None for t in reported) else None
+        return self._prices.cost(
+            model,
+            at.date(),
+            input_tokens=reading.input_tokens,
+            output_tokens=reading.output_tokens,
+            thinking_tokens=reading.thinking_tokens,
+        )
 
     def _on_model[T: BaseModel](
         self, model: str, request: LlmRequest, schema: type[T], calls: list[LlmCallRecord]
@@ -383,6 +431,20 @@ class GeminiClient:
             fallback=model != self._models[request.role],
             key=request_key(model, request, schema, generation_settings(request)),
         )
+        if self._cache is not None:
+            cached = self._cache.load(target.key, schema)
+            if cached is not None:
+                hit = target.record(
+                    attempt=0,
+                    at=self._clock.now(),
+                    waited_ns=0,
+                    duration_ns=0,
+                    cache=CacheUse.HIT,
+                    ok=True,
+                )
+                self._note(calls, hit)
+                return cached.value
+        cache_use = CacheUse.OFF if self._cache is None else CacheUse.MISS
         config = generation_config(request, schema)
         contents = request_content(request)
         attempt = retries = invalid = 0
@@ -405,7 +467,7 @@ class GeminiClient:
                         at=at,
                         waited_ns=waited_ns,
                         duration_ns=self._clock.monotonic_ns() - started,
-                        cache=CacheUse.OFF,
+                        cache=cache_use,
                         failure=failure,
                         ok=False,
                     ),
@@ -435,13 +497,25 @@ class GeminiClient:
                     at=at,
                     waited_ns=waited_ns,
                     duration_ns=self._clock.monotonic_ns() - started,
-                    cache=CacheUse.OFF,
+                    cache=cache_use,
                     reading=reading,
+                    cost=self._cost(model, at, reading),
                     ok=value is not None,
                 ),
             )
             waited_ns = 0
             if value is not None:
+                if self._cache is not None and reading.text is not None:
+                    self._cache.store(
+                        CacheEntry(
+                            key=target.key,
+                            model=model,
+                            purpose=request.purpose,
+                            prompt_version=request.prompt_version,
+                            created=at,
+                            output=reading.text,
+                        )
+                    )
                 return value
             if invalid == MAX_INVALID_RETRIES:
                 raise LlmInvalidOutput(

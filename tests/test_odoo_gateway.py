@@ -192,6 +192,7 @@ def test_empty_note_is_refused_without_request() -> None:
     assert fake.requests == []
 
 
+@pytest.mark.aturan("BR-23")
 def test_calls_are_logged_with_masked_parameters(caplog: pytest.LogCaptureFixture) -> None:
     fake = FakeOdoo({"res.partner/search_read": []})
     with caplog.at_level(logging.INFO, logger="faktur_beres.tools.odoo"):
@@ -273,6 +274,7 @@ def test_typed_search_read_checks_order_too() -> None:
     assert fake.requests == []
 
 
+@pytest.mark.aturan("BR-23")
 def test_log_keeps_size_and_hash_of_files_not_their_content(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -292,6 +294,7 @@ def test_log_keeps_size_and_hash_of_files_not_their_content(
     assert datas == {"bytes": 307200, "sha256": hashlib.sha256(content).hexdigest()}
 
 
+@pytest.mark.aturan("BR-23")
 def test_long_texts_are_logged_as_length_and_hash() -> None:
     from faktur_beres.tools.odoo_gateway import log_params
 

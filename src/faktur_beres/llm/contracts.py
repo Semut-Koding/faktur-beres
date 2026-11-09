@@ -22,7 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from faktur_beres.domain.base import DomainModel
 
 MAX_OUTPUT_TOKENS_CAP = 32768
-UNKNOWN_COST = "tidak diketahui"
+UNKNOWN_COST: Literal["tidak diketahui"] = "tidak diketahui"
 KEY_SHOWN = 16  # hex digits of the request key in the audit
 
 

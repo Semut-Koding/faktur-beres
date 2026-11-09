@@ -23,6 +23,7 @@ CODE_RULES: tuple[str, ...] = (
     "BR-17",
     "BR-18",
     "BR-22",
+    "BR-23",
     "BR-24",
     "BR-25",
     "BR-27",
