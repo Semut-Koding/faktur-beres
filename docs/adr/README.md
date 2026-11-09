@@ -23,6 +23,7 @@ Setiap keputusan penting dicatat sebagai satu berkas bernomor.
 | [0005](0005-llm-memutuskan-kode-menghitung.md) | LLM merencanakan dan memutuskan di dalam pagar; kode menghitung dan menjalankan aksi | Diterima | 2026-11-05 |
 | [0006](0006-persetujuan-dan-idempotensi.md) | Persetujuan lewat interrupt, aksi di node terpisah, dan kunci idempoten | Diterima | 2026-11-05 |
 | [0007](0007-data-sintetis-dan-skenario.md) | Data sintetis, dataset tunggal, dan katalog 40 skenario berlabel | Diterima | 2026-11-05 |
+| [0008](0008-gemini-sdk-model-kuota-cache-data.md) | Gemini: SDK, model per peran, kuota, cache, dan data | Diterima | 2026-11-09 |
 
 ## Templat
 
