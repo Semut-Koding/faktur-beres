@@ -82,24 +82,28 @@ _NPWP_IN_TEXT = re.compile(r"(?<!\d)(?:\d[\s.\-]?){14}\d(?:[\s.\-]?\d)?(?!\d)")
 _LONG_DIGITS = re.compile(r"(?<!\d)\d{8,}(?!\d)")
 
 
+def _slots(value: str) -> str:
+    """The digits of a value and the ``*`` that stand for digits hidden earlier, in order."""
+    return re.sub(r"[^\d*]", "", value)
+
+
 def mask_npwp(value: str) -> str:
-    """``0990********0000``: the first and last 4 digits stay; masking twice changes nothing."""
-    if "*" in value:
-        return value
-    digits = re.sub(r"\D", "", value)
-    if len(digits) <= 8:
-        return "*" * len(digits)
-    return digits[:4] + "*" * (len(digits) - 8) + digits[-4:]
+    """``0990********0000``: the first and last 4 characters stay; masking twice changes nothing.
+
+    A ``*`` counts as a digit that is already hidden, so a printed footnote mark cannot open a hole.
+    """
+    slots = _slots(value)
+    if len(slots) <= 8:
+        return "*" * len(slots)
+    return slots[:4] + "*" * (len(slots) - 8) + slots[-4:]
 
 
 def mask_account(value: str) -> str:
-    """``******7927``: only the last 4 digits stay; masking twice changes nothing."""
-    if "*" in value:
-        return value
-    digits = re.sub(r"\D", "", value)
-    if len(digits) <= 4:
-        return "*" * len(digits)
-    return "*" * (len(digits) - 4) + digits[-4:]
+    """``******7927``: only the last 4 characters stay; masking twice changes nothing."""
+    slots = _slots(value)
+    if len(slots) <= 4:
+        return "*" * len(slots)
+    return "*" * (len(slots) - 4) + slots[-4:]
 
 
 def mask_text(text: str) -> str:

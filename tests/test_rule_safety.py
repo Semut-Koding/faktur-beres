@@ -124,6 +124,35 @@ def test_refused_recipients(raw: str, reason: str) -> None:
     assert not check.allowed and check.reason == reason
 
 
+NAUGHTY = (
+    "1381646027*",
+    "*0990427957220000",
+    "0990.4279.5722.0000 (*)",
+    "****",
+    "*",
+    "",
+    "0990427957220000",
+    "137-00-1234567-8",
+)
+
+
+@pytest.mark.aturan("BR-24")
+@pytest.mark.parametrize("value", NAUGHTY)
+def test_masking_never_shows_more_digits_than_the_rule(value: str) -> None:
+    npwp, account = mask_npwp(value), mask_account(value)
+    assert sum(c.isdigit() for c in npwp) <= 8
+    assert sum(c.isdigit() for c in account) <= 4
+    assert mask_npwp(npwp) == npwp and mask_account(account) == account
+
+
+@pytest.mark.aturan("BR-24")
+def test_a_star_counts_as_a_hidden_digit() -> None:
+    assert mask_account("1381646027*") == "*******027*"
+    assert mask_npwp("0990********0000") == "0990********0000"
+    assert mask_params({"rekening": "1381646027*"}) == {"rekening": "*******027*"}
+    assert "4279" not in mask_params({"npwp": "*0990427957220000"})["npwp"]
+
+
 def test_masking_twice_keeps_the_visible_digits() -> None:
     once = mask_params({"npwp": "0990427957220000", "rekening": "5450717927"})
     assert mask_params(once) == {"npwp": "0990********0000", "rekening": "******7927"}
