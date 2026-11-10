@@ -215,16 +215,10 @@ def create_app(
             data = runner.files.read(invoice["stored_path"])
         except OSError as exc:
             raise HTTPException(404, "Berkas tidak tersedia.") from exc
-        return Response(
-            data,
-            media_type=invoice["file_mime"],
-            headers={
-                "Content-Disposition": "inline",
-                "Content-Security-Policy": FILE_POLICY
-                if "xml" in invoice["file_mime"]
-                else "default-src 'none'; style-src 'unsafe-inline'; object-src 'self'",
-            },
-        )
+        headers = {"Content-Disposition": "inline"}
+        if "xml" in invoice["file_mime"]:
+            headers["Content-Security-Policy"] = FILE_POLICY
+        return Response(data, media_type=invoice["file_mime"], headers=headers)
 
     @app.get("/api/metrik")
     def metrics() -> dict[str, Any]:
