@@ -14,6 +14,8 @@ from faktur_beres.db.connection import libpq_url, make_engine, require_project_d
 from faktur_beres.db.models import Base
 
 MIGRATIONS = Path(__file__).parent / "migrations"
+#: Derived from the policy documents, not process data; ``eval:graph`` resets before every scenario.
+PRESERVED_ON_RESET = frozenset({"policy_chunks", "policy_reason_quotes"})
 CHECKPOINT_TABLES = frozenset(
     {"checkpoints", "checkpoint_blobs", "checkpoint_writes", "checkpoint_migrations"}
 )
@@ -55,7 +57,7 @@ def reset(url: str) -> list[str]:
             )
             tables = sorted(
                 (
-                    {t.name for t in Base.metadata.sorted_tables}
+                    ({t.name for t in Base.metadata.sorted_tables} - PRESERVED_ON_RESET)
                     | (CHECKPOINT_TABLES - {"checkpoint_migrations"})
                 )
                 & present

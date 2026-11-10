@@ -13,6 +13,7 @@ from decimal import Decimal
 from enum import StrEnum
 from typing import Any
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     BigInteger,
     Boolean,
@@ -35,6 +36,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 from faktur_beres.domain.invoice import Channel
 from faktur_beres.domain.reasons import InvoiceStatus, Route
+from faktur_beres.llm.embedding_contract import EMBEDDING_DIMENSIONS
 
 MONEY = Numeric(18, 2)
 QUANTITY = Numeric(18, 4)
@@ -299,6 +301,46 @@ class ApprovalRow(Base):
     note: Mapped[str | None] = mapped_column(Text)
     decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PolicyChunkRow(Base):
+    """One article of a policy document with its embedding (derived data: ``db:reset`` keeps it)."""
+
+    __tablename__ = "policy_chunks"
+    __table_args__ = (
+        UniqueConstraint("ref", name="uq_policy_chunks_ref"),
+        Index(
+            "ix_policy_chunks_embedding",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    ref: Mapped[str] = mapped_column(Text)
+    document: Mapped[str] = mapped_column(Text)
+    title: Mapped[str] = mapped_column(Text)
+    text: Mapped[str] = mapped_column(Text)
+    sha256: Mapped[str] = mapped_column(Text)
+    embedding: Mapped[list[float]] = mapped_column(Vector(EMBEDDING_DIMENSIONS))
+    model: Mapped[str] = mapped_column(Text)
+    dimensions: Mapped[int] = mapped_column(Integer)
+    chunk_format: Mapped[int] = mapped_column(Integer)
+    indexed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class PolicyReasonQuote(Base):
+    """The best articles for one reason code, found at indexing time, so ``decide`` needs no API."""
+
+    __tablename__ = "policy_reason_quotes"
+    __table_args__ = (UniqueConstraint("reason", "ref", name="uq_policy_reason_quotes_reason"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    reason: Mapped[str] = mapped_column(Text)
+    ref: Mapped[str] = mapped_column(Text)
+    score: Mapped[Decimal] = mapped_column(Numeric(8, 6))
+    query_sha256: Mapped[str] = mapped_column(Text)
 
 
 class AuditEntry(Base):
