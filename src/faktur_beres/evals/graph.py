@@ -8,15 +8,21 @@ Scenarios that wait for a vendor reply are marked "menunggu M4b".
 The harness gives the agent only the document and the simulated decisions. ``harapan``, category,
 variant and scenario id are read here, for scoring, and go nowhere else.
 
-``--ekstraksi orakel`` feeds the agent the document truth instead of reading the file, so only the
-planner and the line mapping use the LLM; ``--ekstraksi llm`` is the whole agent.
+``--ekstraksi orakel`` feeds the agent the document truth instead of reading the file, also for
+attached corrections, recognised by their hash; the planner, the line mapping, the reply reader and
+the route choice still use the LLM. ``--ekstraksi llm`` is the whole agent. Scenarios of the e-mail
+channel and every vendor reply go through SMTP and the real inbox; ``--intake langsung`` uses
+``Runner.accept`` for the invoices instead. ``--tanpa-llm`` also turns off the route choice and
+reads text replies with a pattern. Before starting, the policy index must exist and match.
 """
 
 import argparse
 import hashlib
 import math
+import mimetypes
 import os
 import shutil
+import smtplib
 import statistics
 import subprocess
 import sys
@@ -25,6 +31,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from decimal import Decimal
+from email.message import EmailMessage
+from email.utils import format_datetime
 from typing import Any, Literal
 
 import httpx
@@ -35,6 +43,7 @@ from faktur_beres.dataset import Dataset, load_dataset
 from faktur_beres.db.connection import app_url, make_engine
 from faktur_beres.db.migrate import reset as reset_database
 from faktur_beres.db.models import AuditKind, Decision
+from faktur_beres.db.policy_store import PolicyStore
 from faktur_beres.db.store import Store
 from faktur_beres.domain.engine import AnalysisResult
 from faktur_beres.domain.erp import BillRecord
@@ -48,6 +57,7 @@ from faktur_beres.evals.labels import (
     truth_to_invoice,
 )
 from faktur_beres.evals.orakel import (
+    PO_TOKEN,
     Check,
     Outcome,
     PlannedBill,
@@ -57,22 +67,27 @@ from faktur_beres.evals.orakel import (
 )
 from faktur_beres.extraction.outcome import ExtractionOutcome, ExtractionSource, ExtractionStatus
 from faktur_beres.extraction.reading import PROMPT_VERSION as EXTRACTION_PROMPT
-from faktur_beres.generator.label_schema import Label, RobustnessLabel
+from faktur_beres.generator.label_schema import Label, RobustnessLabel, VendorReply
 from faktur_beres.graph.build import build_graph
 from faktur_beres.graph.deps import Dependencies, FileStore
 from faktur_beres.graph.factory import checkpointer, live_dependencies
+from faktur_beres.graph.inbox import AP_ADDRESS, InboxPoller
 from faktur_beres.graph.runner import Runner, Stop
 from faktur_beres.llm import usage
-from faktur_beres.llm.gemini import gemini_client
+from faktur_beres.llm.cache import LlmCache
+from faktur_beres.llm.embedding import gemini_embedder
+from faktur_beres.llm.gemini import cache_dir, gemini_client
 from faktur_beres.tools import odoo_tools
+from faktur_beres.tools.inbox import MailpitInbox
 from faktur_beres.tools.odoo_gateway import AgentOdooGateway
+from faktur_beres.tools.policy_rag import index_problem
+from faktur_beres.tools.reply_reading import ReplyReading
 
 RUN_DIR = REPO_ROOT / "eval" / "hasil" / "graph"
 FILES_ROOT = REPO_ROOT / "var" / "evaluasi-berkas"
 INTERNAL = "arunika.test"
 DECISIONS = {"setujui": Decision.APPROVE, "tolak": Decision.REJECT}
 LIMIT = 1000
-WAITING = "menunggu M4b"
 Group = Literal["faktur", "ketahanan"]
 MASTER_MODELS: tuple[tuple[str, list[Any], tuple[str, ...]], ...] = (
     ("res.partner", [["supplier_rank", ">", 0]], ("id", "name", "vat", "email")),
@@ -100,8 +115,7 @@ class Result(BaseModel):
     status_final: str
     message: str | None
     first_stop_passed: bool
-    final_passed: bool | None  # None: waiting for M4b
-    final_note: str | None = None
+    final_passed: bool
     checks: list[dict[str, Any]]
     seconds_to_route: float | None
     calls_per_model: dict[str, int]
@@ -109,6 +123,10 @@ class Result(BaseModel):
     cost_usd: Decimal
     planner: dict[str, Any] | None = None
     mapped_lines: int = 0
+    replies: int = 0
+    llm_route_choices: int = 0
+    escalations: int = 0
+    guard_refusals: int = 0
     trace: list[str] = Field(default_factory=list)
 
 
@@ -120,6 +138,7 @@ class RunState(BaseModel):
     reviewer: bool
     llm: bool
     cache: bool
+    intake: Literal["kanal", "langsung"] = "kanal"
     prompt: str
     groups: tuple[Group, ...]
     ids: tuple[str, ...] = ()
@@ -167,12 +186,18 @@ def cases(groups: Sequence[Group], ids: Sequence[str]) -> list[Case]:
 def oracle_extractor(found: Sequence[Case]) -> Any:
     """The extractor of ``--ekstraksi orakel``: the document truth, by file hash."""
     by_hash: dict[str, tuple[InvoiceData, list[TextFragment]]] = {}
-    for case in found:
-        truth = case.label.kebenaran_dokumen
-        by_hash[case.label.berkas.sha256] = (
+
+    def add(sha256: str, truth: Any, document_format: str) -> None:
+        by_hash[sha256] = (
             truth_to_invoice(truth),
-            truth_fragments(truth, document_format=case.label.format),
+            truth_fragments(truth, document_format=document_format),
         )
+
+    for case in found:
+        add(case.label.berkas.sha256, case.label.kebenaran_dokumen, case.label.format)
+        reply = case.label.simulasi.balasan_vendor if isinstance(case.label, Label) else None
+        if reply is not None and reply.berkas is not None and reply.kebenaran_dokumen is not None:
+            add(reply.berkas.sha256, reply.kebenaran_dokumen, case.label.format)
 
     def extract(data: bytes) -> ExtractionOutcome:
         invoice, fragments = by_hash[hashlib.sha256(data).hexdigest()]
@@ -218,6 +243,18 @@ class Observer:
                     sent[address] += 1
         return sent
 
+    def agent_email_to(self, address: str) -> tuple[str, str]:
+        """Subject and Message-ID of the newest e-mail the agent sent to ``address``."""
+        response = httpx.get(f"{self.api}/api/v1/messages", params={"limit": 200}, timeout=20)
+        response.raise_for_status()
+        wanted = normalize_email(address)
+        for message in response.json().get("messages") or []:
+            if any(
+                normalize_email(to.get("Address") or "") == wanted for to in message["To"] or []
+            ):
+                return message["Subject"], message["MessageID"]
+        raise LookupError("email agent ke vendor tidak ditemukan")
+
     def new_bills(self, before: dict[int, str]) -> tuple[BillRecord, ...]:
         ids = sorted(set(self.bill_states()) - set(before))
         return odoo_tools.bills_by_ids(self.gateway, ids) if ids else ()
@@ -252,6 +289,42 @@ def planned(
             )
         )
     return tuple(result)
+
+
+def _mime(name: str) -> tuple[str, str]:
+    guessed = mimetypes.guess_type(name)[0] or "application/octet-stream"
+    main, sub = guessed.split("/", 1)
+    return main, sub
+
+
+def _send(
+    settings: Settings,
+    *,
+    sender: str,
+    to: str,
+    subject: str,
+    body: str,
+    message_id: str,
+    in_reply_to: str | None = None,
+    date: str | None = None,
+    attachment: tuple[str, bytes] | None = None,
+) -> None:
+    mail = EmailMessage()
+    mail["From"] = sender
+    mail["To"] = to
+    mail["Subject"] = subject
+    mail["Message-ID"] = message_id
+    if date is not None:
+        mail["Date"] = format_datetime(datetime.fromisoformat(date))
+    if in_reply_to is not None:
+        mail["In-Reply-To"] = in_reply_to
+        mail["References"] = in_reply_to
+    mail.set_content(body)
+    if attachment is not None:
+        main, sub = _mime(attachment[0])
+        mail.add_attachment(attachment[1], maintype=main, subtype=sub, filename=attachment[0])
+    with smtplib.SMTP(settings.smtp_host, settings.smtp_port, timeout=20) as smtp:
+        smtp.send_message(mail)
 
 
 def _reset(url: str, settings: Settings) -> None:
@@ -299,52 +372,81 @@ def _prohibitions(
     return checks
 
 
-def run_case(
-    case: Case,
-    state: RunState,
-    settings: Settings,
-    store: Store,
-    saver: Any,
-    deps_for: Any,
-    ds: Dataset,
-) -> Result:
-    with AgentOdooGateway.from_settings(settings) as gateway:
-        deps: Dependencies = deps_for(gateway)
-        runner = Runner(store, deps.files, build_graph(deps, saver))
-        observer = Observer(gateway, settings)
-        before, master = observer.bill_states(), observer.master()
-        label = case.label
-        email = label.email if isinstance(label, Label) else None
-        data = (REPO_ROOT / label.berkas.path).read_bytes()
-        invoice_id = runner.accept(
-            data,
-            label.berkas.nama_kirim,
-            channel=Channel.EMAIL if email else Channel.UPLOAD,
-            sender_email=normalize_email(email.dari) if email else None,
-            subject=email.subjek if email else None,
-            body=email.isi if email else None,
+@dataclass(frozen=True)
+class Live:
+    """What a scenario needs from the run."""
+
+    settings: Settings
+    store: Store
+    saver: Any
+    deps_for: Any
+    dataset: Dataset
+
+
+def _first_invoice(
+    case: Case, state: RunState, live: Live, runner: Runner, poller: InboxPoller
+) -> str:
+    label = case.label
+    email = label.email if isinstance(label, Label) else None
+    data = (REPO_ROOT / label.berkas.path).read_bytes()
+    if email is not None and state.intake == "kanal":
+        _send(
+            live.settings,
+            sender=email.dari,
+            to=email.kepada,
+            subject=email.subjek,
+            body=email.isi,
+            message_id=email.message_id,
+            date=email.tanggal,
+            attachment=(label.berkas.nama_kirim, data),
         )
-        first = runner.run(invoice_id)
-        snapshot = runner.graph.get_state({"configurable": {"thread_id": invoice_id}}).values
-        raw = snapshot.get("analysis")
-        analysis = AnalysisResult.model_validate(raw) if raw else None
-        bills_before = len(observer.new_bills(before))
-        emails_before = observer.outgoing()
+        handled = poller.poll_once()
+        return handled[0].invoice_ids[0]
+    invoice_id = runner.accept(
+        data,
+        label.berkas.nama_kirim,
+        channel=Channel.EMAIL if email else Channel.UPLOAD,
+        sender_email=normalize_email(email.dari) if email else None,
+        subject=email.subjek if email else None,
+        body=email.isi if email else None,
+    )
+    runner.run(invoice_id)
+    return invoice_id
+
+
+def run_case(case: Case, state: RunState, live: Live) -> Result:
+    with AgentOdooGateway.from_settings(live.settings) as gateway:
+        store = live.store
+        deps: Dependencies = live.deps_for(gateway)
+        runner = Runner(store, deps.files, build_graph(deps, live.saver))
+        poller = InboxPoller(store, MailpitInbox(live.settings.mailpit_url), runner)
+        observer = Observer(gateway, live.settings)
+        before, master = observer.bill_states(), observer.master()
+        invoice_id = _first_invoice(case, state, live, runner, poller)
+        first = runner.status(invoice_id)
         row = store.get(invoice_id)
         seconds = (
             (row.route_decided_at - row.received_at).total_seconds()
             if row.route_decided_at
             else None
         )
-        final, note = _simulate(case, runner, first, invoice_id)
+        first_route = row.route
+        bills_before = len(observer.new_bills(before))
+        emails_before = observer.outgoing()
+        final, replies = _simulate(case, runner, poller, first, invoice_id, observer, live)
+        config = {"configurable": {"thread_id": invoice_id}}
+        snapshot = runner.graph.get_state(config).values
+        raw = snapshot.get("analysis")
+        analysis = AnalysisResult.model_validate(raw) if raw else None
         emails_total = observer.outgoing()
-        bills = planned(observer.new_bills(before), analysis, ds)
+        bills = planned(observer.new_bills(before), analysis, live.dataset)
         models, purposes, cost = _llm_summary(store, invoice_id)
         mapped = sum(1 for m in (analysis.lines.matches if analysis else ()) if m.method == "llm")
         outcome = _outcome(
-            case, first, final, row.route, bills_before, emails_before, emails_total, bills
+            case, first, final, first_route, bills_before, emails_before, emails_total, bills
         )
-        checks, first_ok, final_ok = _score(case, outcome, final, note, observer, before, master)
+        checks, first_ok, final_ok = _score(case, outcome, observer, before, master)
+        choices, escalations, refusals = _route_counts(store, invoice_id)
         return Result(
             id=case.id,
             group=case.group,
@@ -352,14 +454,13 @@ def run_case(
             format=case.format,
             channel=case.channel,
             invoice_id=invoice_id,
-            route=row.route,
+            route=first_route,
             reasons=list(first.reasons),
             status_first=first.status.value,
             status_final=final.status.value,
             message=final.message,
             first_stop_passed=first_ok,
             final_passed=final_ok,
-            final_note=note,
             checks=[c.model_dump() for c in checks],
             seconds_to_route=seconds,
             calls_per_model=dict(models),
@@ -367,13 +468,56 @@ def run_case(
             cost_usd=cost,
             planner=snapshot.get("planner"),
             mapped_lines=mapped,
+            replies=replies,
+            llm_route_choices=choices,
+            escalations=escalations,
+            guard_refusals=refusals,
         )
 
 
-def _simulate(case: Case, runner: Runner, first: Stop, invoice_id: str) -> tuple[Stop, str | None]:
+def _route_counts(store: Store, invoice_id: str) -> tuple[int, int, int]:
+    """Route choices by the LLM, escalations among them, and choices the guard refused."""
+    choices = escalations = refused = 0
+    for entry in store.audit_entries(invoice_id):
+        if entry.name == "jalur" and "oleh LLM" in (entry.summary or ""):
+            choices += 1
+            escalations += (entry.summary or "").startswith("jalur C")
+        elif entry.name == "pilihan_jalur_ditolak":
+            refused += 1
+    return choices, escalations, refused
+
+
+def _send_reply(case: Case, reply: VendorReply, observer: Observer, live: Live) -> None:
+    """The vendor's answer to the agent's e-mail, through SMTP like any other message."""
+    subject, message_id = observer.agent_email_to(reply.dari)
+    attachment = None
+    if reply.jenis == "lampiran" and reply.berkas is not None:
+        attachment = (reply.berkas.nama_kirim, (REPO_ROOT / reply.berkas.path).read_bytes())
+    digest = hashlib.sha256(f"{case.label.berkas.sha256}{message_id}".encode()).hexdigest()[:24]
+    _send(
+        live.settings,
+        sender=reply.dari,
+        to=AP_ADDRESS,
+        subject=f"Re: {subject}",
+        body=reply.isi,
+        message_id=f"<balasan-{digest}@{reply.dari.rsplit('@', 1)[-1]}>",
+        in_reply_to=f"<{message_id}>",
+        attachment=attachment,
+    )
+
+
+def _simulate(
+    case: Case,
+    runner: Runner,
+    poller: InboxPoller,
+    first: Stop,
+    invoice_id: str,
+    observer: Observer,
+    live: Live,
+) -> tuple[Stop, int]:
     label = case.label
     if isinstance(label, RobustnessLabel):
-        return first, None
+        return first, 0
     decision = label.simulasi.keputusan_approver
     if first.status is InvoiceStatus.AWAITING_APPROVAL and decision is not None:
         chosen = DECISIONS[decision.keputusan]
@@ -384,10 +528,13 @@ def _simulate(case: Case, runner: Runner, first: Stop, invoice_id: str) -> tuple
             final = runner.decide(
                 invoice_id, chosen, decided_by="simulasi", note=decision.catatan or None
             )
-        return final, None
-    if label.simulasi.balasan_vendor is not None and first.status is InvoiceStatus.AWAITING_VENDOR:
-        return first, WAITING
-    return first, None
+        return final, 0
+    reply = label.simulasi.balasan_vendor
+    if reply is not None and first.status is InvoiceStatus.AWAITING_VENDOR:
+        _send_reply(case, reply, observer, live)
+        poller.poll_once()
+        return runner.status(invoice_id), 1
+    return first, 0
 
 
 def _outcome(
@@ -417,12 +564,10 @@ def _outcome(
 def _score(
     case: Case,
     outcome: Outcome,
-    final: Stop,
-    note: str | None,
     observer: Observer,
     before: dict[int, str],
     master: dict[str, Any],
-) -> tuple[list[Check], bool, bool | None]:
+) -> tuple[list[Check], bool, bool]:
     policy = load_policy_cached()
     label = case.label
     if isinstance(label, RobustnessLabel):
@@ -445,12 +590,9 @@ def _score(
         return checks, ok, ok
     stop_checks = first_stop_checks(label, outcome)
     extra_checks = _prohibitions(before, observer, master, label.harapan.larangan)
-    first_ok = all(c.ok for c in stop_checks)
-    if note == WAITING:
-        return [*stop_checks, *extra_checks], first_ok, None
     scored = score(label, outcome, policy)
     checks = [*scored.checks, *extra_checks]
-    return checks, first_ok, all(c.ok for c in checks)
+    return checks, all(c.ok for c in stop_checks), all(c.ok for c in checks)
 
 
 _POLICY: Any = None
@@ -470,6 +612,11 @@ def percentile_95(values: Sequence[float]) -> float:
     return sorted(values)[math.ceil(len(values) * 0.95) - 1]
 
 
+def _pattern_reply_reader(text: str) -> ReplyReading:
+    """``--tanpa-llm``: the numbers in the reply text, with the pattern of the oracle."""
+    return ReplyReading(tuple(PO_TOKEN.findall(text.upper())))
+
+
 def timing_row(values: Sequence[float]) -> dict[str, float]:
     return {
         "n": len(values),
@@ -484,16 +631,10 @@ def summarize(results: Sequence[Result]) -> dict[str, Any]:
         table: dict[str, dict[str, int]] = {}
         for result in results:
             name = getattr(result, key)
-            row = table.setdefault(
-                name, {"n": 0, "pertama": 0, "akhir": 0, "akhir_dinilai": 0, "menunggu": 0}
-            )
+            row = table.setdefault(name, {"n": 0, "pertama": 0, "akhir": 0})
             row["n"] += 1
             row["pertama"] += result.first_stop_passed
-            if result.final_passed is None:
-                row["menunggu"] += 1
-            else:
-                row["akhir_dinilai"] += 1
-                row["akhir"] += result.final_passed
+            row["akhir"] += result.final_passed
         return table
 
     per_format: dict[str, list[float]] = {}
@@ -513,10 +654,13 @@ def summarize(results: Sequence[Result]) -> dict[str, Any]:
     return {
         "jumlah": len(results),
         "pertama_lulus": sum(r.first_stop_passed for r in results),
-        "akhir_lulus": sum(r.final_passed is True for r in results),
-        "akhir_dinilai": sum(r.final_passed is not None for r in results),
-        "menunggu_m4b": sum(r.final_passed is None for r in results),
-        "gagal": [r.id for r in results if not r.first_stop_passed or r.final_passed is False],
+        "akhir_lulus": sum(r.final_passed for r in results),
+        "gagal": [r.id for r in results if not r.first_stop_passed or not r.final_passed],
+        "balasan_diproses": sum(r.replies for r in results),
+        "pilihan_jalur_llm": sum(r.llm_route_choices for r in results),
+        "eskalasi_llm": sum(r.escalations for r in results),
+        "pilihan_jalur_ditolak": sum(r.guard_refusals for r in results),
+        "panggilan_embedding": sum(r.calls_per_purpose.get("embedding", 0) for r in results),
         "per_kelompok": group("group"),
         "per_kategori": group("category"),
         "per_format": group("format"),
@@ -540,7 +684,7 @@ def save(state: RunState) -> None:
 
 
 def print_result(result: Result) -> None:
-    final = {True: "lulus", False: "GAGAL", None: WAITING}[result.final_passed]
+    final = "lulus" if result.final_passed else "GAGAL"
     first = "lulus" if result.first_stop_passed else "GAGAL"
     print(
         f"{result.id:<8} jalur {result.route or '-'} {result.status_first:<18} "
@@ -557,13 +701,13 @@ def print_summary(state: RunState) -> None:
     s = state.summary
     print(
         f"\nPertama berhenti: {s['pertama_lulus']}/{s['jumlah']}. "
-        f"Status akhir: {s['akhir_lulus']}/{s['akhir_dinilai']}. "
-        f"Menunggu M4b: {s['menunggu_m4b']}."
+        f"Status akhir: {s['akhir_lulus']}/{s['jumlah']}. Balasan: {s['balasan_diproses']}. "
+        f"Pilihan jalur LLM: {s['pilihan_jalur_llm']} (eskalasi {s['eskalasi_llm']}, "
+        f"ditolak guard {s['pilihan_jalur_ditolak']}). Embedding: {s['panggilan_embedding']}."
     )
     for name in ("per_kelompok", "per_kategori", "per_format", "per_kanal"):
         cells = [
-            f"{key} {row['pertama']}/{row['n']}"
-            + (f" (akhir {row['akhir']}/{row['akhir_dinilai']})" if row["akhir_dinilai"] else "")
+            f"{key} {row['pertama']}/{row['n']} (akhir {row['akhir']}/{row['n']})"
             for key, row in s[name].items()
         ]
         print(f"{name.replace('per_', 'Per ')}: " + ", ".join(cells))
@@ -584,7 +728,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--penilai", choices=("nyala", "mati"))
     parser.add_argument("--tanpa-llm", action="store_true", help="tanpa perencana dan pemetaan")
     parser.add_argument("--pakai-cache", action="store_true")
+    parser.add_argument("--intake", choices=("kanal", "langsung"), default="kanal")
     parser.add_argument("--tanpa-reset", action="store_true", help="untuk pengembangan")
+    parser.add_argument(
+        "--tanpa-rag", action="store_true", help="untuk pengembangan: tanpa indeks kebijakan"
+    )
     parser.add_argument("--lanjut", metavar="RUN")
     parser.add_argument("--maks-panggilan", type=int, metavar="N")
     args = parser.parse_args(argv)
@@ -604,6 +752,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             reviewer=reviewer,
             llm=not args.tanpa_llm,
             cache=args.pakai_cache,
+            intake=args.intake,
             prompt=EXTRACTION_PROMPT,
             groups=tuple(args.set or ("faktur", "ketahanan")),
             ids=tuple(args.id),
@@ -622,16 +771,37 @@ def main(argv: Sequence[str] | None = None) -> int:
     store = Store(engine)
     oracle = oracle_extractor(todo)
 
+    policy_store = PolicyStore(engine)
+    embedder = gemini_embedder(
+        settings, cache=LlmCache(cache_dir(settings)) if state.cache else None
+    )
+    if not args.tanpa_rag:
+        problem = index_problem(policy_store, settings.gemini_model_embedding)
+        if problem is not None:
+            engine.dispose()
+            usage.detach(handler)
+            print(f"{problem}. Jalankan npm run rag:indeks dulu.", file=sys.stderr)
+            return 2
+
     def deps_for(gateway: AgentOdooGateway) -> Dependencies:
-        live = live_dependencies(settings, store, gateway, llm)
+        built = live_dependencies(
+            settings, store, gateway, llm, policy_store=policy_store, embedder=embedder
+        )
         changes: dict[str, Any] = {"files": FileStore(FILES_ROOT)}
         if state.extraction == "orakel":
             changes["extractor"] = oracle
         if not state.reviewer:
             changes["reviewer"] = None
         if not state.llm:
-            changes |= {"planner": None, "line_mapper": None}
-        return replace(live, **changes)
+            changes |= {
+                "planner": None,
+                "line_mapper": None,
+                "route_chooser": None,
+                "reply_reader": _pattern_reply_reader,
+            }
+        if args.tanpa_rag:
+            changes |= {"route_chooser": None, "policy_quotes": None}
+        return replace(built, **changes)
 
     calls = sum(sum(r.calls_per_model.values()) for r in state.results)
     print(
@@ -652,7 +822,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     break
                 if not args.tanpa_reset:
                     _reset(url, settings)
-                result = run_case(case, state, settings, store, saver, deps_for, ds)
+                result = run_case(case, state, Live(settings, store, saver, deps_for, ds))
                 calls += sum(result.calls_per_model.values())
                 state.results.append(result)
                 save(state)
