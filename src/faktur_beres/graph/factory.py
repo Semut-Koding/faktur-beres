@@ -28,6 +28,7 @@ from faktur_beres.tools.extract_invoice import extract_invoice
 from faktur_beres.tools.inbox import MailpitInbox
 from faktur_beres.tools.injection_review import review_injection
 from faktur_beres.tools.odoo_gateway import AgentOdooGateway
+from faktur_beres.tools.reply_reading import read_reply_numbers
 
 FILES_ROOT = REPO_ROOT / "var" / "berkas"
 
@@ -73,6 +74,7 @@ def live_dependencies(
             invoice, vendor, erp, llm=llm, policy=policy
         ),
         line_mapper=lambda invoice, po, lines: line_mapping.map_lines(invoice, po, lines, llm=llm),
+        reply_reader=lambda text: read_reply_numbers(text, llm=llm),
         bills=OdooBills(gateway, policy.rounding.total),
         mailer=MailpitMailer(
             smtp_host=settings.smtp_host, smtp_port=settings.smtp_port, api_url=settings.mailpit_url

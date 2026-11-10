@@ -17,7 +17,7 @@ from langgraph.types import interrupt
 from pydantic import TypeAdapter
 
 from faktur_beres.db.models import ActionKind, AuditKind, Decision
-from faktur_beres.db.store import LineOutcome
+from faktur_beres.db.store import LineOutcome, NewFile
 from faktur_beres.domain.engine import (
     AnalysisResult,
     Identification,
@@ -31,6 +31,7 @@ from faktur_beres.domain.engine import (
     unreadable_analysis,
     validate_step,
 )
+from faktur_beres.domain.erp import PoState
 from faktur_beres.domain.findings import Finding, PriceEvidence, QuantityEvidence
 from faktur_beres.domain.invoice import (
     Channel,
@@ -69,6 +70,24 @@ PLANNER_STATUSES = frozenset(
     {PoStatus.CANDIDATE, PoStatus.CORRECTED, PoStatus.NOT_FOUND, PoStatus.AMBIGUOUS}
 )
 BILL_NOTE_RULES = frozenset({"BR-06", "BR-07", "BR-08"})
+#: What depends on the previous document, cleared when a corrected invoice arrives.
+REVISION_RESET: dict[str, Any] = {
+    "invoice": None,
+    "extraction": {},
+    "arithmetic": {},
+    "identification": {},
+    "planner": None,
+    "review": None,
+    "matching": {},
+    "analysis": {},
+    "route": "",
+    "reused_from": None,
+    "po_from_reply": None,
+    "verification": [],
+    "extra_reasons": [],
+    "bill_attempted": False,
+    "draft_left": None,
+}
 _FRAGMENTS = TypeAdapter(list[TextFragment])
 Update = dict[str, Any]
 
@@ -262,7 +281,13 @@ class Nodes:
         assert invoice is not None
         intake = IntakeContext.model_validate(state["intake"])
         reader = self._reader(state, "identify")
-        ident = identify_step(invoice, intake, reader, self.deps.policy)
+        ident = identify_step(
+            invoice,
+            intake,
+            reader,
+            self.deps.policy,
+            po_number_from_reply=state.get("po_from_reply"),
+        )
         return {
             "identification": ident.model_dump(mode="json"),
             "planner": self._plan(state, invoice, ident),
@@ -516,7 +541,7 @@ class Nodes:
                     invoice.invoice_number, invoice.nsfp, invoice.tax_invoice_date, row.file_name
                 )
                 + f" Referensi: [{invoice_id}]."
-                + _bill_details(analysis)
+                + _bill_details(analysis, state.get("revision"))
             )
             key, noted = self._claim(state, ActionKind.POST_NOTE, target, {"text": text})
             if noted is None:
@@ -603,8 +628,10 @@ class Nodes:
         findings = list(analysis.findings)
         clarifying = decision is not None and decision["decision"] == Decision.CLARIFY.value
         notice = not clarifying and ReasonCode.DUPLICATE_CONFIRMED in analysis.reasons
+        clarification_round = state.get("clarification_round", 0) + (0 if notice else 1)
         content = {
             "jenis": "pemberitahuan" if notice else "klarifikasi",
+            "putaran": clarification_round,
             "alasan": [r.value for r in analysis.reasons],
             "pesan": [f.message for f in findings if f.reason is not None],
             "catatan": approver_note,
@@ -635,7 +662,125 @@ class Nodes:
             else initial_status(Route.B, analysis.reasons)
         )
         deps.store.set_status(invoice_id, final, node="act_vendor_email")
-        return {"final_status": final.value}
+        return {"final_status": final.value, "clarification_round": clarification_round}
+
+    def await_vendor(self, state: GraphState) -> Update:
+        """Only the interrupt: no effect here, because this node runs again on resume."""
+        return {"reply": interrupt({"menunggu": "vendor", "invoice_id": state["invoice_id"]})}
+
+    def apply_reply(self, state: GraphState) -> Update:
+        """Record the reply. An attached invoice starts a new revision of the same thread."""
+        store, invoice_id = self.deps.store, state["invoice_id"]
+        reply = state["reply"]
+        attachment = reply["attachment"]
+        store.audit(
+            invoice_id,
+            kind=AuditKind.DECISION,
+            name="balasan_vendor",
+            node="apply_reply",
+            params={"message_id": reply["message_id"]},
+            summary="lampiran" if attachment else "teks",
+        )
+        fragments = _dump_fragments(_reply_fragments(reply["subject"], reply["text"]))
+        common: Update = {
+            "handled_replies": [*state.get("handled_replies", []), reply["message_id"]],
+            "decision": None,
+        }
+        if attachment is None:
+            return {
+                **common,
+                "fragments": [*state.get("fragments", []), *fragments],
+                "reply_outcome": "",
+            }
+        store.add_revision(
+            invoice_id,
+            attachment["revision"],
+            NewFile(
+                path=attachment["path"],
+                sha256=attachment["sha256"],
+                mime=attachment["mime"],
+                size=attachment["size"],
+                name=attachment["name"],
+                source="balasan",
+            ),
+        )
+        intake = IntakeContext(
+            invoice_id=invoice_id,
+            channel=Channel.EMAIL,
+            sender_email=reply["sender"],
+            file_name=attachment["name"],
+            file_sha256=attachment["sha256"],
+        )
+        return {
+            **common,
+            **REVISION_RESET,
+            "revision": attachment["revision"],
+            "intake": intake.model_dump(mode="json"),
+            "fragments": fragments,
+        }
+
+    def read_reply(self, state: GraphState) -> Update:
+        """A text reply: one valid PO number goes back to ``identify``, anything else waits."""
+        deps, invoice_id = self.deps, state["invoice_id"]
+        reply = state["reply"]
+        fragments = _reply_fragments(reply["subject"], reply["text"])
+        if self._reply_has_instruction(state, fragments):
+            deps.store.audit(
+                invoice_id,
+                kind=AuditKind.GUARD,
+                name="balasan_berisi_instruksi",
+                node="read_reply",
+                summary="balasan dinilai ulang lewat aturan",
+            )
+            return {"reply_outcome": "instruksi", "po_from_reply": None}
+        if deps.reply_reader is None:
+            raise RuntimeError("pembaca balasan tidak terpasang")
+        reading = deps.reply_reader(reply["text"])
+        deps.store.audit_llm(invoice_id, "read_reply", reading.calls)
+        valid = self._valid_po_numbers(state, reading.numbers)
+        if len(valid) == 1:
+            deps.store.audit(
+                invoice_id,
+                kind=AuditKind.GUARD,
+                name="nomor_po_dari_balasan",
+                node="read_reply",
+                summary=f"{valid[0]} dari {len(reading.numbers)} nomor yang disebut",
+            )
+            return {"reply_outcome": "po", "po_from_reply": valid[0]}
+        deps.store.audit(
+            invoice_id,
+            kind=AuditKind.GUARD,
+            name="balasan_tanpa_satu_nomor_po",
+            node="read_reply",
+            summary=f"{len(valid)} sah dari {len(reading.numbers)} nomor; tetap menunggu",
+        )
+        deps.store.set_status(invoice_id, InvoiceStatus.AWAITING_VENDOR, node="read_reply")
+        return {"reply_outcome": "tunggu", "final_status": InvoiceStatus.AWAITING_VENDOR.value}
+
+    def _reply_has_instruction(self, state: GraphState, fragments: Sequence[TextFragment]) -> bool:
+        """BR-15 on the reply alone, before a model reads it; layer 2 confirms a weak pattern."""
+        found, _ = judge_step(None, fragments, None)
+        if not any(f.reason is not None for f in found.findings):
+            return False
+        if self.deps.reviewer is None:
+            return True
+        outcome = self.deps.reviewer(fragments)
+        self.deps.store.audit_llm(state["invoice_id"], "read_reply", outcome.calls)
+        judged, _ = judge_step(None, fragments, outcome.review)
+        return any(f.reason is not None for f in judged.findings)
+
+    def _valid_po_numbers(self, state: GraphState, numbers: Sequence[str]) -> list[str]:
+        """Numbers that exist, belong to this vendor and are not cancelled; each once."""
+        vendor = _analysis(state).vendor.vendor
+        if vendor is None:
+            return []
+        reader = self._reader(state, "read_reply")
+        valid: dict[str, None] = {}
+        for raw in numbers:
+            po = reader.purchase_order(normalize_po_number(raw))
+            if po is not None and po.vendor_id == vendor.id and po.state is not PoState.CANCEL:
+                valid[po.number] = None
+        return list(valid)
 
     def _email(
         self,
@@ -734,6 +879,7 @@ class Nodes:
     def apply_decision(self, state: GraphState) -> Update:
         deps, invoice_id = self.deps, state["invoice_id"]
         decision = state["decision"]
+        assert decision is not None
         chosen = Decision(decision["decision"])
         deps.store.decide(
             invoice_id, decision=chosen, decided_by=decision["decided_by"], note=decision["note"]
@@ -766,11 +912,23 @@ class Nodes:
         return {}
 
 
-def _bill_details(analysis: AnalysisResult) -> str:
-    """What the AP staff should know on the draft: PO found, LLM mapping, lower price."""
+def _reply_fragments(subject: str, text: str) -> list[TextFragment]:
+    """Subject and body of a vendor reply, for BR-15."""
+    pieces = ((subject, "subjek balasan"), (text, "balasan"))
+    return [
+        TextFragment(source=TextSource.VENDOR_REPLY, text=value, where=where)
+        for value, where in pieces
+        if value.strip()
+    ]
+
+
+def _bill_details(analysis: AnalysisResult, revision: int | None = None) -> str:
+    """What the AP staff should know on the draft: revision, PO found, LLM mapping, lower price."""
     details = [
         mask_text(f.message) for f in analysis.findings if f.is_note and f.rule in BILL_NOTE_RULES
     ]
+    if revision:
+        details.insert(0, f"Faktur perbaikan (revisi {revision}) dari balasan vendor.")
     return f" Catatan: {' '.join(details)}" if details else ""
 
 

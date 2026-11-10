@@ -33,11 +33,13 @@ from faktur_beres.tools.injection_review import ReviewOutcome
 from faktur_beres.tools.line_mapping import LineMappingOutcome
 from faktur_beres.tools.odoo_tools import AttachmentResult, DraftBillResult, NoteResult
 from faktur_beres.tools.po_planner import PlannerOutcome
+from faktur_beres.tools.reply_reading import ReplyReading
 
 Extractor = Callable[[bytes], ExtractionOutcome]
 Reviewer = Callable[[Sequence[TextFragment]], ReviewOutcome]
 Planner = Callable[[InvoiceData, VendorRecord, ErpReader], PlannerOutcome]
 LineMapper = Callable[[InvoiceData, PurchaseOrderRecord, LinesResult], LineMappingOutcome]
+ReplyReader = Callable[[str], ReplyReading]
 
 
 class GraphStore(Protocol):
@@ -174,10 +176,10 @@ class FileStore:
     def __init__(self, root: Path) -> None:
         self.root = root
 
-    def save(self, invoice_id: str, extension: str, data: bytes) -> str:
+    def save(self, invoice_id: str, extension: str, data: bytes, stem: str = "asli") -> str:
         folder = self.root / invoice_id
         folder.mkdir(parents=True, exist_ok=True)
-        path = folder / f"asli.{extension}"
+        path = folder / f"{stem}.{extension}"
         path.write_bytes(data)
         return path.relative_to(self.root).as_posix()
 
@@ -198,6 +200,7 @@ class Dependencies:
     reviewer: Reviewer | None = None
     planner: Planner | None = None
     line_mapper: LineMapper | None = None
+    reply_reader: ReplyReader | None = None
     internal_domain: str = "arunika.test"
     sender: str = "ap@arunika.test"
     retry_attempts: int = 3

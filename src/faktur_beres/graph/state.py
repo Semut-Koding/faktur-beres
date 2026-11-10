@@ -14,6 +14,23 @@ class Decision(TypedDict):
     note: str | None
 
 
+class ReplyFile(TypedDict):
+    revision: int
+    path: str
+    sha256: str
+    mime: str
+    size: int
+    name: str
+
+
+class VendorReply(TypedDict):
+    message_id: str
+    sender: str
+    subject: str
+    text: str
+    attachment: ReplyFile | None
+
+
 class GraphState(TypedDict, total=False):
     invoice_id: str
     intake: dict[str, Any]
@@ -34,5 +51,11 @@ class GraphState(TypedDict, total=False):
     bill_attempted: bool
     draft_left: int | None  # the agent's draft that failed verification
     approval_request: dict[str, Any]
-    decision: Decision
+    decision: Decision | None
+    clarification_round: int
+    reply: VendorReply
+    handled_replies: list[str]
+    reply_outcome: str  # po | instruksi | tunggu
+    po_from_reply: str | None
+    revision: int
     final_status: str
