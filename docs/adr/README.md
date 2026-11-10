@@ -24,8 +24,8 @@ Setiap keputusan penting dicatat sebagai satu berkas bernomor.
 | [0006](0006-persetujuan-dan-idempotensi.md) | Persetujuan lewat interrupt, aksi di node terpisah, dan kunci idempoten | Diterima | 2026-11-05 |
 | [0007](0007-data-sintetis-dan-skenario.md) | Data sintetis, dataset tunggal, dan katalog 40 skenario berlabel | Diterima | 2026-11-05 |
 | [0008](0008-gemini-sdk-model-kuota-cache-data.md) | Gemini: SDK, model per peran, kuota, cache, dan data | Diterima | 2026-11-09 |
-| [0009](0009-graph-basis-data-dan-aksi.md) | Graph LangGraph, basis data aplikasi, dan aksi sampai agent berhenti | Diusulkan | 2026-11-10 |
-| [0010](0010-llm-di-graph.md) | LLM di graph: peran cadangan, batas waktu per tujuan, dan pemanggilan alat di dalam pagar | Diusulkan | 2026-11-10 |
+| [0009](0009-graph-basis-data-dan-aksi.md) | Graph LangGraph, basis data aplikasi, dan aksi sampai agent berhenti | Diterima | 2026-11-10 |
+| [0010](0010-llm-di-graph.md) | LLM di graph: peran cadangan, batas waktu per tujuan, dan pemanggilan alat di dalam pagar | Diterima | 2026-11-10 |
 
 ## Templat
 

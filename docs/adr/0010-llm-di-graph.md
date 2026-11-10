@@ -1,7 +1,7 @@
 # ADR-0010: LLM di graph: peran cadangan, batas waktu per tujuan, dan pemanggilan alat di dalam pagar
 
-- Status: Diusulkan
-- Tanggal: 2026-11-10
+- Status: Diterima
+- Tanggal: 2026-11-10 (diterima pemilik 2026-11-10)
 - Terkait: [SPEC §5.1–§5.3, §8 (BR-06, BR-07, BR-15, BR-27), §14](../SPEC.md), [ADR-0005](0005-llm-memutuskan-kode-menghitung.md), [ADR-0008](0008-gemini-sdk-model-kuota-cache-data.md)
 
 ## Konteks
@@ -13,7 +13,7 @@ ADR-0008 mencatat bahwa selama peran utama dan kuat memakai model yang sama, tid
 3. **Function calling multi-giliran.** Deklarasi dibuat dari skema Pydantic, mode `ANY` dengan `allowed_function_names`, tanpa function calling otomatis SDK. Giliran model masuk riwayat persis seperti diterima, sehingga `thought_signature` kembali tanpa diubah dan tidak pernah memakai signature pengganti. Panggilan paralel dijawab bersama pada satu giliran, berurutan. Throttle, retry, audit, dan cache berlaku per giliran; kunci cache mencakup seluruh riwayat dan deklarasi, dan entri menyimpan giliran model (base64), tidak pernah prompt.
 4. **Pergantian model di tengah percakapan** mengulang percakapan dari awal dengan sesi alat baru, karena signature tidak dicampur antar-model. Anggaran menghitung semua panggilan.
 5. **Perencana `identify` bersifat penasihat.** Alatnya hanya membaca dan terikat pada vendor yang sudah teridentifikasi, jadi tidak ada parameter `partner_id`; ini lebih ketat dari contoh di SPEC §5.2. Batasnya 20 PO × 20 baris, 6 panggilan model, dan 12 eksekusi alat. Fungsi tidak dikenal dan argumen tidak valid tidak dijalankan. Nomor PO yang diusulkan harus pernah muncul di hasil alat pada percakapan yang sama. BR-06 tetap memutuskan; kesesuaian usulan dengan aturan dicatat di jejak. Penjelasannya hanya catatan internal. Perencana tidak memakai peran cadangan, dan bila LLM tidak tersedia aturan tetap berjalan.
-6. **Pemetaan baris (BR-07).** Hanya baris `no_match` yang dikirim, dan hanya baris PO yang belum terpakai dan produknya tunggal yang ditawarkan, tanpa harga dan kuantitas. Ref harus salah satu yang ditawarkan, satu baris PO untuk satu baris faktur, `null` boleh. Jawaban yang ditolak guard diminta sekali lagi, lalu diperlakukan seperti `LlmUnavailable` (BR-27). `domain` tetap tanpa LLM: `match_lines` menerima pemetaan yang sudah divalidasi dan memeriksa kembali keberadaan baris PO.
+6. **Pemetaan baris (BR-07).** Hanya baris `no_match` yang dikirim, dan hanya baris PO yang belum terpakai dan produknya tunggal yang ditawarkan, tanpa harga dan kuantitas. Ref harus salah satu yang ditawarkan, satu baris PO untuk satu baris faktur, `null` boleh. Jawaban yang ditolak guard diminta sekali lagi, lalu diperlakukan seperti `LlmUnavailable` (BR-27). Pagar tambahan: pemetaan hanya dipakai bila satuan tercetak sejenis dengan satuan baris PO (berat atau hitungan) dan harga satuan faktur berada dalam ±toleransi BR-08 dari harga PO; selain itu pemetaan dibuang, baris tetap tanpa padanan (BR-09), dan jejak mencatat alasannya. `domain` tetap tanpa LLM: `match_lines` menerima pemetaan yang sudah divalidasi dan memeriksa kembali baris PO, satuan, dan harga.
 7. **Prompt `extraction-v2`.** Kode barang hanya diisi bila benar-benar tercetak, dan kolom nomor urut bukan kode barang. `extraction-v1` tetap ada dan tetap dikunci tes sidik.
 
 ## Konsekuensi
