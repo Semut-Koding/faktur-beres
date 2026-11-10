@@ -2,10 +2,18 @@
 
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol
 
-from faktur_beres.db.models import ActionKind, AuditKind, Decision, Invoice
+from faktur_beres.db.models import (
+    ActionKind,
+    AuditKind,
+    Decision,
+    InboxKind,
+    InboxMessage,
+    Invoice,
+)
 from faktur_beres.db.store import ActionState, LineOutcome, NewFile, NewInvoice, OpenApproval
 from faktur_beres.domain.erp import (
     ErpReader,
@@ -40,6 +48,33 @@ class GraphStore(Protocol):
     def add_revision(self, invoice_id: str, revision: int, file: NewFile) -> None: ...
 
     def get(self, invoice_id: str) -> Invoice: ...
+
+    def inbox_done(self, message_ids: Sequence[str]) -> set[str]: ...
+
+    def inbox_begin(
+        self,
+        message_id: str,
+        *,
+        received_at: datetime | None,
+        sender: str | None,
+        recipient: str | None,
+        subject: str | None,
+    ) -> InboxMessage: ...
+
+    def inbox_progress(self, message_id: str, attachments: Sequence[dict[str, Any]]) -> None: ...
+
+    def inbox_finish(
+        self,
+        message_id: str,
+        *,
+        kind: InboxKind,
+        invoice_id: str | None = None,
+        reason: str | None = None,
+    ) -> None: ...
+
+    def invoice_for_message(self, message_id: str, sha256: str) -> str | None: ...
+
+    def invoice_for_outgoing(self, message_ids: Sequence[str]) -> str | None: ...
 
     def first_with_hash(self, sha256: str, *, excluding: str) -> Invoice | None: ...
 

@@ -1,4 +1,4 @@
-"""``npm run agent:proses``, ``agent:status``, ``agent:jejak``, ``agent:putuskan``, ``agent:ulang``.
+"""``npm run agent:proses``, ``status``, ``jejak``, ``putuskan``, ``ulang``, and ``agent:inbox``.
 
 Only files inside the repository are accepted, and any path with a ``_privat`` or ``privat``
 component is refused; the file name is stored but never sent to the LLM.
@@ -7,6 +7,7 @@ component is refused; the file name is stored but never sent to the LLM.
 import argparse
 import json
 import sys
+import time
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -15,10 +16,12 @@ from faktur_beres.db.connection import DatabaseNotConfigured, app_url, make_engi
 from faktur_beres.db.models import AuditEntry, Decision
 from faktur_beres.db.store import Store, UnknownInvoice
 from faktur_beres.domain.rules.safety import mask_params
-from faktur_beres.graph.factory import live_runner
+from faktur_beres.graph.factory import live_poller, live_runner
+from faktur_beres.graph.inbox import InboxPoller
 from faktur_beres.graph.runner import DecisionRefused, FileRefused, Stop
 from faktur_beres.llm import usage
 
+POLL_SECONDS = 10
 FORBIDDEN_PARTS = frozenset({"_privat", "privat"})
 CHOICES = {"setujui": Decision.APPROVE, "tolak": Decision.REJECT, "klarifikasi": Decision.CLARIFY}
 
@@ -94,6 +97,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     decide.add_argument("--catatan")
     decide.add_argument("--oleh", default="approver")
     commands.add_parser("ulang").add_argument("invoice_id")
+    inbox = commands.add_parser("inbox")
+    inbox.add_argument("--terus", action="store_true", help="baca tiap 10 detik sampai dihentikan")
     args = parser.parse_args(argv)
     try:
         return _run(args)
@@ -103,6 +108,22 @@ def main(argv: Sequence[str] | None = None) -> int:
     except DatabaseNotConfigured as exc:
         print(str(exc), file=sys.stderr)
         return 2
+
+
+def _poll(poller: InboxPoller, *, keep_going: bool) -> None:
+    while True:
+        handled = poller.poll_once()
+        for item in handled:
+            target = ", ".join(item.invoice_ids) or "-"
+            print(f"{item.kind.value:<8} {target} {item.reason or ''}".rstrip())
+        if not keep_going:
+            if not handled:
+                print("Tidak ada pesan baru.")
+            return
+        try:
+            time.sleep(POLL_SECONDS)
+        except KeyboardInterrupt:
+            return
 
 
 def _run(args: argparse.Namespace) -> int:
@@ -140,6 +161,8 @@ def _run(args: argparse.Namespace) -> int:
                         note=args.catatan,
                     )
                 )
+            elif args.perintah == "inbox":
+                _poll(live_poller(settings, runner), keep_going=args.terus)
             else:
                 show(runner.retry(args.invoice_id))
     finally:

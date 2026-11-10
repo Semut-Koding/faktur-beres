@@ -38,6 +38,7 @@
     "agent:status": "uv run python -m faktur_beres.graph.cli status",
     "agent:jejak": "uv run python -m faktur_beres.graph.cli jejak",
     "agent:putuskan": "uv run python -m faktur_beres.graph.cli putuskan",
+    "agent:inbox": "uv run python -m faktur_beres.graph.cli inbox",
     "agent:ulang": "uv run python -m faktur_beres.graph.cli ulang",
     "graph:diagram": "uv run python -m faktur_beres.graph.diagram",
     "db:migrate": "uv run python -m faktur_beres.db migrasi",

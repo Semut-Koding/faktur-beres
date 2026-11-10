@@ -19,11 +19,13 @@ from faktur_beres.domain.policy import load_policy
 from faktur_beres.domain.rules.bill_plan import BillPlan
 from faktur_beres.graph.build import build_graph
 from faktur_beres.graph.deps import Dependencies, FileStore
+from faktur_beres.graph.inbox import InboxPoller
 from faktur_beres.graph.runner import Runner
 from faktur_beres.llm.gemini import GeminiClient, gemini_client
 from faktur_beres.tools import line_mapping, odoo_tools, po_planner
 from faktur_beres.tools.email_tool import MailpitMailer
 from faktur_beres.tools.extract_invoice import extract_invoice
+from faktur_beres.tools.inbox import MailpitInbox
 from faktur_beres.tools.injection_review import review_injection
 from faktur_beres.tools.odoo_gateway import AgentOdooGateway
 
@@ -104,3 +106,7 @@ def live_runner(settings: Settings, *, use_cache: bool = False) -> Iterator[Runn
             yield Runner(store, deps.files, build_graph(replace(deps), saver))
     finally:
         engine.dispose()
+
+
+def live_poller(settings: Settings, runner: Runner) -> InboxPoller:
+    return InboxPoller(runner.store, MailpitInbox(settings.mailpit_url), runner)

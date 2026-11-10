@@ -9,7 +9,15 @@ from typing import Any
 
 from langgraph.checkpoint.memory import InMemorySaver
 
-from faktur_beres.db.models import ActionKind, ActionStatus, AuditKind, Decision, Invoice
+from faktur_beres.db.models import (
+    ActionKind,
+    ActionStatus,
+    AuditKind,
+    Decision,
+    InboxKind,
+    InboxMessage,
+    Invoice,
+)
 from faktur_beres.db.store import (
     ActionState,
     LineOutcome,
@@ -50,6 +58,7 @@ class FakeStore:
         self.trail: list[AuditRow] = []
         self.llm: list[LlmCallRecord] = []
         self.statuses: list[str] = []
+        self.inbox: dict[str, InboxMessage] = {}
         self.files: dict[tuple[str, int], NewFile] = {}
 
     def create_invoice(self, new: NewInvoice) -> str:
@@ -88,6 +97,63 @@ class FakeStore:
 
     def get(self, invoice_id: str) -> Invoice:
         return self.invoices[invoice_id]
+
+    def inbox_done(self, message_ids: Sequence[str]) -> set[str]:
+        return {m for m in message_ids if m in self.inbox and self.inbox[m].status == "selesai"}
+
+    def inbox_begin(
+        self,
+        message_id: str,
+        *,
+        received_at: datetime | None,
+        sender: str | None,
+        recipient: str | None,
+        subject: str | None,
+    ) -> InboxMessage:
+        return self.inbox.setdefault(
+            message_id,
+            InboxMessage(
+                message_id=message_id,
+                received_at=received_at,
+                sender=sender,
+                recipient=recipient,
+                subject=subject,
+                attachments=[],
+                status="diproses",
+            ),
+        )
+
+    def inbox_progress(self, message_id: str, attachments: Sequence[dict[str, Any]]) -> None:
+        self.inbox[message_id].attachments = [dict(a) for a in attachments]
+
+    def inbox_finish(
+        self,
+        message_id: str,
+        *,
+        kind: InboxKind,
+        invoice_id: str | None = None,
+        reason: str | None = None,
+    ) -> None:
+        row = self.inbox[message_id]
+        row.kind, row.invoice_id, row.reason, row.status = (
+            kind.value,
+            invoice_id,
+            reason,
+            "selesai",
+        )
+
+    def invoice_for_message(self, message_id: str, sha256: str) -> str | None:
+        for key, row in self.invoices.items():
+            if row.source_message_id == message_id and row.file_sha256 == sha256:
+                return key
+        return None
+
+    def invoice_for_outgoing(self, message_ids: Sequence[str]) -> str | None:
+        for row in self.action_rows.values():
+            result = row["result"] or {}
+            if row["kind"] is ActionKind.SEND_EMAIL and result.get("message_id") in message_ids:
+                return str(row["invoice_id"])
+        return None
 
     def first_with_hash(self, sha256: str, *, excluding: str) -> Invoice | None:
         same = [
