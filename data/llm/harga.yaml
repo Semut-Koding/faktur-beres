@@ -7,9 +7,12 @@
 # Tulis harga sebagai string desimal, jangan pecahan desimal YAML (float).
 # Model dan validasinya: faktur_beres.llm.cost.PriceList.
 sumber: https://aistudio.google.com/docs/pricing  # dialihkan dari ai.google.dev/gemini-api/docs/pricing
-diperbarui: 2026-11-09
+diperbarui: 2026-11-10
 mata_uang: USD
 model:
+  gemini-embedding-2:  # masukan teks; embedding tidak punya token keluaran
+    - masukan_per_juta: "0.20"
+      keluaran_per_juta: "0"
   gemini-3.5-flash-lite:
     - masukan_per_juta: "0.30"
       keluaran_per_juta: "2.50"
