@@ -171,6 +171,21 @@ def test_pre_commit_hook_install_is_idempotent(repo: Path) -> None:
     assert install_pre_commit_hook(repo) == "sudah terpasang"
 
 
+def test_pre_commit_hook_runs_ruff_before_the_secret_guard() -> None:
+    lines = HOOK_SCRIPT.splitlines()
+    assert "set -e" in lines
+    check, fmt = lines.index("uv run ruff check ."), lines.index("uv run ruff format --check .")
+    assert check < fmt < lines.index("exec npm run --silent guard:secrets")
+
+
+def test_an_older_hook_of_ours_is_replaced(repo: Path) -> None:
+    hook = repo / ".git" / "hooks" / "pre-commit"
+    hook.parent.mkdir(parents=True, exist_ok=True)
+    hook.write_text(f"#!/bin/sh\n{HOOK_MARKER}\nexec true\n", encoding="utf-8")
+    assert install_pre_commit_hook(repo) == "diperbarui"
+    assert hook.read_text(encoding="utf-8") == HOOK_SCRIPT
+
+
 def test_foreign_pre_commit_hook_is_left_alone(repo: Path) -> None:
     hook = repo / ".git" / "hooks" / "pre-commit"
     hook.write_text("#!/bin/sh\necho hook lain\n", encoding="utf-8")

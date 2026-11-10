@@ -33,7 +33,11 @@ VERSION = re.compile(r"(\d+(?:\.\d+)+)")
 HOOK_MARKER = "# faktur-beres: dipasang oleh npm run setup"
 HOOK_SCRIPT = f"""#!/bin/sh
 {HOOK_MARKER}
-# Menolak commit yang memuat berkas .env atau nilai rahasia (npm run guard:secrets).
+# Menolak commit yang gagal lint atau format, atau memuat berkas .env dan nilai rahasia.
+set -e
+cd "$(git rev-parse --show-toplevel)"
+uv run ruff check .
+uv run ruff format --check .
 exec npm run --silent guard:secrets
 """
 
@@ -169,7 +173,7 @@ def ensure_env(example: Path = ENV_EXAMPLE, target: Path = ENV_FILE) -> list[tup
 
 
 def install_pre_commit_hook(repo: Path = REPO_ROOT) -> str:
-    """Install the guard:secrets pre-commit hook. Returns a short status message."""
+    """Install the pre-commit hook (ruff, guard:secrets). Returns a short status message."""
     try:
         result = subprocess.run(
             ["git", "rev-parse", "--git-path", "hooks"],
@@ -210,7 +214,7 @@ def main() -> int:
     env_status = ensure_env()
     print_table(("Variabel", "Status"), env_status)
 
-    print(f"\n== Hook pre-commit guard:secrets: {install_pre_commit_hook()}")
+    print(f"\n== Hook pre-commit (ruff dan guard:secrets): {install_pre_commit_hook()}")
 
     failed = [c.name for c in checks if not c.ok]
     if failed:
