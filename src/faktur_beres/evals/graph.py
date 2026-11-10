@@ -14,6 +14,7 @@ planner and the line mapping use the LLM; ``--ekstraksi llm`` is the whole agent
 
 import argparse
 import hashlib
+import math
 import os
 import shutil
 import statistics
@@ -464,6 +465,11 @@ def load_policy_cached() -> Any:
     return _POLICY
 
 
+def percentile_95(values: Sequence[float]) -> float:
+    """The nearest-rank 95th percentile: with few values it is the largest one."""
+    return sorted(values)[math.ceil(len(values) * 0.95) - 1]
+
+
 def summarize(results: Sequence[Result]) -> dict[str, Any]:
     def group(key: str) -> dict[str, dict[str, int]]:
         table: dict[str, dict[str, int]] = {}
@@ -489,7 +495,8 @@ def summarize(results: Sequence[Result]) -> dict[str, Any]:
         name: {
             "n": len(values),
             "median_detik": round(statistics.median(values), 1),
-            "p95_detik": round(sorted(values)[max(0, int(len(values) * 0.95) - 1)], 1),
+            "p95_detik": round(percentile_95(values), 1),
+            "maks_detik": round(max(values), 1),
         }
         for name, values in sorted(per_format.items())
     }
