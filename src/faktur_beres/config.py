@@ -63,6 +63,15 @@ class Settings(BaseSettings):
     gemini_timeout_text_seconds: int = 60  # a request without a document, every model
     llm_cache_dir: str = "var/cache/llm"  # relative to the repository root
 
+    # API and dashboard (M4c). The access codes are random and never committed.
+    api_host: str = "127.0.0.1"
+    api_port: int = 28000
+    demo_kode_ap: SecretStr | None = None
+    demo_kode_approver: SecretStr | None = None
+    inbox_interval_detik: float | None = None  # empty: the API does not watch the inbox
+    public_mailpit_url: str | None = None  # links shown in the dashboard
+    public_odoo_url: str | None = None
+
 
 @lru_cache
 def get_settings() -> Settings:

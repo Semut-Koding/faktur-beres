@@ -20,7 +20,13 @@ ENV_EXAMPLE = REPO_ROOT / ".env.example"
 ENV_FILE = REPO_ROOT / ".env"
 
 #: Variables that setup fills with ``secrets.token_urlsafe`` when they are empty.
-GENERATED_SECRETS = ("ODOO_DB_PASSWORD", "ODOO_ADMIN_PASSWORD", "APP_DB_PASSWORD")
+GENERATED_SECRETS = (
+    "ODOO_DB_PASSWORD",
+    "ODOO_ADMIN_PASSWORD",
+    "APP_DB_PASSWORD",
+    "DEMO_KODE_AP",
+    "DEMO_KODE_APPROVER",
+)
 APP_DB_URL_TEMPLATE = "postgresql+psycopg://fakturberes:{password}@127.0.0.1:25432/fakturberes"
 EMPTY_HINTS = {
     "ODOO_ADMIN_API_KEY": "kosong, diisi `npm run odoo:init`",

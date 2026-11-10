@@ -1,0 +1,43 @@
+{
+  "sumber": "eval/README.md, bagian \"Sampai status akhir (M4b, 10 November 2026)\"",
+  "tanggal": "2026-11-10",
+  "skenario": 40,
+  "mode": [
+    {
+      "nama": "Orakel",
+      "run": "20261110-092337",
+      "pertama_berhenti": "40/40",
+      "status_akhir": "40/40",
+      "ketahanan": "13/13",
+      "balasan": 13,
+      "pilihan_jalur_llm": 14,
+      "eskalasi": 0,
+      "tidak_selesai": 0
+    },
+    {
+      "nama": "LLM segar",
+      "run": "20261110-093859",
+      "pertama_berhenti": "40/40",
+      "status_akhir": "40/40",
+      "ketahanan": "13/13",
+      "balasan": 13,
+      "pilihan_jalur_llm": 12,
+      "eskalasi": 0,
+      "tidak_selesai": 2
+    }
+  ],
+  "waktu_sampai_jalur_detik": {
+    "mode": "LLM segar",
+    "n": 53,
+    "median": 11.5,
+    "p95": 36.1,
+    "maks": 65.2
+  },
+  "biaya_llm_segar": {
+    "panggilan_flash_lite": 193,
+    "panggilan_embedding": 27,
+    "biaya_usd": 0.18,
+    "biaya_usd_per_faktur": 0.0034
+  },
+  "batas_tafsir": "Satu run per mode, n per format kecil, dan semua pilihan jalur tetap di bawaan, sehingga eskalasi yang sah belum terukur pada data ini."
+}
