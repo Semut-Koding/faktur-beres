@@ -41,6 +41,8 @@
     "agent:inbox": "uv run python -m faktur_beres.graph.cli inbox",
     "agent:ulang": "uv run python -m faktur_beres.graph.cli ulang",
     "graph:diagram": "uv run python -m faktur_beres.graph.diagram",
+    "rag:indeks": "uv run python -m faktur_beres.tools.policy_cli indeks",
+    "rag:cari": "uv run python -m faktur_beres.tools.policy_cli cari",
     "db:migrate": "uv run python -m faktur_beres.db migrasi",
     "db:reset": "uv run python -m faktur_beres.db reset",
     "guard:secrets": "uv run python -m faktur_beres.devtools.guard_secrets"
