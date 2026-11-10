@@ -24,6 +24,7 @@ from faktur_beres.db.store import (
     NewFile,
     NewInvoice,
     OpenApproval,
+    UnknownInvoice,
     format_invoice_id,
 )
 from faktur_beres.domain.erp import ErpReader, NoOtherInvoices
@@ -96,6 +97,8 @@ class FakeStore:
         row.file_name = file.name
 
     def get(self, invoice_id: str) -> Invoice:
+        if invoice_id not in self.invoices:
+            raise UnknownInvoice(invoice_id)
         return self.invoices[invoice_id]
 
     def inbox_done(self, message_ids: Sequence[str]) -> set[str]:

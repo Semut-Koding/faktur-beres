@@ -129,6 +129,7 @@ def test_a_subject_with_a_reference_never_makes_a_new_invoice(tmp_path: Path) ->
     inbox.add("m1", sender=VENDOR, subject="Re: [FB-000999] x", attachments=(("a.pdf", pdf()),))
     [handled] = poll.poll_once()
     assert handled.kind is InboxKind.DITOLAK and h.store.invoices == {}
+    assert handled.reason == "thread tidak dikenal"
 
 
 def test_mailpit_lists_oldest_first_and_reads_reply_headers() -> None:

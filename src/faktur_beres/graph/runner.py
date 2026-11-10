@@ -6,7 +6,7 @@ message and the checkpoint stays (BR-27).
 """
 
 import hashlib
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
@@ -14,8 +14,9 @@ from langgraph.errors import GraphInterrupt
 from langgraph.types import Command
 
 from faktur_beres.db.models import AuditKind, Decision
-from faktur_beres.db.store import NewInvoice
+from faktur_beres.db.store import NewInvoice, UnknownInvoice
 from faktur_beres.domain.invoice import Channel
+from faktur_beres.domain.normalize import normalize_email
 from faktur_beres.domain.reasons import InvoiceStatus
 from faktur_beres.domain.status import InvalidTransition
 from faktur_beres.extraction.filetype import FileKind, FileRejected, identify
@@ -28,6 +29,21 @@ from faktur_beres.tools.errors import AccessDenied, ToolError
 EXTENSION = {FileKind.PDF: "pdf", FileKind.PNG: "png", FileKind.JPEG: "jpg", FileKind.XML: "xml"}
 MAX_NOTE = 500
 DURABILITY = "sync"  # the checkpoint is written before the next step starts (ADR-0009)
+
+
+def without_quotes(text: str) -> str:
+    """The reply without the lines that quote earlier e-mail."""
+    kept = [line for line in text.splitlines() if not line.lstrip().startswith(">")]
+    return "\n".join(kept).strip()
+
+
+@dataclass(frozen=True)
+class IncomingReply:
+    message_id: str
+    sender: str | None
+    subject: str
+    text: str
+    attachments: Sequence[tuple[str, bytes]] = ()
 
 
 class FileRefused(ValueError):
@@ -188,6 +204,75 @@ class Runner:
                 Command(resume=payload), self._config(invoice_id), durability=DURABILITY
             ),
         )
+
+    def reply_refusal(self, invoice_id: str, sender: str | None, message_id: str) -> str | None:
+        """Why this reply cannot continue the thread (BR-20), or None when it can."""
+        try:
+            status = InvoiceStatus(self.store.get(invoice_id).status)
+        except UnknownInvoice:
+            return "thread tidak dikenal"
+        config = self._config(invoice_id)
+        pending = self.graph.get_state(config)
+        if message_id in (pending.values.get("handled_replies") or []):
+            return "balasan ini sudah diproses"
+        if status is not InvoiceStatus.AWAITING_VENDOR or pending.next != ("await_vendor",):
+            return "thread tidak sedang menunggu balasan"
+        vendor = (pending.values.get("analysis") or {}).get("vendor", {}).get("vendor") or {}
+        registered = normalize_email(vendor.get("email") or "")
+        if not registered or normalize_email(sender or "") != registered:
+            self.store.audit(
+                invoice_id,
+                kind=AuditKind.SECURITY,
+                name="pengirim_balasan_ditolak",
+                summary="pengirim bukan alamat penagihan vendor (BR-20)",
+                params={"message_id": message_id},
+                status="refused",
+            )
+            return "pengirim bukan alamat penagihan vendor"
+        return None
+
+    def reply(self, invoice_id: str, reply: IncomingReply) -> Stop:
+        """Continue the thread with a reply that passed ``reply_refusal``."""
+        refusal = self.reply_refusal(invoice_id, reply.sender, reply.message_id)
+        if refusal is not None:
+            raise DecisionRefused(refusal)
+        payload = {
+            "message_id": reply.message_id,
+            "sender": normalize_email(reply.sender),
+            "subject": reply.subject,
+            "text": without_quotes(reply.text),
+            "attachment": self._store_reply_file(invoice_id, reply.attachments),
+        }
+        self.store.set_status(invoice_id, InvoiceStatus.PROCESSING, node="runner")
+        return self._advance(
+            invoice_id,
+            lambda: self.graph.invoke(
+                Command(resume=payload), self._config(invoice_id), durability=DURABILITY
+            ),
+        )
+
+    def _store_reply_file(
+        self, invoice_id: str, attachments: Sequence[tuple[str, bytes]]
+    ) -> dict[str, Any] | None:
+        """The first attachment that is an invoice, saved beside the original."""
+        for name, data in attachments:
+            try:
+                file = identify(data)
+            except FileRejected:
+                continue
+            revision = (self.store.get(invoice_id).revision or 1) + 1
+            path = self.files.save(
+                invoice_id, EXTENSION[file.kind], data, stem=f"revisi-{revision}"
+            )
+            return {
+                "revision": revision,
+                "path": path,
+                "sha256": hashlib.sha256(data).hexdigest(),
+                "mime": file.mime_type,
+                "size": len(data),
+                "name": name,
+            }
+        return None
 
     def retry(self, invoice_id: str) -> Stop:
         """Continue a failed invoice from its last checkpoint; finished actions are not repeated."""

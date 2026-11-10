@@ -20,7 +20,7 @@ from faktur_beres.domain.invoice import Channel
 from faktur_beres.domain.reasons import InvoiceStatus
 from faktur_beres.extraction.filetype import MAX_FILE_BYTES
 from faktur_beres.graph.deps import GraphStore
-from faktur_beres.graph.runner import FileRefused, Runner
+from faktur_beres.graph.runner import FileRefused, IncomingReply, Runner
 from faktur_beres.tools.inbox import AttachmentInfo, Inbox, Mail
 
 THREAD_REFERENCE = re.compile(r"\[(FB-\d{6})\]")
@@ -99,7 +99,35 @@ class InboxPoller:
         return self._store.invoice_for_outgoing(list(mail.in_reply_to))
 
     def _reply(self, mail: Mail, thread: str) -> Handled:
-        return self._finish(mail, InboxKind.DITOLAK, (thread,), "balasan belum diproses")
+        """F-06, BR-20: attachments are fetched only after the reply is known to be acceptable."""
+        summary = mail.summary
+        refusal = self._runner.reply_refusal(thread, summary.sender, summary.message_id)
+        known = () if refusal == "thread tidak dikenal" else (thread,)
+        if refusal is not None:
+            return self._finish(mail, InboxKind.DITOLAK, known, refusal)
+        entries: list[dict[str, Any]] = []
+        files: list[tuple[str, bytes]] = []
+        for attachment in mail.attachments:
+            entry = self._entry(attachment)
+            entries.append(entry)
+            if attachment.size > MAX_FILE_BYTES:
+                entry["status"] = "terlalu besar"
+                continue
+            data = self._inbox.attachment(summary.id, attachment.part_id)
+            entry["sha256"] = hashlib.sha256(data).hexdigest()
+            files.append((attachment.name, data))
+        self._store.inbox_progress(summary.message_id, entries)
+        self._runner.reply(
+            thread,
+            IncomingReply(
+                message_id=summary.message_id,
+                sender=summary.sender,
+                subject=summary.subject,
+                text=mail.text,
+                attachments=files,
+            ),
+        )
+        return self._finish(mail, InboxKind.BALASAN, (thread,))
 
     def _new_invoices(self, mail: Mail, progress: list[dict[str, Any]]) -> Handled:
         message_id = mail.summary.message_id
