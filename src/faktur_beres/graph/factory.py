@@ -14,6 +14,7 @@ from psycopg_pool import ConnectionPool
 
 from faktur_beres.config import REPO_ROOT, Settings
 from faktur_beres.db.connection import app_url, libpq_url, make_engine
+from faktur_beres.db.policy_store import PolicyStore
 from faktur_beres.db.store import DbInvoiceRegistry, Store
 from faktur_beres.domain.policy import load_policy
 from faktur_beres.domain.rules.bill_plan import BillPlan
@@ -21,6 +22,7 @@ from faktur_beres.graph.build import build_graph
 from faktur_beres.graph.deps import Dependencies, FileStore
 from faktur_beres.graph.inbox import InboxPoller
 from faktur_beres.graph.runner import Runner
+from faktur_beres.llm.embedding import Embedder, gemini_embedder
 from faktur_beres.llm.gemini import GeminiClient, gemini_client
 from faktur_beres.tools import line_mapping, odoo_tools, po_planner
 from faktur_beres.tools.email_tool import MailpitMailer
@@ -28,7 +30,9 @@ from faktur_beres.tools.extract_invoice import extract_invoice
 from faktur_beres.tools.inbox import MailpitInbox
 from faktur_beres.tools.injection_review import review_injection
 from faktur_beres.tools.odoo_gateway import AgentOdooGateway
+from faktur_beres.tools.policy_rag import quotes_for_reasons, search_policy
 from faktur_beres.tools.reply_reading import read_reply_numbers
+from faktur_beres.tools.route_chooser import choose_route
 
 FILES_ROOT = REPO_ROOT / "var" / "berkas"
 
@@ -58,6 +62,8 @@ def live_dependencies(
     gateway: AgentOdooGateway,
     llm: GeminiClient,
     *,
+    policy_store: PolicyStore,
+    embedder: Embedder,
     files_root: Path = FILES_ROOT,
 ) -> Dependencies:
     policy = load_policy()
@@ -75,6 +81,12 @@ def live_dependencies(
         ),
         line_mapper=lambda invoice, po, lines: line_mapping.map_lines(invoice, po, lines, llm=llm),
         reply_reader=lambda text: read_reply_numbers(text, llm=llm),
+        route_chooser=lambda context: choose_route(
+            context,
+            llm=llm,
+            search=lambda query, k: search_policy(policy_store, embedder, query, k),
+        ),
+        policy_quotes=lambda reasons: quotes_for_reasons(policy_store, reasons),
         bills=OdooBills(gateway, policy.rounding.total),
         mailer=MailpitMailer(
             smtp_host=settings.smtp_host, smtp_port=settings.smtp_port, api_url=settings.mailpit_url
@@ -104,7 +116,14 @@ def live_runner(settings: Settings, *, use_cache: bool = False) -> Iterator[Runn
         store = Store(engine)
         with AgentOdooGateway.from_settings(settings) as gateway, checkpointer(url) as saver:
             llm = gemini_client(settings, use_cache=use_cache)
-            deps = live_dependencies(settings, store, gateway, llm)
+            deps = live_dependencies(
+                settings,
+                store,
+                gateway,
+                llm,
+                policy_store=PolicyStore(engine),
+                embedder=gemini_embedder(settings),
+            )
             yield Runner(store, deps.files, build_graph(replace(deps), saver))
     finally:
         engine.dispose()

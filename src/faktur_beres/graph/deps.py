@@ -34,12 +34,15 @@ from faktur_beres.tools.line_mapping import LineMappingOutcome
 from faktur_beres.tools.odoo_tools import AttachmentResult, DraftBillResult, NoteResult
 from faktur_beres.tools.po_planner import PlannerOutcome
 from faktur_beres.tools.reply_reading import ReplyReading
+from faktur_beres.tools.route_chooser import RouteContext, RouteOutcome
 
 Extractor = Callable[[bytes], ExtractionOutcome]
 Reviewer = Callable[[Sequence[TextFragment]], ReviewOutcome]
 Planner = Callable[[InvoiceData, VendorRecord, ErpReader], PlannerOutcome]
 LineMapper = Callable[[InvoiceData, PurchaseOrderRecord, LinesResult], LineMappingOutcome]
 ReplyReader = Callable[[str], ReplyReading]
+RouteChooser = Callable[[RouteContext], RouteOutcome]
+PolicyQuotes = Callable[[Sequence[str]], list[dict[str, str]]]
 
 
 class GraphStore(Protocol):
@@ -124,6 +127,8 @@ class GraphStore(Protocol):
 
     def fail_action(self, key: str, error: str) -> None: ...
 
+    def sent_clarifications(self, invoice_id: str) -> int: ...
+
     def open_approval(
         self,
         invoice_id: str,
@@ -201,6 +206,8 @@ class Dependencies:
     planner: Planner | None = None
     line_mapper: LineMapper | None = None
     reply_reader: ReplyReader | None = None
+    route_chooser: RouteChooser | None = None
+    policy_quotes: PolicyQuotes | None = None
     internal_domain: str = "arunika.test"
     sender: str = "ap@arunika.test"
     retry_attempts: int = 3

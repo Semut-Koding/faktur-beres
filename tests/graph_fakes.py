@@ -251,6 +251,15 @@ class FakeStore:
     def finish_action(self, key: str, result: dict[str, Any]) -> None:
         self.action_rows[key] |= {"status": ActionStatus.DONE, "result": result}
 
+    def sent_clarifications(self, invoice_id: str) -> int:
+        return sum(
+            1
+            for row in self.action_rows.values()
+            if row["invoice_id"] == invoice_id
+            and row["kind"] is ActionKind.SEND_EMAIL
+            and row["status"] is ActionStatus.DONE
+        )
+
     def fail_action(self, key: str, error: str) -> None:
         self.action_rows[key] |= {"status": ActionStatus.FAILED, "error": error}
 

@@ -12,7 +12,7 @@ from datetime import UTC, date, datetime
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import Engine, select, update
+from sqlalchemy import Engine, func, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -532,6 +532,20 @@ class Store:
                 .where(ActionRow.idempotency_key == key)
                 .values(status=status.value, result=result, error=error)
             )
+
+    def sent_clarifications(self, invoice_id: str) -> int:
+        """E-mails to the vendor already sent for this invoice, from the ``actions`` table."""
+        query = (
+            select(func.count())
+            .select_from(ActionRow)
+            .where(
+                ActionRow.invoice_id == invoice_id,
+                ActionRow.kind == ActionKind.SEND_EMAIL.value,
+                ActionRow.status == ActionStatus.DONE.value,
+            )
+        )
+        with self._sessions() as session:
+            return session.scalar(query) or 0
 
     def actions(self, invoice_id: str) -> list[ActionRow]:
         query = select(ActionRow).where(ActionRow.invoice_id == invoice_id).order_by(ActionRow.id)

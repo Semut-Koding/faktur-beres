@@ -17,6 +17,7 @@ from faktur_beres.graph.inbox import InboxPoller
 from faktur_beres.graph.runner import DecisionRefused, IncomingReply, without_quotes
 from faktur_beres.llm.contracts import LlmUnavailable
 from faktur_beres.tools.reply_reading import ReplyReading
+from faktur_beres.tools.route_chooser import RouteOutcome
 from graph_fakes import Harness, harness
 from inbox_fakes import FakeInbox
 from test_graph_flow import good, pdf
@@ -183,6 +184,25 @@ def test_a_revision_with_the_same_problem_sends_a_second_clarification(tmp_path:
     assert stop.status is InvoiceStatus.AWAITING_VENDOR
     assert len(h.mailer.sent) == 2
     assert h.mailer.sent[0].message_id != h.mailer.sent[1].message_id
+
+
+def test_the_chooser_sees_rounds_and_previous_reasons(tmp_path: Path) -> None:
+    outcomes: dict[str, Any] = {}
+    seen: list[Any] = []
+
+    def chooser(context: Any) -> RouteOutcome:
+        seen.append(context)
+        return RouteOutcome("chosen", context.default)
+
+    h, invoice_id = build(tmp_path, "QTY-01", outcomes=outcomes, route_chooser=chooser)
+    h.runner.run(invoice_id)
+    truth = LABELS["QTY-01"].kebenaran_dokumen
+    outcomes[hashlib.sha256(CORRECTED).hexdigest()] = good(
+        truth_to_invoice(truth), truth_fragments(truth, document_format="pdf")
+    )
+    h.runner.reply(invoice_id, message("QTY-01", file=True))
+    assert (seen[0].rounds, seen[0].previous_reasons) == (0, [])
+    assert (seen[1].rounds, seen[1].previous_reasons) == (1, ["quantity_variance"])
 
 
 def test_an_unavailable_reader_fails_and_retry_reads_again(tmp_path: Path) -> None:

@@ -65,6 +65,7 @@ from faktur_beres.tools.email_tool import (
 from faktur_beres.tools.errors import AccessDenied, Conflict, ForbiddenOperation, Rejected
 from faktur_beres.tools.errors import VerificationFailed as ToolVerificationFailed
 from faktur_beres.tools.odoo_tools import bill_note_text
+from faktur_beres.tools.route_chooser import RouteContext
 
 PLANNER_STATUSES = frozenset(
     {PoStatus.CANDIDATE, PoStatus.CORRECTED, PoStatus.NOT_FOUND, PoStatus.AMBIGUOUS}
@@ -412,6 +413,7 @@ class Nodes:
                 "Penilaian injeksi lapis 2 belum berhasil, jadi draft tagihan belum dibuat. "
                 "Coba lagi dengan npm run agent:ulang."
             )
+        route, choice = self._choose_route(state, analysis, invoice)
         vendor = analysis.vendor.vendor
         po = analysis.purchase_order.purchase_order
         deps.store.save_analysis(
@@ -432,14 +434,80 @@ class Nodes:
             name="jalur",
             node="decide",
             summary=(
-                f"jalur {route.value}; alasan {[r.value for r in analysis.reasons]}; "
+                f"jalur {route.value} oleh {choice['oleh']}; "
+                f"alasan {[r.value for r in analysis.reasons]}; "
                 f"diizinkan {[r.value for r in analysis.allowed_routes]}"
+                + (f"; pertimbangan: {choice['pertimbangan']}" if choice["pertimbangan"] else "")
+                + (
+                    f"; kutipan {[q['ref'] for q in choice['kutipan']]}"
+                    if choice["kutipan"]
+                    else ""
+                )
             ),
         )
         return {
             "analysis": analysis.model_dump(mode="json"),
             "route": route.value,
+            "route_choice": choice,
             "retry_review": False,
+        }
+
+    def _choose_route(
+        self, state: GraphState, analysis: AnalysisResult, invoice: InvoiceData | None
+    ) -> tuple[Route, dict[str, Any]]:
+        """BR-17: the code's default, or the LLM's choice when two routes are allowed."""
+        deps, invoice_id = self.deps, state["invoice_id"]
+        default = analysis.default_route
+        by_rule: dict[str, Any] = {
+            "oleh": "aturan",
+            "status": "bawaan",
+            "pertimbangan": None,
+            "kutipan": [],
+            "model_calls": 0,
+        }
+        if len(analysis.allowed_routes) < 2 or deps.route_chooser is None:
+            return default, by_rule
+        vendor = analysis.vendor.vendor
+        outcome = deps.route_chooser(
+            RouteContext(
+                vendor_name=vendor.name if vendor else None,
+                total=invoice.total if invoice else None,
+                details=[
+                    f"{f.reason.value}: {f.message}"
+                    for f in analysis.findings
+                    if f.reason is not None
+                ],
+                rounds=deps.store.sent_clarifications(invoice_id),
+                previous_reasons=state.get("previous_reasons", []),
+                allowed=analysis.allowed_routes,
+                default=default,
+            )
+        )
+        deps.store.audit_llm(invoice_id, "decide", outcome.calls)
+        if outcome.status != "chosen":
+            deps.store.audit(
+                invoice_id,
+                kind=AuditKind.GUARD,
+                name="pilihan_jalur_ditolak",
+                node="decide",
+                summary=f"{outcome.status}: {outcome.refusal or '-'}; jalur bawaan dipakai",
+                status="refused" if outcome.status == "refused" else outcome.status,
+            )
+            return default, {
+                **by_rule,
+                "status": outcome.status,
+                "model_calls": outcome.model_calls,
+            }
+        quotes = [
+            {"ref": q.ref, "judul": q.title, "kutipan": q.quote, "skor": str(q.score)}
+            for q in outcome.quotes
+        ]
+        return outcome.route, {
+            "oleh": "LLM",
+            "status": "dipilih",
+            "pertimbangan": outcome.justification,
+            "kutipan": quotes,
+            "model_calls": outcome.model_calls,
         }
 
     def _analysis_of(self, state: GraphState, invoice: InvoiceData) -> AnalysisResult:
@@ -685,6 +753,7 @@ class Nodes:
         common: Update = {
             "handled_replies": [*state.get("handled_replies", []), reply["message_id"]],
             "decision": None,
+            "previous_reasons": list(state.get("analysis", {}).get("reasons", [])),
         }
         if attachment is None:
             return {
@@ -844,7 +913,8 @@ class Nodes:
             "perencana": state.get("planner"),
             "verifikasi_tagihan": state.get("verification", []),
             "setujui_tidak_tersedia": self._why_no_approve(state),
-            "policy_quotes": [],
+            "policy_quotes": self._policy_quotes(state, reasons),
+            "pilihan_jalur": state.get("route_choice"),
             "usulan": proposed,
             "pilihan": options,
         }
@@ -859,6 +929,12 @@ class Nodes:
         )
         deps.store.set_status(invoice_id, InvoiceStatus.AWAITING_APPROVAL, node="prepare_approval")
         return {"approval_request": pack}
+
+    def _policy_quotes(self, state: GraphState, reasons: Sequence[str]) -> list[dict[str, str]]:
+        """BR-21: quotes per reason (no API call), then those of the LLM's route choice."""
+        quotes = self.deps.policy_quotes(reasons) if self.deps.policy_quotes else []
+        choice = state.get("route_choice") or {}
+        return [*quotes, *({"alasan": "pilihan_jalur", **q} for q in choice.get("kutipan", []))]
 
     @staticmethod
     def _why_no_approve(state: GraphState) -> str | None:

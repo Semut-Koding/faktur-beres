@@ -45,6 +45,8 @@ class GraphState(TypedDict, total=False):
     matching: dict[str, Any]
     analysis: dict[str, Any]
     route: str
+    route_choice: dict[str, Any]
+    previous_reasons: list[str]
     retry_review: bool
     extra_reasons: list[str]
     verification: list[str]  # what differed when the bill action could not be verified

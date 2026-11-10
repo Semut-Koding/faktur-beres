@@ -2,6 +2,7 @@
 
 import re
 from collections.abc import Callable
+from decimal import Decimal
 from functools import cache
 from io import BytesIO
 from pathlib import Path
@@ -12,10 +13,11 @@ from reportlab.pdfgen.canvas import Canvas
 
 from faktur_beres.dataset import load_dataset
 from faktur_beres.db.models import AuditKind, Decision
+from faktur_beres.db.policy_store import PolicyHit
 from faktur_beres.domain.findings import ExtractionEvidence, Finding
 from faktur_beres.domain.invoice import InvoiceData, TextFragment
 from faktur_beres.domain.policy import load_policy
-from faktur_beres.domain.reasons import InvoiceStatus, ReasonCode
+from faktur_beres.domain.reasons import InvoiceStatus, ReasonCode, Route
 from faktur_beres.domain.rules.injection import InjectionReview, ReviewStatus
 from faktur_beres.evals.dataset_erp import DatasetErpReader
 from faktur_beres.evals.labels import (
@@ -31,6 +33,7 @@ from faktur_beres.tools.errors import AccessDenied, Unavailable
 from faktur_beres.tools.injection_review import ReviewOutcome
 from faktur_beres.tools.line_mapping import LineMappingOutcome
 from faktur_beres.tools.po_planner import PlannerOutcome
+from faktur_beres.tools.route_chooser import RouteOutcome
 from graph_fakes import FakeBills, Harness, harness
 
 POLICY = load_policy()
@@ -564,6 +567,61 @@ def test_the_draft_note_names_a_lower_price(tmp_path: Path) -> None:
     h, invoice_id = start(tmp_path, "HRG-02")
     h.runner.run(invoice_id)
     assert "lebih rendah" in h.bills.notes[0]
+
+
+def test_a_single_allowed_route_never_asks_the_llm(tmp_path: Path) -> None:
+    def chooser(_context: Any) -> RouteOutcome:
+        raise AssertionError("tidak boleh dipanggil")
+
+    h, invoice_id = start(tmp_path, "COC-04", route_chooser=chooser)
+    assert h.runner.run(invoice_id).status is InvoiceStatus.AWAITING_APPROVAL
+
+
+@pytest.mark.aturan("BR-17")
+def test_an_escalation_reaches_route_c_with_its_quotes(tmp_path: Path) -> None:
+    hit = PolicyHit("SOP-8.2", "Eskalasi", "Kutipan.", Decimal("0.9"))
+    seen: list[Any] = []
+
+    def chooser(context: Any) -> RouteOutcome:
+        seen.append(context)
+        return RouteOutcome("chosen", Route.C, justification="Wajib ditinjau.", quotes=(hit,))
+
+    def per_reason(reasons: Any) -> list[dict[str, str]]:
+        return [{"alasan": reasons[0], "ref": "SOP-3.3", "judul": "J", "kutipan": "K", "skor": "1"}]
+
+    h, invoice_id = start(tmp_path, "HRG-04", route_chooser=chooser, policy_quotes=per_reason)
+    stop = h.runner.run(invoice_id)
+    assert stop.status is InvoiceStatus.AWAITING_APPROVAL and stop.route == "C"
+    assert h.mailer.sent == []
+    assert (seen[0].allowed, seen[0].default) == ((Route.B, Route.C), Route.B)
+    approval = h.store.current_approval(invoice_id)
+    assert approval is not None
+    assert [q["ref"] for q in approval.evidence["policy_quotes"]] == ["SOP-3.3", "SOP-8.2"]
+    [row] = [r for r in h.store.kinds(AuditKind.DECISION) if r.name == "jalur"]
+    assert "oleh LLM" in (row.summary or "") and "SOP-8.2" in (row.summary or "")
+
+
+@pytest.mark.aturan("BR-17")
+@pytest.mark.parametrize("status", ["refused", "budget_exhausted", "unavailable"])
+def test_a_failed_choice_keeps_the_default_route_and_is_recorded(
+    tmp_path: Path, status: str
+) -> None:
+    outcome = RouteOutcome(status, Route.B, refusal="alasan")
+    h, invoice_id = start(tmp_path, "HRG-04", route_chooser=lambda _c: outcome)
+    assert h.runner.run(invoice_id).status is InvoiceStatus.AWAITING_VENDOR
+    assert [r for r in h.store.trail if r.name == "pilihan_jalur_ditolak"]
+
+
+@pytest.mark.aturan("BR-21")
+def test_the_evidence_pack_quotes_per_reason_without_a_route_choice(tmp_path: Path) -> None:
+    def per_reason(reasons: Any) -> list[dict[str, str]]:
+        return [{"alasan": r, "ref": "SOP-5.2"} for r in reasons]
+
+    h, invoice_id = start(tmp_path, "COC-04", policy_quotes=per_reason)
+    h.runner.run(invoice_id)
+    approval = h.store.current_approval(invoice_id)
+    assert approval is not None
+    assert approval.evidence["policy_quotes"] == [{"alasan": "new_vendor", "ref": "SOP-5.2"}]
 
 
 def test_an_unavailable_mapper_is_a_system_failure(tmp_path: Path) -> None:
