@@ -165,6 +165,7 @@ Panggilan LLM: 8 `gemini-3.5-flash-lite` (7 perencana, 1 pemetaan baris KTH-06),
 | Foto | 9 | 11,9 | 23,9 | 23,9 |
 | Pindaian | 5 | 11,7 | 134,9 | 134,9 |
 | UBL | 5 | 1,9 | 5,2 | 5,2 |
+| **Keseluruhan** | 53 | 7,9 | 23,9 | 134,9 |
 
 Panggilan: 114 `gemini-3.5-flash-lite` (ekstraksi 50, pembacaan ulang 3, penilai 53, perencana 7, pemetaan baris 1), tanpa jawaban dari model cadangan. Biaya setara USD 0,138, atau USD 0,0026 per faktur. Ada dua galat yang pulih dengan retry di model yang sama: satu timeout 122 detik, yang membuat DUP-03 butuh 134,9 detik dan melewati target 2 menit (SPEC F-04), dan satu HTTP 503.
 
