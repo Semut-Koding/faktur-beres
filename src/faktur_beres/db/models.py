@@ -71,6 +71,18 @@ class AuditKind(StrEnum):
     SECURITY = "security"
 
 
+class InboxKind(StrEnum):
+    FAKTUR = "faktur"
+    BALASAN = "balasan"
+    ABAIKAN = "abaikan"
+    DITOLAK = "ditolak"
+
+
+class InboxStatus(StrEnum):
+    PROCESSING = "diproses"
+    DONE = "selesai"
+
+
 class MatchMethod(StrEnum):
     VENDOR_CODE = "vendor_code"
     INTERNAL_CODE = "internal_code"
@@ -119,6 +131,7 @@ class Invoice(Base):
     file_mime: Mapped[str] = mapped_column(Text)
     stored_path: Mapped[str] = mapped_column(Text)
     duplicate_of: Mapped[str | None] = mapped_column(ForeignKey("invoices.invoice_id"))
+    source_message_id: Mapped[str | None] = mapped_column(Text)
     # outcome
     status: Mapped[str] = mapped_column(Text)
     route: Mapped[str | None] = mapped_column(Text)
@@ -143,6 +156,54 @@ class Invoice(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     route_decided_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class InvoiceFile(Base):
+    """Every file an invoice has had, one per revision; ``invoices`` holds the current one."""
+
+    __tablename__ = "invoice_files"
+    __table_args__ = (UniqueConstraint("invoice_id", "revision", name="uq_invoice_files_revision"),)
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    invoice_id: Mapped[str] = mapped_column(ForeignKey("invoices.invoice_id"))
+    revision: Mapped[int] = mapped_column(Integer)
+    path: Mapped[str] = mapped_column(Text)
+    sha256: Mapped[str] = mapped_column(Text)
+    mime: Mapped[str] = mapped_column(Text)
+    size: Mapped[int] = mapped_column(BigInteger)
+    name: Mapped[str] = mapped_column(Text)
+    source: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class InboxMessage(Base):
+    """One message of the AP inbox: the source of truth for what has been handled (F-02)."""
+
+    __tablename__ = "inbox_messages"
+    __table_args__ = (
+        CheckConstraint(one_of("kind", InboxKind), name="kind"),
+        CheckConstraint(one_of("status", InboxStatus), name="status"),
+        UniqueConstraint("message_id", name="uq_inbox_messages_message_id"),
+        Index("ix_inbox_messages_invoice_id", "invoice_id"),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    message_id: Mapped[str] = mapped_column(Text)
+    received_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    sender: Mapped[str | None] = mapped_column(Text)
+    recipient: Mapped[str | None] = mapped_column(Text)
+    subject: Mapped[str | None] = mapped_column(Text)
+    kind: Mapped[str | None] = mapped_column(Text)
+    invoice_id: Mapped[str | None] = mapped_column(ForeignKey("invoices.invoice_id"))
+    attachments: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, server_default=text("'[]'::jsonb")
+    )
+    status: Mapped[str] = mapped_column(Text)
+    reason: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

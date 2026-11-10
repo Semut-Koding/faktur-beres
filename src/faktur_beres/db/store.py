@@ -25,7 +25,11 @@ from faktur_beres.db.models import (
     AuditEntry,
     AuditKind,
     Decision,
+    InboxKind,
+    InboxMessage,
+    InboxStatus,
     Invoice,
+    InvoiceFile,
     InvoiceLineRow,
     MatchResultRow,
 )
@@ -57,6 +61,19 @@ class NewInvoice:
     sender_email: str | None = None
     email_subject: str | None = None
     email_body: str | None = None
+    source_message_id: str | None = None
+
+
+@dataclass(frozen=True)
+class NewFile:
+    """The file of one revision of an invoice."""
+
+    path: str
+    sha256: str
+    mime: str
+    size: int
+    name: str
+    source: str
 
 
 @dataclass(frozen=True)
@@ -141,6 +158,7 @@ class Store:
                     sender_email=new.sender_email,
                     email_subject=new.email_subject,
                     email_body=new.email_body,
+                    source_message_id=new.source_message_id,
                     file_name=new.file_name,
                     file_sha256=new.file_sha256,
                     file_size=new.file_size,
@@ -164,9 +182,139 @@ class Store:
 
     def set_stored_path(self, invoice_id: str, path: str) -> None:
         with self._session() as session:
+            row = session.get(Invoice, invoice_id, with_for_update=True)
+            if row is None:
+                raise UnknownInvoice(invoice_id)
+            row.stored_path = path
             session.execute(
-                update(Invoice).where(Invoice.invoice_id == invoice_id).values(stored_path=path)
+                insert(InvoiceFile)
+                .values(
+                    invoice_id=invoice_id,
+                    revision=row.revision or 1,
+                    path=path,
+                    sha256=row.file_sha256,
+                    mime=row.file_mime,
+                    size=row.file_size,
+                    name=row.file_name,
+                    source=row.channel,
+                )
+                .on_conflict_do_nothing(constraint="uq_invoice_files_revision")
             )
+
+    def add_revision(self, invoice_id: str, revision: int, file: NewFile) -> None:
+        """A newer file of the invoice; a repeated call for the same revision changes nothing."""
+        with self._session() as session:
+            row = session.get(Invoice, invoice_id, with_for_update=True)
+            if row is None:
+                raise UnknownInvoice(invoice_id)
+            session.execute(
+                insert(InvoiceFile)
+                .values(invoice_id=invoice_id, revision=revision, **file.__dict__)
+                .on_conflict_do_nothing(constraint="uq_invoice_files_revision")
+            )
+            row.revision = revision
+            row.stored_path = file.path
+            row.file_sha256 = file.sha256
+            row.file_mime = file.mime
+            row.file_size = file.size
+            row.file_name = file.name
+
+    def files_of(self, invoice_id: str) -> list[InvoiceFile]:
+        query = (
+            select(InvoiceFile)
+            .where(InvoiceFile.invoice_id == invoice_id)
+            .order_by(InvoiceFile.revision)
+        )
+        with self._sessions() as session:
+            return list(session.scalars(query))
+
+    # --- inbox (F-02) ---------------------------------------------------------------------------
+
+    def inbox_done(self, message_ids: Sequence[str]) -> set[str]:
+        query = select(InboxMessage.message_id).where(
+            InboxMessage.message_id.in_(list(message_ids)),
+            InboxMessage.status == InboxStatus.DONE.value,
+        )
+        with self._sessions() as session:
+            return set(session.scalars(query))
+
+    def inbox_begin(
+        self,
+        message_id: str,
+        *,
+        received_at: datetime | None,
+        sender: str | None,
+        recipient: str | None,
+        subject: str | None,
+    ) -> InboxMessage:
+        """The row of a message, created on first sight."""
+        with self._session() as session:
+            session.execute(
+                insert(InboxMessage)
+                .values(
+                    message_id=message_id,
+                    received_at=received_at,
+                    sender=sender,
+                    recipient=recipient,
+                    subject=subject,
+                    status=InboxStatus.PROCESSING.value,
+                )
+                .on_conflict_do_nothing(constraint="uq_inbox_messages_message_id")
+            )
+            return session.scalars(
+                select(InboxMessage).where(InboxMessage.message_id == message_id)
+            ).one()
+
+    def inbox_progress(self, message_id: str, attachments: Sequence[dict[str, Any]]) -> None:
+        with self._session() as session:
+            session.execute(
+                update(InboxMessage)
+                .where(InboxMessage.message_id == message_id)
+                .values(attachments=list(attachments))
+            )
+
+    def inbox_finish(
+        self,
+        message_id: str,
+        *,
+        kind: InboxKind,
+        invoice_id: str | None = None,
+        reason: str | None = None,
+    ) -> None:
+        with self._session() as session:
+            session.execute(
+                update(InboxMessage)
+                .where(InboxMessage.message_id == message_id)
+                .values(
+                    kind=kind.value,
+                    invoice_id=invoice_id,
+                    reason=reason,
+                    status=InboxStatus.DONE.value,
+                )
+            )
+
+    def inbox_rows(self) -> list[InboxMessage]:
+        with self._sessions() as session:
+            return list(session.scalars(select(InboxMessage).order_by(InboxMessage.id)))
+
+    def invoice_for_message(self, message_id: str, sha256: str) -> str | None:
+        """The invoice already made from this attachment of this message, if any."""
+        query = select(Invoice.invoice_id).where(
+            Invoice.source_message_id == message_id, Invoice.file_sha256 == sha256
+        )
+        with self._sessions() as session:
+            return session.scalar(query)
+
+    def invoice_for_outgoing(self, message_ids: Sequence[str]) -> str | None:
+        """The invoice one of whose outgoing e-mails has one of these Message-IDs."""
+        if not message_ids:
+            return None
+        query = select(ActionRow.invoice_id).where(
+            ActionRow.kind == ActionKind.SEND_EMAIL.value,
+            ActionRow.result["message_id"].astext.in_(list(message_ids)),
+        )
+        with self._sessions() as session:
+            return session.scalar(query)
 
     def first_with_hash(self, sha256: str, *, excluding: str) -> Invoice | None:
         """The earliest other invoice with the same file (BR-01)."""

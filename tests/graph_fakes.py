@@ -13,6 +13,7 @@ from faktur_beres.db.models import ActionKind, ActionStatus, AuditKind, Decision
 from faktur_beres.db.store import (
     ActionState,
     LineOutcome,
+    NewFile,
     NewInvoice,
     OpenApproval,
     format_invoice_id,
@@ -49,6 +50,7 @@ class FakeStore:
         self.trail: list[AuditRow] = []
         self.llm: list[LlmCallRecord] = []
         self.statuses: list[str] = []
+        self.files: dict[tuple[str, int], NewFile] = {}
 
     def create_invoice(self, new: NewInvoice) -> str:
         invoice_id = format_invoice_id(len(self.invoices) + 1)
@@ -58,6 +60,7 @@ class FakeStore:
             sender_email=new.sender_email,
             email_subject=new.email_subject,
             email_body=new.email_body,
+            source_message_id=new.source_message_id,
             file_name=new.file_name,
             file_sha256=new.file_sha256,
             file_size=new.file_size,
@@ -72,6 +75,16 @@ class FakeStore:
 
     def set_stored_path(self, invoice_id: str, path: str) -> None:
         self.invoices[invoice_id].stored_path = path
+
+    def add_revision(self, invoice_id: str, revision: int, file: NewFile) -> None:
+        row = self.invoices[invoice_id]
+        self.files.setdefault((invoice_id, revision), file)
+        row.revision = revision
+        row.stored_path = file.path
+        row.file_sha256 = file.sha256
+        row.file_mime = file.mime
+        row.file_size = file.size
+        row.file_name = file.name
 
     def get(self, invoice_id: str) -> Invoice:
         return self.invoices[invoice_id]

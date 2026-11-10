@@ -20,8 +20,15 @@ from faktur_beres.db.connection import (
     require_project_database,
 )
 from faktur_beres.db.migrate import check, reset, upgrade
-from faktur_beres.db.models import ActionKind, ActionRow, ActionStatus, AuditKind, Decision
-from faktur_beres.db.store import DbInvoiceRegistry, NewInvoice, Store, format_invoice_id
+from faktur_beres.db.models import (
+    ActionKind,
+    ActionRow,
+    ActionStatus,
+    AuditKind,
+    Decision,
+    InboxKind,
+)
+from faktur_beres.db.store import DbInvoiceRegistry, NewFile, NewInvoice, Store, format_invoice_id
 from faktur_beres.domain.invoice import Channel, InvoiceData, InvoiceLine, Seller
 from faktur_beres.domain.reasons import InvoiceStatus, ReasonCode, Route
 from faktur_beres.domain.status import InvalidTransition
@@ -245,3 +252,50 @@ def test_db_reset_command_refuses_from_its_guard() -> None:
         [sys.executable, "-c", code], cwd=REPO_ROOT, capture_output=True, text=True, check=False
     )
     assert done.returncode != 0 and "berawalan" in done.stderr
+
+
+def test_a_revision_keeps_the_earlier_file_and_is_idempotent(store: Store) -> None:
+    invoice_id = store.create_invoice(NEW)
+    store.set_stored_path(invoice_id, f"{invoice_id}/asli.pdf")
+    second = NewFile(
+        f"{invoice_id}/revisi-2.pdf", "b" * 64, "application/pdf", 20, "b.pdf", "balasan"
+    )
+    store.add_revision(invoice_id, 2, second)
+    store.add_revision(invoice_id, 2, second)
+    assert [(f.revision, f.sha256) for f in store.files_of(invoice_id)] == [(1, SHA), (2, "b" * 64)]
+    row = store.get(invoice_id)
+    assert (row.revision, row.stored_path, row.file_sha256) == (2, second.path, "b" * 64)
+
+
+def test_inbox_message_is_recorded_once_and_found_by_attachment(store: Store) -> None:
+    kw = {"received_at": None, "sender": "a@b.test", "recipient": "ap@arunika.test", "subject": "s"}
+    first = store.inbox_begin("m-1", **kw)  # type: ignore[arg-type]
+    second = store.inbox_begin("m-1", **kw)  # type: ignore[arg-type]
+    assert first.id == second.id and store.inbox_done(["m-1"]) == set()
+    invoice_id = store.create_invoice(replace(NEW, source_message_id="m-1"))
+    assert store.invoice_for_message("m-1", SHA) == invoice_id
+    assert store.invoice_for_message("m-2", SHA) is None
+    store.inbox_progress("m-1", [{"name": "a.pdf", "invoice_id": invoice_id}])
+    store.inbox_finish("m-1", kind=InboxKind.FAKTUR, invoice_id=invoice_id)
+    assert store.inbox_done(["m-1", "m-2"]) == {"m-1"}
+    [row] = store.inbox_rows()
+    assert (row.kind, row.invoice_id, row.attachments[0]["name"]) == (
+        "faktur",
+        invoice_id,
+        "a.pdf",
+    )
+
+
+def test_an_outgoing_message_id_leads_to_its_invoice(store: Store) -> None:
+    invoice_id = store.create_invoice(NEW)
+    key = "m" * 64
+    store.begin_action(
+        key,
+        invoice_id=invoice_id,
+        kind=ActionKind.SEND_EMAIL,
+        target="v@x.test",
+        content_version="v",
+    )
+    store.finish_action(key, {"message_id": "<abc@x.test>"})
+    assert store.invoice_for_outgoing(["<lain@x.test>", "<abc@x.test>"]) == invoice_id
+    assert store.invoice_for_outgoing(["<lain@x.test>"]) is None

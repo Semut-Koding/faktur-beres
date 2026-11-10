@@ -84,6 +84,7 @@ class Runner:
         sender_email: str | None = None,
         subject: str | None = None,
         body: str | None = None,
+        source_message_id: str | None = None,
     ) -> str:
         """BR-01: the type and size are checked before a thread exists."""
         try:
@@ -102,6 +103,7 @@ class Runner:
                 sender_email=sender_email,
                 email_subject=subject,
                 email_body=body,
+                source_message_id=source_message_id,
             )
         )
         self.store.set_stored_path(

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from faktur_beres.db.models import ActionKind, AuditKind, Decision, Invoice
-from faktur_beres.db.store import ActionState, LineOutcome, NewInvoice, OpenApproval
+from faktur_beres.db.store import ActionState, LineOutcome, NewFile, NewInvoice, OpenApproval
 from faktur_beres.domain.erp import (
     ErpReader,
     InvoiceRegistry,
@@ -36,6 +36,8 @@ class GraphStore(Protocol):
     def create_invoice(self, new: NewInvoice) -> str: ...
 
     def set_stored_path(self, invoice_id: str, path: str) -> None: ...
+
+    def add_revision(self, invoice_id: str, revision: int, file: NewFile) -> None: ...
 
     def get(self, invoice_id: str) -> Invoice: ...
 
