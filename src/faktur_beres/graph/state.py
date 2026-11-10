@@ -32,6 +32,7 @@ class GraphState(TypedDict, total=False):
     extra_reasons: list[str]
     verification: list[str]  # what differed when the bill action could not be verified
     bill_attempted: bool
+    draft_left: int | None  # the agent's draft that failed verification
     approval_request: dict[str, Any]
     decision: Decision
     final_status: str

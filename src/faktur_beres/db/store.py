@@ -206,7 +206,7 @@ class Store:
             if current is not new:
                 check_transition(current, new)
             row.status = new.value
-            row.failure_message = message if new is InvoiceStatus.FAILED else None
+            row.failure_message = message
             session.add(
                 AuditEntry(
                     invoice_id=invoice_id,

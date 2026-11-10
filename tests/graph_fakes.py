@@ -101,7 +101,7 @@ class FakeStore:
             check_transition(current, new)
             self.statuses.append(f"{current.value}>{new.value}")
         row.status = new.value
-        row.failure_message = message if new is InvoiceStatus.FAILED else None
+        row.failure_message = message
         return new
 
     def save_extraction(self, invoice_id: str, invoice: InvoiceData | None, dump: Any) -> None:

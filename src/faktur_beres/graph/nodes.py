@@ -48,6 +48,7 @@ from faktur_beres.domain.rules.safety import (
     content_version,
     idempotency_key,
     mask_evidence_pack,
+    mask_text,
 )
 from faktur_beres.domain.rules.vendor import VendorStatus
 from faktur_beres.extraction.outcome import ExtractionOutcome, ExtractionStatus
@@ -458,6 +459,7 @@ class Nodes:
         plan = analysis.bill_plan
         if plan is None:
             raise RuntimeError("jalur tagihan tanpa rencana tagihan")
+        made: int | None = None
         try:
             key, done = self._claim(state, ActionKind.CREATE_DRAFT_BILL, plan.ref, plan)
             if done is None:
@@ -472,10 +474,11 @@ class Nodes:
                 )
                 if not result.verified or result.bill_id is None:
                     deps.store.fail_action(key, "; ".join(result.differences) or result.outcome)
-                    return self._verification_failed(state, list(result.differences))
+                    left = result.bill_id if result.outcome == "created" else None
+                    return self._verification_failed(state, list(result.differences), left)
                 done = {"bill_id": result.bill_id, "outcome": result.outcome}
                 deps.store.finish_action(key, done)
-            bill_id = int(done["bill_id"])
+            bill_id = made = int(done["bill_id"])
             row = deps.store.get(invoice_id)
             content = deps.files.read(row.stored_path)
             target = f"bill:{bill_id}"
@@ -517,15 +520,44 @@ class Nodes:
                     summary=f"catatan #{note.message_id}",
                 )
         except (Rejected, Conflict, ToolVerificationFailed) as exc:
-            return self._verification_failed(state, [f"{type(exc).__name__}: {exc}"])
+            return self._verification_failed(state, [f"{type(exc).__name__}: {exc}"], made)
         except (AccessDenied, ForbiddenOperation) as exc:
             self._security(state, "act_bill", exc)
             raise
         deps.store.set_status(invoice_id, InvoiceStatus.DRAFT_CREATED, node="act_bill")
         return {"final_status": InvoiceStatus.DRAFT_CREATED.value, "verification": []}
 
-    def _verification_failed(self, state: GraphState, differences: list[str]) -> Update:
-        """BR-18: the draft stays as it is and the invoice goes to route C."""
+    def _warn_draft(self, state: GraphState, bill_id: int, differences: list[str]) -> None:
+        """A warning on the draft left behind, under its own BR-22 key, once."""
+        deps, invoice_id = self.deps, state["invoice_id"]
+        gaps = mask_text("; ".join(differences))[:400] or "tidak diketahui"
+        text = (
+            f"Draft ini tidak lolos verifikasi Faktur Beres (selisih: {gaps}). "
+            "Jangan diposting sebelum diperiksa; perbaiki atau hapus secara manual. "
+            f"Referensi [{invoice_id}]."
+        )
+        key, done = self._claim(
+            state, ActionKind.POST_NOTE, f"bill:{bill_id}", {"peringatan": differences}
+        )
+        if done is not None:
+            return
+        note = deps.bills.post_note(bill_id, text, key)
+        deps.store.finish_action(key, {"message_id": note.message_id})
+        deps.store.audit(
+            invoice_id,
+            kind=AuditKind.TOOL,
+            name="post_note",
+            node="act_bill",
+            params={"bill_id": bill_id},
+            summary="peringatan draft gagal verifikasi",
+        )
+
+    def _verification_failed(
+        self, state: GraphState, differences: list[str], bill_id: int | None
+    ) -> Update:
+        """BR-18: the draft stays as it is, is marked, and the invoice goes to route C."""
+        if bill_id is not None:
+            self._warn_draft(state, bill_id, differences)
         self.deps.store.audit(
             state["invoice_id"],
             kind=AuditKind.GUARD,
@@ -536,6 +568,7 @@ class Nodes:
         )
         return {
             "verification": differences,
+            "draft_left": bill_id,
             "bill_attempted": True,
             "extra_reasons": [ReasonCode.VALIDATION_FAILED.value],
         }
@@ -654,6 +687,7 @@ class Nodes:
             "catatan": list(analysis.notes),
             "perencana": state.get("planner"),
             "verifikasi_tagihan": state.get("verification", []),
+            "setujui_tidak_tersedia": self._why_no_approve(state),
             "policy_quotes": [],
             "usulan": proposed,
             "pilihan": options,
@@ -670,6 +704,18 @@ class Nodes:
         deps.store.set_status(invoice_id, InvoiceStatus.AWAITING_APPROVAL, node="prepare_approval")
         return {"approval_request": pack}
 
+    @staticmethod
+    def _why_no_approve(state: GraphState) -> str | None:
+        if not state.get("bill_attempted"):
+            return None
+        gaps = "; ".join(state.get("verification", [])) or "tidak diketahui"
+        left = state.get("draft_left")
+        where = f" Draft #{left} masih ada dan sudah diberi peringatan." if left else ""
+        return (
+            f"Setujui tidak tersedia karena tagihan untuk faktur ini gagal diverifikasi "
+            f"(selisih: {gaps}).{where}"
+        )
+
     def await_approval(self, state: GraphState) -> Update:
         """Only the interrupt: no effect here, because this node runs again on resume."""
         return {"decision": interrupt(state["approval_request"])}
@@ -683,7 +729,16 @@ class Nodes:
         )
         deps.store.set_status(invoice_id, InvoiceStatus.PROCESSING, node="apply_decision")
         if chosen is Decision.REJECT:
-            deps.store.set_status(invoice_id, InvoiceStatus.REJECTED, node="apply_decision")
+            left = state.get("draft_left")
+            message = (
+                f"Ditolak. Draft tagihan #{left} yang gagal verifikasi masih ada di Odoo dan perlu "
+                "dibereskan staf AP."
+                if left is not None
+                else None
+            )
+            deps.store.set_status(
+                invoice_id, InvoiceStatus.REJECTED, node="apply_decision", message=message
+            )
             return {"final_status": InvoiceStatus.REJECTED.value}
         return {}
 

@@ -188,8 +188,13 @@ def test_a_failed_verification_goes_to_route_c_without_approval_on_offer(tmp_pat
     approval = h.store.current_approval(invoice_id)
     assert approval is not None and Decision.APPROVE.value not in approval.options
     assert approval.evidence["verifikasi_tagihan"] == ["total berbeda"]
+    why = approval.evidence["setujui_tidak_tersedia"]
+    assert "total berbeda" in why and "#1" in why
+    [warning] = h.bills.notes
+    assert "Jangan diposting" in warning and f"[{invoice_id}]" in warning
     final = h.runner.decide(invoice_id, Decision.REJECT, decided_by="uji")
     assert final.status is InvoiceStatus.REJECTED
+    assert "#1" in (final.message or "") and "staf AP" in (final.message or "")
 
 
 # --- route B --------------------------------------------------------------------------------
