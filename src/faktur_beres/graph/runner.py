@@ -17,6 +17,7 @@ from faktur_beres.db.models import AuditKind, Decision
 from faktur_beres.db.store import NewInvoice
 from faktur_beres.domain.invoice import Channel
 from faktur_beres.domain.reasons import InvoiceStatus
+from faktur_beres.domain.status import InvalidTransition
 from faktur_beres.extraction.filetype import FileKind, FileRejected, identify
 from faktur_beres.graph.deps import FileStore, GraphStore
 from faktur_beres.graph.nodes import MissingVendorEmail, ReviewPending
@@ -122,8 +123,28 @@ class Runner:
                     summary=failure_message(exc),
                     status="refused",
                 )
-            self.store.set_status(invoice_id, InvoiceStatus.FAILED, message=failure_message(exc))
+            self._fail(invoice_id, failure_message(exc))
         return self.status(invoice_id)
+
+    def _fail(self, invoice_id: str, message: str) -> None:
+        """To ``failed`` through ``processing``, so the status table of SPEC §6.3 holds.
+
+        A final status stays as it is: the failure is audited and the invoice is not reopened.
+        """
+        current = InvoiceStatus(self.store.get(invoice_id).status)
+        try:
+            if current is not InvoiceStatus.PROCESSING:
+                self.store.set_status(invoice_id, InvoiceStatus.PROCESSING, node="runner")
+            self.store.set_status(invoice_id, InvoiceStatus.FAILED, node="runner", message=message)
+        except InvalidTransition:
+            self.store.audit(
+                invoice_id,
+                kind=AuditKind.DECISION,
+                name="galat_setelah_status_akhir",
+                node="runner",
+                summary=f"status {current.value} dipertahankan: {message}",
+                status="failed",
+            )
 
     def run(self, invoice_id: str) -> Stop:
         return self._advance(

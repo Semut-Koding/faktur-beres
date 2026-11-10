@@ -389,6 +389,36 @@ def test_route_a_waits_for_layer_two_and_retry_runs_it_again(tmp_path: Path) -> 
     assert answers == []
 
 
+@pytest.mark.aturan("BR-27")
+@pytest.mark.parametrize(
+    "status",
+    [InvoiceStatus.RECEIVED, InvoiceStatus.AWAITING_VENDOR, InvoiceStatus.AWAITING_APPROVAL],
+)
+def test_an_error_outside_processing_still_ends_in_failed(
+    tmp_path: Path, status: InvoiceStatus
+) -> None:
+    h, invoice_id = start(tmp_path, "COC-01")
+    h.store.invoices[invoice_id].status = status.value
+
+    def broken() -> None:
+        raise RuntimeError("rusak")
+
+    stop = h.runner._advance(invoice_id, broken)
+    assert stop.status is InvoiceStatus.FAILED and "agent:ulang" in (stop.message or "")
+    assert h.store.statuses == [f"{status.value}>processing", "processing>failed"]
+
+
+def test_an_error_after_a_final_status_does_not_reopen_it(tmp_path: Path) -> None:
+    h, invoice_id = start(tmp_path, "COC-01")
+    h.store.invoices[invoice_id].status = InvoiceStatus.DRAFT_CREATED.value
+
+    def broken() -> None:
+        raise RuntimeError("rusak")
+
+    assert h.runner._advance(invoice_id, broken).status is InvoiceStatus.DRAFT_CREATED
+    assert [r.name for r in h.store.trail][-1] == "galat_setelah_status_akhir"
+
+
 def test_retry_needs_a_failed_invoice(tmp_path: Path) -> None:
     h, invoice_id = start(tmp_path, "COC-04")
     h.runner.run(invoice_id)
