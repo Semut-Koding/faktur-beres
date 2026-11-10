@@ -330,8 +330,9 @@ Dashboard di Vercel. API, Odoo, dan basis data di server yang ditentukan di M6, 
 | **M2 Lapisan alat** ✅ selesai 7 Nov 2026 | Grup Odoo khusus agent (addon `faktur_beres_agent`) dan key agent tanpa `sudo()`, konfigurasi kebijakan, model faktur kanonis `InvoiceData` dan helper normalisasi, aturan deterministik dan mesin analisis, `AgentOdooGateway` dan `odoo_tools` dengan daftar operasi yang diizinkan, `match_engine`, `tax_check`, evaluasi orakel, tes integrasi | Tes unit untuk setiap aturan yang dihitung kode, termasuk tes keterlacakan dan arsitektur; mypy `--strict` untuk paket baru; `odoo:check` lulus dengan matriks hak agent; `eval:orakel` 40/40 luring dan `--odoo`; `test:integrasi` lulus (penolakan hak, tiga draft tagihan sama dengan label, idempotensi) | 10–11 Nov |
 | **M3 Ekstraksi** ✅ selesai 9 Nov 2026 | Perbaikan dari tinjauan M2; klien Gemini (`faktur_beres.llm`: model per peran, retry, model cadangan, throttle, cache, audit, biaya setara); jenis berkas dan lapisan teks PDF; parser UBL; skema ekstraksi Gemini yang dinormalisasi ke `InvoiceData` dengan helper M2; validasi dan pembacaan ulang maksimal 2 kali (BR-04); injeksi dua lapis (pola kuat dan lemah, penilai LLM); **set uji ketahanan bergaya dunia nyata**; `eval:ekstraksi` dan `eval:injeksi` | UBL 100% sama dengan label; akurasi per field pada 40 faktur, 11 lampiran balasan, dan set ketahanan dilaporkan terpisah, beserta rantai ekstraksi → aturan dibanding orakel; `eval:orakel` tetap 40/40; pola kuat tanpa positif palsu di set dev; model dipilih lewat uji banding (ADR-0008) | 11–12 Nov |
 | **M4a Graph inti, basis data, dan aksi** ✅ selesai 10 Nov 2026 | Label versi 2; klien LLM (peran cadangan, batas waktu per tujuan, function calling multi-giliran); ekstraksi v2; migrasi Alembic pertama (`invoices`, `invoice_lines`, `match_results`, `actions`, `approvals`, `audit_log`); node LangGraph dan checkpointer PostgreSQL; perencana `identify` dan pemetaan baris oleh LLM di dalam pagar; aksi jalur A, B keluar (`email_tool`), dan C (interrupt, keputusan approver lewat CLI); `eval:graph` dan `eval:perencana` | `eval:graph` mode orakel: 40/40 pemeriksaan pertama berhenti, 27/27 status akhir, 13 B "menunggu M4b", ketahanan 13/13; graph dengan LLM dimatikan setara `analyse()` untuk 40 + 13; mode LLM dilaporkan; `alembic check` bersih; ADR-0009 dan ADR-0010 | 10–12 Nov |
-| **M4b Balasan vendor, RAG, dan API** | Pemantau inbox dan email masuk (F-02); balasan vendor yang melanjutkan thread (F-06, BR-20); RAG kebijakan dan pilihan jalur oleh LLM dengan kutipan kebijakan (BR-17, BR-21); FastAPI + SSE dan API keputusan approver; pengingat dan daftar perhatian BR-19, `vendor_memory`, rekap harian (BR-26) | Jalur A, B, dan C berjalan ujung ke ujung, termasuk 13 skenario B yang menunggu balasan | 13–16 Nov |
-| **M5 Dashboard dan evaluasi** | Dashboard (SPEC §10), harness 40 × 3, laporan metrik | Metrik terisi; target tercapai atau selisihnya dijelaskan | 16–19 Nov |
+| **M4b Email masuk, balasan vendor, dan RAG** | Perbaikan dari tinjauan M4a; pemantau inbox (F-02); balasan vendor yang melanjutkan thread (F-06, BR-20); RAG kebijakan (`policy_rag`, BR-28); pilihan jalur oleh LLM di dalam himpunan yang diizinkan, dengan kutipan kebijakan (BR-17, BR-21) | `eval:graph` mode orakel dengan kanal email dan balasan lewat Mailpit sungguhan: 40/40 pertama berhenti, 40/40 status akhir, ketahanan 13/13; mode LLM dilaporkan; ADR-0009 dan ADR-0010 Diterima; ADR-0011 dan ADR-0012 Diusulkan | 10–12 Nov |
+| **M4c API dan tindak lanjut** | FastAPI + SSE dan API keputusan approver; pengingat dan daftar perhatian BR-19; rekap harian (BR-26); `vendor_memory` | Ditetapkan di prompt M4c | 13–14 Nov |
+| **M5 Dashboard dan evaluasi** | Dashboard (SPEC §10), harness 40 × 3, akurasi per field di `eval:graph`, laporan metrik | Metrik terisi; target tercapai atau selisihnya dijelaskan | 15–19 Nov |
 | **M6 Publik dan finalisasi** | Deploy publik, pengetatan guardrail, README demo, bahan video dan proposal | Tautan live dan repo publik; daftar periksa lomba lengkap | 20–26 Nov |
 | Cadangan | Perbaikan | | 27–28 Nov |
 | Pengumpulan | | | 29 Nov (batas 30 Nov) |
@@ -391,6 +392,28 @@ Dashboard di Vercel. API, Odoo, dan basis data di server yang ditentukan di M6, 
 - **Peran cadangan LLM** memakai `gemini-3.6-flash` (kuota AI Studio dicek pemilik 10 November 2026: 5 permintaan per menit dan 20 per hari; Flash-Lite 15 per menit dan 500 per hari; reset harian pukul 15.00 WIB). `gemini-3.7-flash` tidak dipakai, karena menurut halaman deprecations Gemini API endpoint itu diarahkan otomatis ke `gemini-3.8-flash`, model yang di M3 menjawab 503 dan butuh sekitar 195 detik per dokumen.
 - **Embedding RAG (M4b)** memakai `gemini-embedding-2`, dengan kuota 100 permintaan per menit dan 1.000 per hari.
 - **Set frasa injeksi tertutup** dijalankan pemilik pada 10 November 2026; hasilnya di [eval/README](../eval/README.md#set-frasa-injeksi). Set itu tetap dipegang perencana dan dijalankan lagi sebelum pengumpulan.
+
+### Masukan dari tinjauan M4a untuk M4b–M4c (10 November 2026)
+Temuan perencana atas HEAD `abfd9a5`:
+- Penyamaran bisa dilewati: `mask_npwp` dan `mask_account` mengembalikan nilai yang mengandung `*` apa adanya.
+- Status `failed` bisa gagal dipasang bila galat terjadi saat status bukan `processing`.
+- Paket bukti memuat NPWP dan rekening utuh, termasuk data master Odoo.
+- Draft yang gagal verifikasi tidak diberi peringatan, dan paket bukti tidak menjelaskan kenapa "Setujui" tidak tersedia.
+- Email vendor memakai bahasa internal dan membuka batas toleransi; header `Date` belum ada.
+- Pemetaan baris oleh LLM hanya dijaga validitas ref, sehingga pemetaan keliru bisa lolos ke jalur A.
+- Catatan draft belum menyebut baris hasil pemetaan LLM atau nomor PO yang dikoreksi.
+- Proses: dua commit masuk saat lint gagal, dan beberapa commit terlalu besar.
+- `eval/README.md` hanya memuat p95 per format, padahal target SPEC §12.2 berlaku keseluruhan.
+
+Keputusan pemilik:
+- ADR-0009 dan ADR-0010 diterima setelah dilengkapi.
+- Paket bukti disamarkan seperti audit (BR-24 diperluas di SPEC 0.6 ke paket bukti dan antarmuka). Nilai utuh tetap ada di berkas asli, Odoo, dan data kerja internal agent, yang tidak pernah dikirim utuh ke API atau antarmuka.
+- "Setujui" tetap tidak ditawarkan setelah verifikasi gagal; agent menulis peringatan pada draft dan paket bukti menjelaskan alasannya.
+- Pemetaan LLM hanya dipakai bila satuannya sejenis dan harga berada dalam ±toleransi BR-08.
+- Email vendor tanpa nama sistem internal dan tanpa batas toleransi, dengan header `Date`.
+- M4 dipecah menjadi M4b dan M4c.
+- Batas waktu dokumen tetap 120 detik; ditinjau ulang di M5 dengan data 3 kali run.
+- Embedding RAG memakai `gemini-embedding-2` dengan 768 dimensi.
 
 ## 7. Risiko dan mitigasi
 
