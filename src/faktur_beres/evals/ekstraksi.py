@@ -61,7 +61,6 @@ from faktur_beres.domain.rules.injection import (
     has_strong_pattern,
     judge_injection,
 )
-from faktur_beres.evals import audit_log
 from faktur_beres.evals.dataset_erp import DatasetErpReader
 from faktur_beres.evals.ketahanan import robustness_intake
 from faktur_beres.evals.labels import (
@@ -78,6 +77,7 @@ from faktur_beres.evals.paths import PathRefused, checked_path
 from faktur_beres.extraction.outcome import ExtractionOutcome
 from faktur_beres.extraction.reading import PROMPT_VERSION as EXTRACTION_PROMPT
 from faktur_beres.generator.label_schema import DocumentTruth
+from faktur_beres.llm import usage
 from faktur_beres.llm.contracts import (
     CacheUse,
     LlmCallRecord,
@@ -755,7 +755,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (PathRefused, ValueError, LlmConfigError) as exc:
         print(f"GALAT: {exc}", file=sys.stderr)
         return 2
-    handler = audit_log.attach(state.run)
+    handler = usage.attach(state.run)
     print(
         f"run {state.run}: {len(docs)} dokumen, model {state.models}, "
         f"penilai {'ya' if state.review else 'tidak'}, cache {'ya' if state.cache else 'tidak'}"
@@ -769,7 +769,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"GALAT konfigurasi LLM: {exc}", file=sys.stderr)
         return 2
     finally:
-        audit_log.detach(handler)
+        usage.detach(handler)
     print_summary(state)
     print(f"\nhasil: {path.relative_to(REPO_ROOT)}")
     return 3 if state.stopped else 0

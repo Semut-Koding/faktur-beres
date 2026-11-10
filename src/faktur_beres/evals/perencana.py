@@ -19,9 +19,9 @@ from faktur_beres.domain.normalize import normalize_po_number
 from faktur_beres.domain.policy import load_policy
 from faktur_beres.domain.rules.purchase_order import identify_purchase_order
 from faktur_beres.domain.rules.vendor import identify_vendor
-from faktur_beres.evals import audit_log
 from faktur_beres.evals.dataset_erp import DatasetErpReader
 from faktur_beres.evals.labels import label_intake, load_labels, truth_to_invoice
+from faktur_beres.llm import usage
 from faktur_beres.llm.gemini import gemini_client
 from faktur_beres.tools.po_planner import run_planner
 
@@ -91,7 +91,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     run = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     reader = DatasetErpReader(load_dataset())
     llm = gemini_client(settings, use_cache=args.pakai_cache)
-    handler = audit_log.attach(run)
+    handler = usage.attach(run)
     rows = []
     try:
         cases = [(s, False) for s in AS_PRINTED] + [(s, True) for s in PO_REMOVED]
@@ -100,7 +100,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             rows.append(row)
             print(row.model_dump_json())
     finally:
-        audit_log.detach(handler)
+        usage.detach(handler)
     RUN_DIR.mkdir(parents=True, exist_ok=True)
     path = RUN_DIR / f"{run}.json"
     path.write_text(

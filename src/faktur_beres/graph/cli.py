@@ -17,6 +17,7 @@ from faktur_beres.db.store import Store, UnknownInvoice
 from faktur_beres.domain.rules.safety import mask_params
 from faktur_beres.graph.factory import live_runner
 from faktur_beres.graph.runner import DecisionRefused, FileRefused, Stop
+from faktur_beres.llm import usage
 
 FORBIDDEN_PARTS = frozenset({"_privat", "privat"})
 CHOICES = {"setujui": Decision.APPROVE, "tolak": Decision.REJECT, "klarifikasi": Decision.CLARIFY}
@@ -124,21 +125,25 @@ def _run(args: argparse.Namespace) -> int:
         return 0
     settings = get_settings()
     use_cache = args.perintah == "proses" and args.pakai_cache
-    with live_runner(settings, use_cache=use_cache) as runner:
-        if args.perintah == "proses":
-            path = checked_file(args.berkas)
-            show(runner.process(path.read_bytes(), path.name))
-        elif args.perintah == "putuskan":
-            show(
-                runner.decide(
-                    args.invoice_id,
-                    CHOICES[args.keputusan],
-                    decided_by=args.oleh,
-                    note=args.catatan,
+    handler = usage.attach(f"agent-{args.perintah}")
+    try:
+        with live_runner(settings, use_cache=use_cache) as runner:
+            if args.perintah == "proses":
+                path = checked_file(args.berkas)
+                show(runner.process(path.read_bytes(), path.name))
+            elif args.perintah == "putuskan":
+                show(
+                    runner.decide(
+                        args.invoice_id,
+                        CHOICES[args.keputusan],
+                        decided_by=args.oleh,
+                        note=args.catatan,
+                    )
                 )
-            )
-        else:
-            show(runner.retry(args.invoice_id))
+            else:
+                show(runner.retry(args.invoice_id))
+    finally:
+        usage.detach(handler)
     return 0
 
 

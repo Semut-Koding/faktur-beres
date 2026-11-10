@@ -26,6 +26,7 @@
     "eval:graph": "uv run python -m faktur_beres.evals.graph",
     "eval:perencana": "uv run python -m faktur_beres.evals.perencana",
     "eval:ekstraksi": "uv run python -m faktur_beres.evals.ekstraksi",
+    "llm:kuota": "uv run python -m faktur_beres.llm.usage",
     "llm:model": "uv run python -m faktur_beres.llm.models",
     "lint": "uv run ruff check . && uv run ruff format --check .",
     "typecheck": "uv run mypy --strict",

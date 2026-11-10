@@ -17,6 +17,7 @@ from google.genai import errors, types
 from pydantic import BaseModel
 
 from faktur_beres.config import Settings, get_settings
+from faktur_beres.llm import usage
 from faktur_beres.llm.contracts import LlmError, LlmRequest, LlmResult, ModelRole, TextPart
 from faktur_beres.llm.cost import load_prices
 from faktur_beres.llm.gemini import (
@@ -118,6 +119,23 @@ def smoke_test(settings: Settings, model: str) -> LlmResult[SmokeReply]:
     return client.generate(SMOKE_REQUEST, SmokeReply)
 
 
+def _smoke_all(settings: Settings, secret: str | None) -> int:
+    failed = 0
+    for role, model in configured_models(settings).items():
+        if not is_stable(model):
+            print(f"{role:<8} {model}: GALAT nama pratinjau/alias tidak dipakai")
+            failed += 1
+            continue
+        try:
+            smoke_test(settings, model)
+        except Exception as exc:
+            print(f"{role:<8} {model}: GALAT {describe_error(exc, secret)}")
+            failed += 1
+        else:
+            print(f"{role:<8} {model}: OK")
+    return failed
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         prog="npm run llm:model", description="Model Gemini yang tersedia untuk key ini."
@@ -147,19 +165,11 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"{len(rows)} model mendukung {GENERATE_ACTION}.")
         return 0
 
-    failed = 0
-    for role, model in configured_models(settings).items():
-        if not is_stable(model):
-            print(f"{role:<8} {model}: GALAT nama pratinjau/alias tidak dipakai")
-            failed += 1
-            continue
-        try:
-            smoke_test(settings, model)
-        except Exception as exc:
-            print(f"{role:<8} {model}: GALAT {describe_error(exc, secret)}")
-            failed += 1
-        else:
-            print(f"{role:<8} {model}: OK")
+    handler = usage.attach("llm-model-uji")
+    try:
+        failed = _smoke_all(settings, secret)
+    finally:
+        usage.detach(handler)
     return 1 if failed else 0
 
 

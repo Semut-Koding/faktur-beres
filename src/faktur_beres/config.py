@@ -14,6 +14,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 ENV_FILE = REPO_ROOT / ".env"
 
 
+LLM_USAGE_PATH = REPO_ROOT / "eval" / "hasil" / "audit-llm.jsonl"
+
+
 class Settings(BaseSettings):
     """Runtime configuration for scripts and (later) the agent."""
 

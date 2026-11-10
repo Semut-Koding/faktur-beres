@@ -41,7 +41,6 @@ from faktur_beres.domain.erp import BillRecord
 from faktur_beres.domain.invoice import Channel, InvoiceData, TextFragment
 from faktur_beres.domain.normalize import normalize_email, tax_id_digits
 from faktur_beres.domain.reasons import InvoiceStatus, ReasonCode, Route
-from faktur_beres.evals import audit_log
 from faktur_beres.evals.labels import (
     load_labels,
     load_robustness_labels,
@@ -63,6 +62,7 @@ from faktur_beres.graph.build import build_graph
 from faktur_beres.graph.deps import Dependencies, FileStore
 from faktur_beres.graph.factory import checkpointer, live_dependencies
 from faktur_beres.graph.runner import Runner, Stop
+from faktur_beres.llm import usage
 from faktur_beres.llm.gemini import gemini_client
 from faktur_beres.tools import odoo_tools
 from faktur_beres.tools.odoo_gateway import AgentOdooGateway
@@ -613,7 +613,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     ds = load_dataset()
     uses_llm = state.llm or state.extraction == "llm" or state.reviewer
     llm = gemini_client(settings, use_cache=state.cache)
-    handler = audit_log.attach(state.run) if uses_llm else None
+    handler = usage.attach(state.run) if uses_llm else None
     engine = make_engine(url)
     store = Store(engine)
     oracle = oracle_extractor(todo)
@@ -654,7 +654,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 save(state)
                 print_result(result)
     finally:
-        audit_log.detach(handler)
+        usage.detach(handler)
         engine.dispose()
     save(state)
     print_summary(state)
