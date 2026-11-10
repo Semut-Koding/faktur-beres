@@ -23,6 +23,9 @@ M4a membangun semua langkah sampai agent pertama kali berhenti: jalur A membuat 
 13. **Kebijakan data paket bukti.** Paket bukti disamarkan seperti audit (BR-24): NPWP 4 digit awal dan akhir, rekening 4 digit akhir, menurut nama field dan di setiap tempat nomor yang sama muncul lagi. Kesimpulan kode tetap utuh. Nilai utuh tetap ada di berkas asli, di Odoo, dan di data kerja internal agent (hasil ekstraksi dan checkpoint), yang tidak pernah dikirim utuh ke API atau antarmuka.
 14. **Versi pustaka** (uv.lock): LangGraph 1.2.20, langgraph-checkpoint 4.3.1, langgraph-checkpoint-postgres 3.2.0, SQLAlchemy 2.1.8, psycopg 3.3.8, psycopg-pool 3.3.3, Alembic 1.20.1. LangGraph 1.0.10 ke atas memuat perbaikan CVE-2026-28277.
 
+## Catatan implementasi (M4b, 10 November 2026)
+Node `await_vendor`, `apply_reply`, dan `read_reply` serta riwayat berkas per revisi ditambahkan di M4b; rinciannya ada di [ADR-0011](0011-email-masuk-dan-balasan-vendor.md).
+
 ## Konsekuensi
 - Node tambahan di jalur C membuat diagram lebih panjang daripada SPEC §5.1, tetapi pemisahan efek samping bisa diuji langsung.
 - State berisi dump JSON sehingga setiap node memvalidasi ulang objeknya; biayanya kecil dibanding panggilan ERP dan LLM.

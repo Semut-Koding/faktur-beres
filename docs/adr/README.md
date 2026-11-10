@@ -26,6 +26,8 @@ Setiap keputusan penting dicatat sebagai satu berkas bernomor.
 | [0008](0008-gemini-sdk-model-kuota-cache-data.md) | Gemini: SDK, model per peran, kuota, cache, dan data | Diterima | 2026-11-09 |
 | [0009](0009-graph-basis-data-dan-aksi.md) | Graph LangGraph, basis data aplikasi, dan aksi sampai agent berhenti | Diterima | 2026-11-10 |
 | [0010](0010-llm-di-graph.md) | LLM di graph: peran cadangan, batas waktu per tujuan, dan pemanggilan alat di dalam pagar | Diterima | 2026-11-10 |
+| [0011](0011-email-masuk-dan-balasan-vendor.md) | Email masuk dan balasan vendor | Diusulkan | 2026-11-10 |
+| [0012](0012-rag-kebijakan-dan-pilihan-jalur.md) | RAG kebijakan dan pilihan jalur oleh LLM | Diusulkan | 2026-11-10 |
 
 ## Templat
 

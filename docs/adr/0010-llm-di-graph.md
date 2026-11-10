@@ -16,6 +16,9 @@ ADR-0008 mencatat bahwa selama peran utama dan kuat memakai model yang sama, tid
 6. **Pemetaan baris (BR-07).** Hanya baris `no_match` yang dikirim, dan hanya baris PO yang belum terpakai dan produknya tunggal yang ditawarkan, tanpa harga dan kuantitas. Ref harus salah satu yang ditawarkan, satu baris PO untuk satu baris faktur, `null` boleh. Jawaban yang ditolak guard diminta sekali lagi, lalu diperlakukan seperti `LlmUnavailable` (BR-27). Pagar tambahan: pemetaan hanya dipakai bila satuan tercetak sejenis dengan satuan baris PO (berat atau hitungan) dan harga satuan faktur berada dalam ±toleransi BR-08 dari harga PO; selain itu pemetaan dibuang, baris tetap tanpa padanan (BR-09), dan jejak mencatat alasannya. `domain` tetap tanpa LLM: `match_lines` menerima pemetaan yang sudah divalidasi dan memeriksa kembali baris PO, satuan, dan harga.
 7. **Prompt `extraction-v2`.** Kode barang hanya diisi bila benar-benar tercetak, dan kolom nomor urut bukan kode barang. `extraction-v1` tetap ada dan tetap dikunci tes sidik.
 
+## Catatan implementasi (M4b, 10 November 2026)
+Pemilih jalur memakai percakapan alat yang sama dengan perencana; rinciannya ada di [ADR-0012](0012-rag-kebijakan-dan-pilihan-jalur.md).
+
 ## Konsekuensi
 - Kuota cadangan 20 per hari hanya cukup untuk gangguan singkat, bukan untuk run evaluasi.
 - Perencana menambah sampai 6 panggilan per faktur tanpa PO, hanya untuk jejak dan paket bukti; keputusannya tetap dari aturan.
