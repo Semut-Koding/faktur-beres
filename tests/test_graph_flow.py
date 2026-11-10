@@ -547,6 +547,25 @@ def test_an_llm_mapping_lets_lines_without_codes_become_a_draft(tmp_path: Path) 
     assert {m["method"] for m in matches} == {"llm"}
 
 
+def test_the_draft_note_names_a_po_found_without_a_number(tmp_path: Path) -> None:
+    h, invoice_id = start(tmp_path, "NPO-01")
+    h.runner.run(invoice_id)
+    [note] = h.bills.notes
+    assert "Catatan:" in note and "P00033" in note
+
+
+def test_the_draft_note_names_lines_mapped_by_the_llm(tmp_path: Path) -> None:
+    h, invoice_id = start(tmp_path, "KTH-06", line_mapper=_kth06_mapping)
+    h.runner.run(invoice_id)
+    assert "dipetakan LLM" in h.bills.notes[0]
+
+
+def test_the_draft_note_names_a_lower_price(tmp_path: Path) -> None:
+    h, invoice_id = start(tmp_path, "HRG-02")
+    h.runner.run(invoice_id)
+    assert "lebih rendah" in h.bills.notes[0]
+
+
 def test_an_unavailable_mapper_is_a_system_failure(tmp_path: Path) -> None:
     def mapper(*_a: Any) -> LineMappingOutcome:
         raise LlmUnavailable("habis")

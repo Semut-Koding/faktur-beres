@@ -68,6 +68,7 @@ from faktur_beres.tools.odoo_tools import bill_note_text
 PLANNER_STATUSES = frozenset(
     {PoStatus.CANDIDATE, PoStatus.CORRECTED, PoStatus.NOT_FOUND, PoStatus.AMBIGUOUS}
 )
+BILL_NOTE_RULES = frozenset({"BR-06", "BR-07", "BR-08"})
 _FRAGMENTS = TypeAdapter(list[TextFragment])
 Update = dict[str, Any]
 
@@ -515,6 +516,7 @@ class Nodes:
                     invoice.invoice_number, invoice.nsfp, invoice.tax_invoice_date, row.file_name
                 )
                 + f" Referensi: [{invoice_id}]."
+                + _bill_details(analysis)
             )
             key, noted = self._claim(state, ActionKind.POST_NOTE, target, {"text": text})
             if noted is None:
@@ -762,6 +764,14 @@ class Nodes:
             summary=f"status {state.get('final_status')}",
         )
         return {}
+
+
+def _bill_details(analysis: AnalysisResult) -> str:
+    """What the AP staff should know on the draft: PO found, LLM mapping, lower price."""
+    details = [
+        mask_text(f.message) for f in analysis.findings if f.is_note and f.rule in BILL_NOTE_RULES
+    ]
+    return f" Catatan: {' '.join(details)}" if details else ""
 
 
 def _extraction_summary(dump: dict[str, Any]) -> dict[str, Any]:
