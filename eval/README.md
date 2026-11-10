@@ -152,6 +152,24 @@ Opsi lain: `--set faktur|ketahanan`, `--penilai nyala|mati`, `--pakai-cache`, `-
 
 Panggilan LLM: 8 `gemini-3.5-flash-lite` (7 perencana, 1 pemetaan baris KTH-06), biaya setara USD 0,0037.
 
+**Mode LLM segar (10 November 2026, run `20261110-022507`).** Seluruh agent: ekstraksi LLM (`extraction-v2`), penilai lapis 2 nyala, perencana dan pemetaan baris nyala, tanpa cache, dalam satu proses dan satu jendela kuota.
+
+| Set | Pertama berhenti | Status akhir | Menunggu M4b |
+|---|---|---|---|
+| 40 faktur | 40/40 | 27/27 | 13 |
+| Ketahanan | 13/13 | 13/13 | 0 |
+
+| Format | n | Median sampai jalur (detik) | p95 | Maks |
+|---|---|---|---|---|
+| PDF | 34 | 7,2 | 17,3 | 18,1 |
+| Foto | 9 | 11,9 | 23,9 | 23,9 |
+| Pindaian | 5 | 11,7 | 134,9 | 134,9 |
+| UBL | 5 | 1,9 | 5,2 | 5,2 |
+
+Panggilan: 114 `gemini-3.5-flash-lite` (ekstraksi 50, pembacaan ulang 3, penilai 53, perencana 7, pemetaan baris 1), tanpa jawaban dari model cadangan. Biaya setara USD 0,138, atau USD 0,0026 per faktur. Ada dua galat yang pulih dengan retry di model yang sama: satu timeout 122 detik, yang membuat DUP-03 butuh 134,9 detik dan melewati target 2 menit (SPEC F-04), dan satu HTTP 503.
+
+Batas tafsirnya: satu run saja, n per format kecil (p95 pindaian sama dengan maksimum), dan 13 skenario balasan vendor baru dinilai sampai pertama berhenti. Run ini tidak mengukur akurasi per field; itu diukur `eval:ekstraksi`.
+
 ## Evaluasi perencana
 
 `npm run eval:perencana` menjalankan perencana `identify` pada 8 kasus dengan ERP dari dataset. NPO-01 dan NPO-02 seperti tercetak; COC-01, COC-02, DUP-04, REK-04, HRG-04, dan QTY-01 dengan nomor PO dihapus. Jawaban yang diharapkan dihitung BR-06 saat run, bukan dari label.
