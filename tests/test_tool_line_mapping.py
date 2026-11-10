@@ -121,12 +121,60 @@ def test_domain_refuses_a_mapping_to_a_line_outside_the_po() -> None:
     assert mapped.matches[0].status == "no_match"
 
 
-def test_price_is_still_checked_after_mapping() -> None:
+def _changed_first_line(invoice, **update):
+    first = invoice.lines[0].model_copy(update=update)
+    return invoice.model_copy(update={"lines": (first, *invoice.lines[1:])})
+
+
+def _mapping_for(invoice, po) -> dict[int, int]:
+    from faktur_beres.domain.rules.lines import unit_kind
+
+    free = list(po.lines)
+    mapping: dict[int, int] = {}
+    for index, line in enumerate(invoice.lines, start=1):
+        same = [pl for pl in free if pl.price_unit == line.unit_price]
+        assert same and unit_kind(line.unit) == unit_kind(same[0].uom_name)
+        mapping[index] = same[0].id
+        free.remove(same[0])
+    return mapping
+
+
+@pytest.mark.aturan("BR-07")
+def test_a_valid_mapping_passes_the_extra_guards() -> None:
     invoice, po, _ = kth06()
-    first = invoice.lines[0].model_copy(
-        update={"unit_price": invoice.lines[0].unit_price * Decimal(2)}
-    )
-    changed = invoice.model_copy(update={"lines": (first, *invoice.lines[1:])})
-    ids = {i: pl.id for i, pl in enumerate(po.lines, start=1)}
-    mapped = match_lines(changed, po, POLICY, llm_mapping=ids)
-    assert any(f.reason is not None and f.reason.value == "price_variance" for f in mapped.findings)
+    mapped = match_lines(invoice, po, POLICY, llm_mapping=_mapping_for(invoice, po))
+    assert mapped.all_matched and mapped.llm_dropped == ()
+
+
+@pytest.mark.aturan("BR-07")
+@pytest.mark.parametrize("factor", ["1.5", "0.5"])
+def test_a_mapping_with_a_price_out_of_band_is_dropped(factor: str) -> None:
+    invoice, po, _ = kth06()
+    mapping = _mapping_for(invoice, po)
+    changed = _changed_first_line(invoice, unit_price=invoice.lines[0].unit_price * Decimal(factor))
+    mapped = match_lines(changed, po, POLICY, llm_mapping=mapping)
+    assert mapped.matches[0].status == "no_match"
+    assert "jauh dari harga PO" in mapped.llm_dropped[0]
+
+
+@pytest.mark.aturan("BR-07")
+@pytest.mark.parametrize("unit", ["liter", "meter"])
+def test_a_mapping_with_an_unknown_unit_is_dropped(unit: str) -> None:
+    invoice, po, _ = kth06()
+    changed = _changed_first_line(invoice, unit=unit)
+    mapped = match_lines(changed, po, POLICY, llm_mapping=_mapping_for(invoice, po))
+    assert mapped.matches[0].status == "no_match" and "tidak sejenis" in mapped.llm_dropped[0]
+
+
+@pytest.mark.aturan("BR-07")
+def test_shipping_mapped_to_a_die_cut_line_is_refused_by_its_price() -> None:
+    label = LABELS["QTY-04"]
+    invoice = truth_to_invoice(label.kebenaran_dokumen)
+    po = DatasetErpReader(load_dataset()).purchase_order(label.po_rujukan)
+    assert po is not None
+    baseline = match_lines(invoice, po, POLICY)
+    [shipping] = [m.line for m in baseline.matches if m.status == "no_match"]
+    [die_cut] = po.lines
+    mapped = match_lines(invoice, po, POLICY, llm_mapping={shipping: die_cut.id})
+    assert mapped.matches[shipping - 1].status == "no_match"
+    assert "jauh dari harga PO" in mapped.llm_dropped[0]

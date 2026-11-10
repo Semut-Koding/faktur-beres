@@ -356,6 +356,15 @@ class Nodes:
                     summary=f"{len(outcome.mapping)} baris dipetakan",
                 )
             matching = apply_line_mapping(invoice, ident, matching, deps.policy, outcome.mapping)
+            for why in matching.lines.llm_dropped:
+                deps.store.audit(
+                    invoice_id,
+                    kind=AuditKind.GUARD,
+                    name="pemetaan_baris_dibuang",
+                    node="match",
+                    summary=why,
+                    status="refused",
+                )
         return {
             "matching": matching.model_dump(mode="json"),
             "review": review.model_dump(mode="json") if review is not None else None,

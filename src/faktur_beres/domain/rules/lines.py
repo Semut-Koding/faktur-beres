@@ -13,8 +13,9 @@
 
 Line matching runs only once the PO is established (BR-06). A free description the code cannot map
 may be mapped by the LLM (``tools.line_mapping``): this module has no LLM, it takes the mapping that
-code has already validated, and still checks that the PO line exists and is the only line of its
-product.
+code has already validated, and still checks that the PO line exists, is the only line of its
+product, has a unit of the same kind (weight or count), and has a price within ±the tolerance of
+BR-08. Otherwise the mapping is dropped and the line stays without a counterpart.
 """
 
 import re
@@ -43,6 +44,12 @@ RULE_MAPPING = "BR-07"
 RULE_PRICE = "BR-08"
 RULE_QUANTITY = "BR-09"
 _TRAILING_BRACKETS = re.compile(r"\s*[\(\[][^\)\]]*[\)\]]\s*$")
+UNIT_KINDS: dict[str, frozenset[str]] = {
+    "berat": frozenset({"kg", "kgm", "kilogram"}),
+    "hitungan": frozenset(
+        {"pcs", "unit", "units", "roll", "set", "lembar", "paket", "buah", "h87", "c62"}
+    ),
+}
 
 
 class LineMatch(DomainModel):
@@ -59,6 +66,7 @@ class LinesResult(DomainModel):
     purchase_order: str | None = None
     matches: tuple[LineMatch, ...] = ()
     findings: tuple[Finding, ...] = ()
+    llm_dropped: tuple[str, ...] = ()  # why a mapping proposed by the LLM was not used
 
     @property
     def all_matched(self) -> bool:
@@ -211,23 +219,51 @@ def check_quantity(
     )
 
 
+def unit_kind(unit: str) -> str | None:
+    """``berat``, ``hitungan``, or None for a unit outside the list."""
+    name = unit.strip().casefold()
+    return next((kind for kind, units in UNIT_KINDS.items() if name in units), None)
+
+
+def _llm_mapping_problem(
+    line: InvoiceLine, po_line: PurchaseOrderLineRecord, policy: PolicyConfig
+) -> str | None:
+    """Why the mapping cannot be used, or None (BR-07)."""
+    kind = unit_kind(line.unit)
+    if kind is None or kind != unit_kind(po_line.uom_name):
+        return f"satuan {line.unit} tidak sejenis dengan {po_line.uom_name}"
+    gap = abs(line.unit_price - po_line.price_unit)
+    if gap > po_line.price_unit * policy.price_tolerance_percent / 100:
+        return f"harga {rupiah(line.unit_price)} jauh dari harga PO {rupiah(po_line.price_unit)}"
+    return None
+
+
 def _mapped_by_llm(
-    index: int, match: LineMatch, po: PurchaseOrderRecord, mapping: Mapping[int, int]
-) -> LineMatch:
-    """Apply a validated LLM mapping to a line the code found no counterpart for (BR-07)."""
+    index: int,
+    line: InvoiceLine,
+    match: LineMatch,
+    po: PurchaseOrderRecord,
+    mapping: Mapping[int, int],
+    policy: PolicyConfig,
+) -> tuple[LineMatch, str | None]:
+    """Apply a validated LLM mapping to a line without counterpart (BR-07), or say why not."""
     po_line_id = mapping.get(index)
     if match.status != "no_match" or po_line_id is None:
-        return match
+        return match, None
     chosen = [pl for pl in po.lines if pl.id == po_line_id]
     if len(chosen) != 1 or sum(pl.product_id == chosen[0].product_id for pl in po.lines) != 1:
-        return match
-    return LineMatch(
+        return match, f"baris {index}: baris PO tidak bisa dipakai"
+    problem = _llm_mapping_problem(line, chosen[0], policy)
+    if problem is not None:
+        return match, f"baris {index}: {problem}"
+    mapped = LineMatch(
         line=index,
         status="matched",
         method="llm",
         po_line_id=chosen[0].id,
         product_id=chosen[0].product_id,
     )
+    return mapped, None
 
 
 def match_lines(
@@ -248,8 +284,12 @@ def match_lines(
     used: dict[int, Decimal] = defaultdict(Decimal)
     matches: list[LineMatch] = []
     findings: list[Finding] = []
+    dropped: list[str] = []
     for index, line in enumerate(invoice.lines, start=1):
-        match = _mapped_by_llm(index, line_match := map_line(index, line, po), po, llm_mapping)
+        line_match = map_line(index, line, po)
+        match, why_dropped = _mapped_by_llm(index, line, line_match, po, llm_mapping, policy)
+        if why_dropped is not None:
+            dropped.append(why_dropped)
         matches.append(match)
         if match is not line_match and match.po_line_id is not None:
             findings.append(
@@ -301,5 +341,9 @@ def match_lines(
             findings.append(quantity)
         used[po_line.id] += line.quantity
     return LinesResult(
-        ran=True, purchase_order=po.number, matches=tuple(matches), findings=tuple(findings)
+        ran=True,
+        purchase_order=po.number,
+        matches=tuple(matches),
+        findings=tuple(findings),
+        llm_dropped=tuple(dropped),
     )
