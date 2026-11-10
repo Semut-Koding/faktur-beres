@@ -16,6 +16,7 @@ Prompt yang sudah disimpan tidak diubah. Koreksi atau tambahan ditulis sebagai p
 | [`M2.md`](M2.md) | Catatan tinjauan M1 dan lapisan alat: grup Odoo agent, aturan deterministik, `odoo_tools`, evaluasi orakel | Selesai |
 | [`M3.md`](M3.md) | Catatan tinjauan M2, ekstraksi Gemini, parser UBL, injeksi dua lapis, set uji ketahanan | Selesai |
 | [`M4a.md`](M4a.md) | Catatan tinjauan M3, graph inti, basis data aplikasi, aksi sampai agent pertama kali berhenti, dan keputusan approver lewat CLI | Selesai |
+| [`M4b.md`](M4b.md) | Catatan tinjauan M4a, email masuk dan balasan vendor, RAG kebijakan, dan pilihan jalur oleh LLM | Berjalan |
 
 ## Format laporan
 Laporan ditulis di akhir tugas dalam bahasa Indonesia, dengan bagian berikut secara berurutan:
