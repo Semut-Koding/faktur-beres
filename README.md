@@ -33,12 +33,13 @@ npm run db:migrate     # tabel aplikasi (Alembic) dan tabel checkpointer LangGra
 
 Port sengaja dibuat berbeda dari proyek lain di mesin yang sama (aturan +20000, [RENCANA-TEKNIS §4.3](docs/RENCANA-TEKNIS.md#43-kontainer-lokal-dan-port)).
 
-Kembalikan data Odoo ke kondisi seed kapan saja dengan `npm run odoo:reset`. Kosongkan data aplikasi dengan `npm run db:reset`.
+Kembalikan data Odoo ke kondisi seed kapan saja dengan `npm run odoo:reset`. Kosongkan data aplikasi dengan `npm run db:reset`; indeks kebijakan tetap ada. Setelah `db:reset`, pesan lama di Mailpit akan terbaca lagi oleh `agent:inbox`, jadi saat menyiapkan demo kosongkan Mailpit bersama `db:reset`.
 
 Proses satu faktur lewat CLI (hanya berkas di dalam repo):
 
 ```bash
 npm run agent:proses -- eval/berkas/COC-03/faktur.xml
+npm run agent:inbox            # baca inbox AP sekali; -- --terus untuk berulang
 npm run agent:status
 npm run agent:jejak -- FB-000001
 npm run agent:putuskan -- FB-000001 setujui --oleh "Nama Approver"
@@ -62,6 +63,9 @@ Perintah berikut memanggil Gemini, jadi memakai kuota tier gratis. Isi `GEMINI_A
 
 ```bash
 npm run llm:model -- --uji   # periksa model terkonfigurasi (satu permintaan kecil per model)
+npm run llm:kuota            # permintaan per model sejak reset harian terakhir (15.00 WIB)
+npm run rag:indeks           # buat indeks kebijakan (hanya potongan baru atau berubah)
+npm run rag:cari -- "ongkos kirim"   # cari di kebijakan
 npm run test:llm             # tes smoke Gemini
 npm run eval:ekstraksi       # akurasi ekstraksi dan rantai ke aturan, tiga kelompok (sekitar 120 panggilan)
 npm run eval:injeksi         # injeksi dua lapis pada set frasa dev (sekitar 100 panggilan)
