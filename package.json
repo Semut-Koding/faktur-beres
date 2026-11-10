@@ -47,6 +47,7 @@
     "graph:diagram": "uv run python -m faktur_beres.graph.diagram",
     "rag:indeks": "uv run python -m faktur_beres.tools.policy_cli indeks",
     "rag:cari": "uv run python -m faktur_beres.tools.policy_cli cari",
+    "demo:balas": "uv run python -m faktur_beres.devtools.demo_reply",
     "api": "uv run python -m faktur_beres.api",
     "db:migrate": "uv run python -m faktur_beres.db migrasi",
     "db:reset": "uv run python -m faktur_beres.db reset",
