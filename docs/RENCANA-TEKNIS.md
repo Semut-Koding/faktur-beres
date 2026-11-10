@@ -100,16 +100,17 @@
 - MVP memakai satu proses API yang menjalankan graph di latar. Karena state ada di PostgreSQL, worker bisa dipisah dan ditambah tanpa mengubah graph.
 
 ### 3.4 Keterlacakan aturan
-Setiap aturan yang dihitung kode punya tes bertanda `@pytest.mark.aturan("BR-xx")`. Daftar aturannya adalah konstanta `faktur_beres.domain.rules.CODE_RULES`, dan `tests/test_traceability.py` memastikan tiap BR di daftar itu punya minimal satu tes. Jumlah di bawah dihitung saat M3 selesai (9 November 2026): fungsi tes, dan kasus setelah parametrisasi. Seluruhnya ada 1.112 kasus tes unit, ditambah 13 tes integrasi dan 2 tes smoke LLM.
+Setiap aturan yang dihitung kode punya tes bertanda `@pytest.mark.aturan("BR-xx")`. Daftar aturannya adalah konstanta `faktur_beres.domain.rules.CODE_RULES`, dan `tests/test_traceability.py` memastikan tiap BR di daftar itu punya minimal satu tes. Jumlah di bawah dihitung saat M4a selesai (10 November 2026): fungsi tes, dan kasus setelah parametrisasi; tes basis data bertanda `integrasi` ikut terhitung. Seluruhnya ada 1.357 kasus tes unit, ditambah 28 tes integrasi dan 2 tes smoke LLM.
 
 | BR | Fungsi atau modul | Berkas tes | Tes (kasus) |
 |---|---|---|---|
+| BR-01 | `graph/runner.py`: `accept` (jenis berkas sebelum thread dibuat); node `intake` (hash sama); `graph/deps.py`: `FileStore` | `test_graph_flow.py` | 3 (3) |
 | BR-02 | `extraction/convert.py`: `convert` (field wajib); `extraction/ubl.py` | `test_extraction_convert.py` | 3 (3) |
 | BR-03 | `rules/arithmetic.py`: `check_arithmetic` | `test_rule_arithmetic.py` | 6 (10) |
 | BR-04 | `extraction/reading.py`: `read_with_llm` (pembacaan ulang, konsistensi); `extraction/outcome.py` | `test_extraction_reading.py` | 11 (11) |
 | BR-05 | `rules/vendor.py`: `identify_vendor`; `engine.analyse` melewati pemeriksaan bergantung vendor | `test_rule_vendor.py`, `test_engine.py` | 11 (12) |
 | BR-06 | `rules/purchase_order.py`: `identify_purchase_order`, `is_strong_candidate` | `test_rule_purchase_order.py`, `test_engine.py` | 12 (16) |
-| BR-07 | `rules/lines.py`: `map_line` | `test_rule_lines.py` | 4 (9) |
+| BR-07 | `rules/lines.py`: `map_line`, pemetaan tervalidasi di `match_lines`; `tools/line_mapping.py`: guard pemetaan LLM | `test_rule_lines.py`, `test_tool_line_mapping.py`, `test_graph_flow.py` | 10 (18) |
 | BR-08 | `rules/lines.py`: `check_price`, `price_limit` | `test_rule_lines.py` | 4 (4) |
 | BR-09 | `rules/lines.py`: `check_quantity`, `match_lines`; `tools/match_engine.py` | `test_rule_lines.py`, `test_engine.py`, `test_match_and_tax_tools.py` | 10 (10) |
 | BR-10 | `rules/tax.py`: `check_tax`, `check_seller_identity`; `tax_ids.py`; `tools/tax_check.py` | `test_rule_tax.py`, `test_match_and_tax_tools.py` | 14 (22) |
@@ -120,15 +121,17 @@ Setiap aturan yang dihitung kode punya tes bertanda `@pytest.mark.aturan("BR-xx"
 | BR-15 | `rules/injection.py`: `PATTERNS` kuat dan lemah, `judge_injection`, `document_fragments`; `tools/injection_review.py` (lapis kedua) | `test_rule_injection.py`, `test_rule_injection_layers.py`, `test_tool_injection_review.py` | 36 (97) |
 | BR-16 | `rules/routing.py`: `priority_route`, `initial_status` | `test_rule_routing.py` | 2 (6) |
 | BR-17 | `rules/routing.py`: `allowed_routes`, `default_route`, `guard_route` | `test_rule_routing.py` | 4 (15) |
-| BR-18 | `rules/bill_plan.py`: `plan_bill`, `BillPlan`; `tools/odoo_tools.py`: `create_draft_bill`, `verify_bill` | `test_rule_bill_plan.py` (+ `test_odoo_tools_draft.py`, `test_integrasi_draft.py`) | 5 (5) |
-| BR-22 | `rules/safety.py`: `canonical_json`, `idempotency_key` | `test_rule_safety.py` | 3 (3) |
-| BR-23 | `llm/gemini.py`: catatan per percobaan di logger `faktur_beres.llm`; `llm/cost.py`; log gateway tanpa isi berkas | `test_llm_cache_audit_cost.py`, `test_odoo_gateway.py` | 7 (7) |
+| BR-18 | `rules/bill_plan.py`: `plan_bill`, `BillPlan`; `tools/odoo_tools.py`: `create_draft_bill`, `verify_bill`; node `act_bill` | `test_rule_bill_plan.py`, `test_graph_flow.py` (+ `test_odoo_tools_draft.py`, `test_integrasi_draft.py`) | 7 (7) |
+| BR-19 | `tools/email_tool.py`: templat, subjek berreferensi; node `act_vendor_email` (bagian keluar; pengingat di M4b) | `test_tool_email.py`, `test_graph_flow.py` | 5 (5) |
+| BR-21 | node `prepare_approval`: paket bukti dan pilihan approver | `test_graph_flow.py` | 2 (2) |
+| BR-22 | `rules/safety.py`: `canonical_json`, `idempotency_key`; tabel `actions` (`db/store.py`: `begin_action`); Message-ID deterministik (`tools/email_tool.py`) | `test_rule_safety.py`, `test_db_store.py`, `test_graph_flow.py`, `test_tool_email.py` | 9 (9) |
+| BR-23 | `llm/gemini.py`: catatan per percobaan di logger `faktur_beres.llm`; `llm/cost.py`; log gateway tanpa isi berkas; `audit_log` (`db/store.py`, `graph/audit.py`) | `test_llm_cache_audit_cost.py`, `test_odoo_gateway.py`, `test_db_store.py` | 9 (9) |
 | BR-24 | `rules/safety.py`: `mask_npwp`, `mask_account`, `mask_params` (dipakai log gateway) | `test_rule_safety.py` (+ `test_odoo_gateway.py`) | 2 (2) |
-| BR-25 | `rules/safety.py`: `check_recipient` | `test_rule_safety.py` | 2 (15) |
-| BR-27 | `llm/gemini.py`: `GeminiClient` (retry, backoff, model cadangan, `LlmUnavailable`) | `test_llm_gemini.py` | 9 (14) |
+| BR-25 | `rules/safety.py`: `check_recipient`; `tools/email_tool.py`: `send_checked`; penerima dari Odoo di node `act_vendor_email` | `test_rule_safety.py`, `test_tool_email.py`, `test_graph_flow.py` | 6 (21) |
+| BR-27 | `llm/gemini.py`: `GeminiClient` (retry, backoff, model cadangan, `LlmUnavailable`); `graph/runner.py`: status `failed` dan `retry`; `RetryPolicy` node | `test_llm_gemini.py`, `test_graph_flow.py` | 13 (18) |
 | BR-28 | `domain/policy.py`: `PolicyConfig`, `load_policy` | `test_policy.py` | 2 (2) |
 
-Rangkaian lengkapnya diuji `tests/test_engine.py`, evaluasi orakel (`tests/test_orakel.py`, 40/40), dan cek silang set ketahanan (`tests/test_robustness_oracle.py`). Batas antara kode agent dan kode evaluasi diuji `tests/test_architecture.py`, termasuk paket `llm` dan `extraction`, dan `domain` yang tidak mengimpor `llm`, `extraction`, atau `tools`.
+Rangkaian lengkapnya diuji `tests/test_engine.py`, evaluasi orakel (`tests/test_orakel.py`, 40/40), dan cek silang set ketahanan (`tests/test_robustness_oracle.py`). Kesetaraan graph dengan `analyse()` diuji `tests/test_graph_equivalence.py` untuk 40 skenario dan 13 dokumen ketahanan. Batas antara kode agent dan kode evaluasi diuji `tests/test_architecture.py`, termasuk paket `llm`, `extraction`, `db`, dan `graph`, dan `domain` yang tidak mengimpor `llm`, `extraction`, atau `tools`.
 
 ---
 
