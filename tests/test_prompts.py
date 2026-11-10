@@ -21,6 +21,7 @@ from faktur_beres.tools.injection_review import ReviewAnswer
 from faktur_beres.tools.line_mapping import MappingAnswer
 from faktur_beres.tools.po_planner import TOOLS as PLANNER_TOOLS
 from faktur_beres.tools.reply_reading import ReplyAnswer
+from faktur_beres.tools.route_chooser import TOOLS as ROUTE_TOOLS
 
 PACKAGE_DIR = REPO_ROOT / "src" / "faktur_beres"
 FINGERPRINTS = REPO_ROOT / "tests" / "data" / "prompt_fingerprints.json"
@@ -30,6 +31,7 @@ SCHEMAS = [
     MappingAnswer,
     ReplyAnswer,
     *(t.schema for t in PLANNER_TOOLS),
+    *(t.schema for t in ROUTE_TOOLS),
 ]
 
 
