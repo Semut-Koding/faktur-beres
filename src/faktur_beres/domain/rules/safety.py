@@ -83,7 +83,9 @@ _LONG_DIGITS = re.compile(r"(?<!\d)\d{8,}(?!\d)")
 
 
 def mask_npwp(value: str) -> str:
-    """``0990********0000``: the first 4 and the last 4 digits stay."""
+    """``0990********0000``: the first and last 4 digits stay; masking twice changes nothing."""
+    if "*" in value:
+        return value
     digits = re.sub(r"\D", "", value)
     if len(digits) <= 8:
         return "*" * len(digits)
@@ -91,7 +93,9 @@ def mask_npwp(value: str) -> str:
 
 
 def mask_account(value: str) -> str:
-    """``******7927``: only the last 4 digits stay."""
+    """``******7927``: only the last 4 digits stay; masking twice changes nothing."""
+    if "*" in value:
+        return value
     digits = re.sub(r"\D", "", value)
     if len(digits) <= 4:
         return "*" * len(digits)

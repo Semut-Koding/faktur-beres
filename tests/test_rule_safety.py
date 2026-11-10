@@ -122,3 +122,8 @@ def test_allowed_recipients(raw: str, reason: str) -> None:
 def test_refused_recipients(raw: str, reason: str) -> None:
     check = check_recipient(raw, VENDORS, "arunika.test")
     assert not check.allowed and check.reason == reason
+
+
+def test_masking_twice_keeps_the_visible_digits() -> None:
+    once = mask_params({"npwp": "0990427957220000", "rekening": "5450717927"})
+    assert mask_params(once) == {"npwp": "0990********0000", "rekening": "******7927"}

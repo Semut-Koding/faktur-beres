@@ -100,7 +100,7 @@
 - MVP memakai satu proses API yang menjalankan graph di latar. Karena state ada di PostgreSQL, worker bisa dipisah dan ditambah tanpa mengubah graph.
 
 ### 3.4 Keterlacakan aturan
-Setiap aturan yang dihitung kode punya tes bertanda `@pytest.mark.aturan("BR-xx")`. Daftar aturannya adalah konstanta `faktur_beres.domain.rules.CODE_RULES`, dan `tests/test_traceability.py` memastikan tiap BR di daftar itu punya minimal satu tes. Jumlah di bawah dihitung saat M4a selesai (10 November 2026): fungsi tes, dan kasus setelah parametrisasi; tes basis data bertanda `integrasi` ikut terhitung. Seluruhnya ada 1.360 kasus tes unit, ditambah 28 tes integrasi dan 2 tes smoke LLM.
+Setiap aturan yang dihitung kode punya tes bertanda `@pytest.mark.aturan("BR-xx")`. Daftar aturannya adalah konstanta `faktur_beres.domain.rules.CODE_RULES`, dan `tests/test_traceability.py` memastikan tiap BR di daftar itu punya minimal satu tes. Jumlah di bawah dihitung saat M4a selesai (10 November 2026): fungsi tes, dan kasus setelah parametrisasi; tes basis data bertanda `integrasi` ikut terhitung. Seluruhnya ada 1.361 kasus tes unit, ditambah 28 tes integrasi dan 2 tes smoke LLM.
 
 | BR | Fungsi atau modul | Berkas tes | Tes (kasus) |
 |---|---|---|---|
