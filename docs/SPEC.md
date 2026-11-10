@@ -139,6 +139,8 @@ intake ─▶ extract ─▶ validate ──(gagal, perbaikan ≤ 2×)──▶ 
              C: interrupt      ◀────────────┘  keputusan approver ─▶ act atau tutup
 ```
 
+Bentuk graph yang dikompilasi ada di [diagram](diagram-graph.md). Setelah email klarifikasi, graph menunggu di `await_vendor` (interrupt). Balasan berlampiran faktur masuk `extract` sebagai revisi baru. Balasan teks dibaca `read_reply`: tepat satu nomor PO yang sah mengulang `identify`, selain itu kembali menunggu tanpa email baru.
+
 | Node | Tugas | Dikerjakan oleh |
 |---|---|---|
 | `intake` | Menerima berkas, email, atau UBL; membuat `invoice_id`; menyimpan berkas asli dan hash SHA-256 | Kode |
@@ -159,8 +161,10 @@ intake ─▶ extract ─▶ validate ──(gagal, perbaikan ≤ 2×)──▶ 
 | `odoo_tools` | Odoo JSON-2, user agent | **Baca:** vendor dan rekening, produk, PO dan barisnya, penerimaan, tagihan vendor. **Tulis:** membuat draft tagihan dari baris PO, melampirkan berkas, menulis catatan di chatter. **Tidak ada:** hapus, posting, konfirmasi PO, validasi penerimaan, ubah data vendor atau rekening |
 | `match_engine` | Kode | Pencocokan tiga arah, deteksi duplikat dan rekening |
 | `tax_check` | Kode | NPWP, NSFP, kode transaksi, DPP nilai lain, dan PPN |
-| `policy_rag` | pgvector | Mencari pasal SOP dan kontrak yang relevan. Hasilnya kutipan teks, bukan angka keputusan (BR-28) |
-| `email_tool` | SMTP dan API Mailpit | Mengirim email templat ke alamat yang diizinkan (BR-25), membaca inbox AP |
+| `policy_rag` | pgvector, embedding Gemini | Mencari pasal SOP dan kontrak yang relevan: `search_policy(query, k ≤ 5)` mengembalikan ref, judul, kutipan, dan skor. Hasilnya kutipan teks, bukan angka keputusan (BR-28) |
+| `email_tool` | SMTP dan API Mailpit | Mengirim email templat ke alamat yang diizinkan (BR-25) |
+| `inbox` | API Mailpit | Membaca inbox AP: daftar pesan, isi, header, dan lampiran. Tanpa aksi |
+| `route_chooser` | Gemini, `policy_rag` | Memilih jalur di dalam himpunan yang diizinkan (BR-17): `search_policy` dan `submit_route`, dijaga `guard_route` |
 
 Pada node `identify` dan `decide`, LLM memanggil alat lewat *tool calling* dari daftar yang diizinkan. Parameter divalidasi skema sebelum dijalankan. Misalnya, `partner_id` hanya boleh berasal dari hasil alat sebelumnya.
 
@@ -236,7 +240,8 @@ Prioritas: **C > B > A**. Semua alasan dicatat walaupun hanya satu jalur yang di
 ### F-02 Faktur masuk lewat email
 1. Vendor mengirim email berlampiran faktur ke `ap@arunika.test`.
 2. Pemantau inbox membaca email baru lewat API Mailpit. Satu lampiran faktur menjadi satu faktur.
-3. Email yang subjeknya memuat referensi thread (mis. `[FB-000123]`) diperlakukan sebagai balasan (F-06), bukan faktur baru.
+3. Email yang subjeknya memuat referensi thread (mis. `[FB-000123]`), atau yang `In-Reply-To`/`References`-nya menunjuk email keluar agent, diperlakukan sebagai balasan (F-06), bukan faktur baru.
+4. Satu Message-ID diproses sekali. Pesan keluar agent dan pesan dari domain internal tidak diproses.
 
 ### F-03 E-invoice UBL masuk
 1. Berkas XML UBL masuk lewat unggahan atau lampiran email.
@@ -256,7 +261,7 @@ Prioritas: **C > B > A**. Semua alasan dicatat walaupun hanya satu jalur yang di
 
 ### F-06 Jalur B: klarifikasi vendor dan melanjutkan
 1. `act` mengirim email templat ke alamat penagihan vendor di Odoo (BR-19, BR-25), berisi rincian selisih dan permintaan koreksi. Status `awaiting_vendor`.
-2. Balasan vendor masuk ke inbox AP. Balasan hanya diterima dari alamat vendor terdaftar (BR-20).
+2. Balasan vendor masuk ke inbox AP. Balasan hanya diterima dari alamat vendor terdaftar (BR-20). Yang diperiksa adalah header `From`; di produksi perlu SPF, DKIM, dan DMARC (ADR-0011).
 3. Lampiran faktur perbaikan diproses ulang mulai `extract` di thread yang sama. Balasan berisi informasi saja, misalnya nomor PO yang benar, diekstrak sebagai data lalu `identify` diulang.
 4. Duplikat pasti (B5) hanya mendapat email pemberitahuan, lalu status `closed_duplicate` tanpa menunggu.
 
@@ -347,7 +352,7 @@ PostgreSQL dengan pgvector, terpisah dari database Odoo.
 | `vendor_memory` | Pola selisih per vendor | Memori jangka panjang |
 | `policy_chunks` | Potongan SOP dan kontrak beserta embedding | RAG |
 
-M4a membuat `invoices`, `invoice_lines`, `match_results`, `actions`, `approvals`, dan `audit_log`; `vendor_memory` dan `policy_chunks` dibuat di M4b. Tabel checkpointer dibuat oleh LangGraph dan tidak dikelola Alembic. Skema rinci ada di migrasi berversi dan [ADR-0009](adr/0009-graph-basis-data-dan-aksi.md).
+M4a membuat `invoices`, `invoice_lines`, `match_results`, `actions`, `approvals`, dan `audit_log`. M4b membuat `inbox_messages`, `invoice_files` (riwayat berkas per revisi), `policy_chunks`, dan `policy_reason_quotes`. `vendor_memory` dibuat di M4c. Tabel checkpointer dibuat oleh LangGraph dan tidak dikelola Alembic. Skema rinci ada di migrasi berversi dan [ADR-0009](adr/0009-graph-basis-data-dan-aksi.md).
 
 ### 9.3 Berkas
 Berkas faktur asli disimpan di `var/berkas/<invoice_id>/` (tidak di-commit) dan dilampirkan ke draft tagihan di Odoo. Penyimpanan untuk demo publik ditetapkan di M6.
@@ -404,7 +409,7 @@ Mitigasi mengacu pada OWASP Top 10 for Agentic Applications 2026 dan UU Nomor 27
 - Harness menyimulasikan balasan vendor dan keputusan approver sesuai label.
 - **Evaluasi orakel** (sejak M2): aturan deterministik dijalankan pada `kebenaran_dokumen` label seolah ekstraksinya sempurna, lengkap dengan simulasi balasan vendor dan keputusan approver. Data ERP diambil dari dataset (luring) atau dari Odoo hasil seed lewat user agent (baca saja). Targetnya 40/40. Hasilnya menjadi batas atas evaluasi penuh dan memisahkan kesalahan ekstraksi atau LLM dari kesalahan aturan.
 - **Evaluasi ekstraksi** (sejak M3): ekstraksi dan validasi dijalankan pada berkas 40 skenario, 11 lampiran balasan, dan set uji ketahanan. Hasilnya dibandingkan per field dengan `kebenaran_dokumen`, lalu aturan dijalankan pada hasil ekstraksi dan dibandingkan dengan evaluasi orakel. Set ketahanan dilaporkan terpisah dari metrik utama.
-- **Evaluasi graph** (sejak M4a, `npm run eval:graph`): graph sungguhan dijalankan pada setiap skenario dan dinilai dari Odoo, Mailpit, dan basis data aplikasi dengan penilai yang sama dengan evaluasi orakel. Mode orakel memakai `kebenaran_dokumen` sebagai hasil ekstraksi; mode LLM menjalankan seluruh agent. Sampai M4b, skenario yang menunggu balasan vendor dinilai pada saat pertama berhenti saja.
+- **Evaluasi graph** (sejak M4a, `npm run eval:graph`): graph sungguhan dijalankan pada setiap skenario dan dinilai dari Odoo, Mailpit, dan basis data aplikasi dengan penilai yang sama dengan evaluasi orakel. Mode orakel memakai `kebenaran_dokumen` sebagai hasil ekstraksi; mode LLM menjalankan seluruh agent. Sejak M4b, semua skenario dinilai sampai status akhir, dengan kanal email dan balasan vendor lewat Mailpit sungguhan.
 - **Set frasa injeksi** (sejak M3): frasa wajar dan serangan berlabel untuk mengukur kedua lapis BR-15. Set dev ada di repo; set tertutup dipegang perencana dan dijalankan saat tinjauan.
 - Penilaian berdasarkan **state akhir** sistem, seperti metode τ-bench: tagihan di Odoo, email di Mailpit, serta status dan alasan di basis data aplikasi ([§15.4](#154-format-label)).
 
@@ -445,7 +450,7 @@ Mitigasi mengacu pada OWASP Top 10 for Agentic Applications 2026 dan UU Nomor 27
 | Ambang persetujuan dan toleransi harga | Rp50.000.000 dan +1%, nilai demo | Bisa diubah lewat konfigurasi |
 | Kode status NSFP | Generator memakai `00`; validator hanya memeriksa panjang dan digit | M1 |
 | Model Gemini utama dan cadangan | Keluarga Flash-Lite dan Flash; peran, ID persis, dan dasar pemilihannya di ADR-0008. Peran cadangan memakai `gemini-3.6-flash` (ADR-0010) | M3, M4a |
-| Dimensi embedding RAG | Menyusul, mengikuti batas indeks pgvector | M4 |
+| Dimensi embedding RAG | 768, dengan `gemini-embedding-2` (ADR-0012) | M4b |
 | Akses dashboard publik | Perlu kode akses atau batas laju agar kuota LLM tidak habis | M6 |
 | Hosting API, Odoo, dan basis data untuk demo publik | Belum ditentukan | M6 |
 | Lisensi repo publik | Belum ditentukan | M6 |
