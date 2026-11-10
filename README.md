@@ -21,18 +21,29 @@ npm run odoo:init      # database fakturberes, modul, addon grup agent, perusaha
 npm run odoo:seed      # data sintetis dari data/seed/dataset.yaml (aman diulang)
 npm run odoo:check     # pastikan isi Odoo sama dengan dataset
 npm run odoo:snapshot  # simpan kondisi seed untuk reset cepat
+npm run db:migrate     # tabel aplikasi (Alembic) dan tabel checkpointer LangGraph
 ```
 
 | Layanan | Alamat lokal |
 |---|---|
 | Odoo | http://localhost:28069 (login `admin`, sandi di `.env`) |
 | Mailpit (email keluar dan masuk) | http://localhost:28025 |
-| API Faktur Beres (mulai M4) | http://localhost:28000 |
+| API Faktur Beres (mulai M4b) | http://localhost:28000 |
 | Dashboard (mulai M5) | http://localhost:25173 |
 
 Port sengaja dibuat berbeda dari proyek lain di mesin yang sama (aturan +20000, [RENCANA-TEKNIS §4.3](docs/RENCANA-TEKNIS.md#43-kontainer-lokal-dan-port)).
 
-Kembalikan data Odoo ke kondisi seed kapan saja dengan `npm run odoo:reset`.
+Kembalikan data Odoo ke kondisi seed kapan saja dengan `npm run odoo:reset`. Kosongkan data aplikasi dengan `npm run db:reset`.
+
+Proses satu faktur lewat CLI (hanya berkas di dalam repo):
+
+```bash
+npm run agent:proses -- eval/berkas/COC-03/faktur.xml
+npm run agent:status
+npm run agent:jejak -- FB-000001
+npm run agent:putuskan -- FB-000001 setujui --oleh "Nama Approver"
+npm run agent:ulang -- FB-000001   # lanjutkan faktur berstatus failed
+```
 
 > **Peringatan:** jangan menjalankan `podman compose down -v`, `podman volume rm`, atau `podman system prune`. Perintah itu bisa menghapus data proyek lain di mesin yang sama. Panduan lengkap: [docs/deploy/lokal-podman.md](docs/deploy/lokal-podman.md).
 
@@ -54,6 +65,8 @@ npm run llm:model -- --uji   # periksa model terkonfigurasi (satu permintaan kec
 npm run test:llm             # tes smoke Gemini
 npm run eval:ekstraksi       # akurasi ekstraksi dan rantai ke aturan, tiga kelompok (sekitar 120 panggilan)
 npm run eval:injeksi         # injeksi dua lapis pada set frasa dev (sekitar 100 panggilan)
+npm run eval:perencana       # perencana identify pada 8 kasus (paling banyak 48 panggilan)
+npm run eval:graph           # graph sungguhan, 40 skenario dan set ketahanan (sekitar 150 panggilan)
 ```
 
 ## Demo publik
