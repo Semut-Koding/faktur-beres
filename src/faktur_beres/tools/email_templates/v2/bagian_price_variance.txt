@@ -1,0 +1,3 @@
+Harga satuan
+{rincian}
+Mohon konfirmasi harga yang benar sesuai pesanan pembelian atau kirim faktur perbaikan.

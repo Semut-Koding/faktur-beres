@@ -221,6 +221,23 @@ def test_a_certain_duplicate_gets_a_notice_and_closes(tmp_path: Path) -> None:
     assert "Pemberitahuan" in mail.subject and "tidak perlu dibalas" in mail.body
 
 
+BANNED_IN_EMAIL = ("Odoo", "Faktur Beres", "batas", "toleransi", *[r.value for r in ReasonCode])
+
+
+@pytest.mark.aturan("BR-19")
+@pytest.mark.parametrize("sid", ["HRG-04", "DUP-01", "QTY-01", "PJK-02", "NPO-03"])
+def test_vendor_emails_hold_no_internal_language(tmp_path: Path, sid: str) -> None:
+    h, invoice_id = start(tmp_path, sid)
+    h.runner.run(invoice_id)
+    [mail] = h.mailer.sent
+    text = f"{mail.subject}\n{mail.body}"
+    for word in BANNED_IN_EMAIL:
+        assert word not in text, word
+    assert "\n\n\n" not in text
+    for number in _full_numbers(sid):
+        assert number not in re.sub(r"[\s.\-/]", "", text)
+
+
 @pytest.mark.aturan("BR-22")
 def test_a_retry_does_not_send_a_second_email(tmp_path: Path) -> None:
     h, invoice_id = start(tmp_path, "HRG-04")

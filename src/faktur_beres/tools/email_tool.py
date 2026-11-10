@@ -2,27 +2,43 @@
 
 The only way the agent sends e-mail. The recipient is the vendor's billing address read from Odoo;
 ``check_recipient`` runs before every send, so an address written in a document or asked for by an
-LLM is refused. The body comes from versioned templates and from findings computed by code, with
-long digit runs masked (BR-24); no LLM writes it in M4a.
+LLM is refused. The body comes from versioned templates and from sentences built here out of the
+evidence of each finding, never from the internal messages: a vendor sees no system name, no
+tolerance and no reason code. Long digit runs are masked (BR-24), and no LLM writes the text.
 
 Idempotent and verified (BR-22): the ``Message-ID`` is derived from the action's key, Mailpit is
 searched for it before sending, and the message is read back afterwards.
 """
 
+import re
 import smtplib
 from collections.abc import Sequence
 from dataclasses import dataclass
 from email.message import EmailMessage
+from email.utils import formatdate
 from importlib import resources
 from typing import Protocol
 
 import httpx
 
-from faktur_beres.domain.findings import Finding
+from faktur_beres.domain.findings import (
+    DocumentSumEvidence,
+    DuplicateEvidence,
+    Finding,
+    LineAmountEvidence,
+    LineMatchEvidence,
+    PriceEvidence,
+    PurchaseOrderEvidence,
+    QuantityEvidence,
+    TaxAmountEvidence,
+    TaxIdEvidence,
+    number,
+    rupiah,
+)
 from faktur_beres.domain.reasons import ReasonCode
 from faktur_beres.domain.rules.safety import check_recipient, mask_text
 
-TEMPLATE_VERSION = "v1"
+TEMPLATE_VERSION = "v2"
 TEMPLATES = "faktur_beres.tools"
 MAX_NOTE = 500
 MESSAGE_ID_DOMAIN = "fakturberes.arunika.test"
@@ -70,8 +86,96 @@ def _subject(invoice_id: str, invoice_number: str | None, kind: str) -> str:
     return f"[{invoice_id}] {kind} faktur {number}"
 
 
+_TAX_NAMES = {"npwp_penjual": "NPWP penjual", "npwp_pembeli": "NPWP pembeli", "nsfp": "NSFP"}
+_TAX_PROBLEMS = {
+    "missing": "tidak tercantum",
+    "not_digits": "formatnya tidak sesuai",
+    "length": "jumlah digitnya tidak sesuai",
+    "check_digit": "tidak valid",
+    "mismatch": "tidak sesuai dengan data kami",
+}
+_TAX_AMOUNTS = {"dpp_nilai_lain": "DPP nilai lain", "ppn": "PPN"}
+_SUMS = {"subtotal": "Subtotal", "total": "Total"}
+_NOT_CONFIRMED = "belum dikonfirmasi"
+_FALLBACK = "Mohon periksa kembali bagian ini pada faktur."
+
+
+def _po_sentence(e: PurchaseOrderEvidence) -> str:
+    if e.found and e.state == "cancel":
+        text = f"Pesanan pembelian {e.found} berstatus batal."
+    elif e.found:
+        text = f"Pesanan pembelian {e.found} {_NOT_CONFIRMED}."
+    elif e.printed:
+        text = f"Nomor pesanan pembelian {e.printed} tidak kami temukan."
+    else:
+        text = "Faktur tidak mencantumkan nomor pesanan pembelian."
+    if e.candidates:
+        text += f" Pesanan yang mungkin terkait: {', '.join(e.candidates)}."
+    return text
+
+
+def _quantity_sentence(e: QuantityEvidence) -> str:
+    if e.problem == "exceeds_ordered":
+        limit = f"jumlah pesanan {number(e.ordered)}"
+    else:
+        limit = f"yang sudah diterima dan belum ditagih {number(e.available)}"
+    return f"Baris {e.line} {e.product}: ditagih {number(e.invoice_quantity)}, sedangkan {limit}."
+
+
+def _line_sentence(e: LineMatchEvidence) -> str:
+    if e.problem == "ambiguous":
+        return (
+            f"Baris {e.line} '{e.description}': padanannya pada pesanan pembelian "
+            f"{e.purchase_order} tidak dapat dipastikan."
+        )
+    return f"Baris {e.line} '{e.description}' tidak tercantum pada pesanan {e.purchase_order}."
+
+
+def vendor_sentence(finding: Finding) -> str:
+    """What the vendor reads about one finding, built from its evidence only."""
+    e = finding.evidence
+    if isinstance(e, PriceEvidence):
+        return (
+            f"Baris {e.line} {e.product}: harga di faktur {rupiah(e.invoice_price)}, "
+            f"harga di pesanan pembelian {rupiah(e.po_price)}."
+        )
+    if isinstance(e, QuantityEvidence):
+        return _quantity_sentence(e)
+    if isinstance(e, LineMatchEvidence):
+        return _line_sentence(e)
+    if isinstance(e, TaxIdEvidence):
+        return f"{_TAX_NAMES[e.field]} {_TAX_PROBLEMS[e.problem]}."
+    if isinstance(e, TaxAmountEvidence):
+        return (
+            f"{_TAX_AMOUNTS[e.field]} pada faktur {rupiah(e.printed)}, "
+            f"seharusnya {rupiah(e.expected)}."
+        )
+    if isinstance(e, LineAmountEvidence):
+        return (
+            f"Baris {e.line}: {number(e.quantity)} × {rupiah(e.unit_price)} = "
+            f"{rupiah(e.computed)}, tercetak {rupiah(e.printed)}."
+        )
+    if isinstance(e, DocumentSumEvidence):
+        return (
+            f"{_SUMS[e.subject]} tercetak {rupiah(e.printed)}, "
+            f"hasil penjumlahan {rupiah(e.computed)}."
+        )
+    if isinstance(e, PurchaseOrderEvidence):
+        return _po_sentence(e)
+    if isinstance(e, DuplicateEvidence):
+        return (
+            f"Faktur nomor {e.ref or '-'} tanggal {e.invoice_date or '-'} dengan total "
+            f"{rupiah(e.total)} sudah tercatat."
+        )
+    return _FALLBACK
+
+
 def _bullets(findings: Sequence[Finding]) -> str:
-    return "\n".join(f"- {mask_text(f.message)}" for f in findings)
+    return "\n".join(f"- {mask_text(vendor_sentence(f))}" for f in findings)
+
+
+def _tidy(body: str) -> str:
+    return re.sub(r"\n{3,}", "\n\n", body).strip() + "\n"
 
 
 def clarification_body(
@@ -96,11 +200,10 @@ def clarification_body(
     if not sections and not note:
         note = _template("umum")
     body = _template("klarifikasi")
-    return (
+    return _tidy(
         body.replace("{nomor}", invoice_number or "tanpa nomor")
         .replace("{bagian}", "\n\n".join(sections))
         .replace("{catatan}", note)
-        .replace("\n\n\n", "\n\n")
     )
 
 
@@ -135,7 +238,7 @@ def duplicate_notice(
     findings: Sequence[Finding],
 ) -> OutgoingEmail:
     mine = [f for f in findings if f.reason is ReasonCode.DUPLICATE_CONFIRMED]
-    body = (
+    body = _tidy(
         _template("duplikat")
         .replace("{nomor}", invoice_number or "tanpa nomor")
         .replace("{rincian}", _bullets(mine))
@@ -194,6 +297,7 @@ class MailpitMailer:
         message["To"] = mail.to
         message["Subject"] = mail.subject
         message["Message-ID"] = mail.message_id
+        message["Date"] = formatdate(localtime=True)
         message.set_content(mail.body)
         try:
             with smtplib.SMTP(self._host, self._port, timeout=10) as smtp:
