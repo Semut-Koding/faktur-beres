@@ -148,6 +148,8 @@ class ToolBudget(_Input):
 
     model_calls: int = Field(ge=1)
     tool_runs: int = Field(ge=0)
+    # When only one tool run is left, the model may call nothing but this tool.
+    finish_tool: str | None = None
 
 
 class ToolEventStatus(StrEnum):

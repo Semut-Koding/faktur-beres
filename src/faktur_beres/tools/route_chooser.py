@@ -42,7 +42,7 @@ from faktur_beres.tools.policy_rag import MAX_K, SearchArgs, SearchOutcome
 
 PROMPT_PACKAGE = "faktur_beres.tools"
 PROMPT_VERSION = "decide-route-v2"
-BUDGET = ToolBudget(model_calls=4, tool_runs=3)
+BUDGET = ToolBudget(model_calls=4, tool_runs=3, finish_tool="submit_route")
 MAX_JUSTIFICATION = 400
 MAX_QUOTES = 3
 MAX_OUTPUT_TOKENS = 2048

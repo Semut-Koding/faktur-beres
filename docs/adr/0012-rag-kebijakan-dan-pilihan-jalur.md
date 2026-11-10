@@ -15,7 +15,7 @@ Decide di M4a selalu memakai jalur bawaan. M4b menambahkan pilihan LLM di dalam 
 5. **Kutipan per alasan tanpa LLM.** Setiap kode alasan punya kueri tetap yang di-embed saat `rag:indeks`. Ref dan skornya disimpan, sehingga `decide` tidak memanggil API untuk ini. Hanya artikel terbaik yang dikutip, dengan ambang skor 0,70. Dasarnya indeks pertama (10 November 2026, 37 potongan): artikel terbaik setiap alasan relevan dan skornya 0,722–0,824, sedangkan artikel kedua mencapai 0,80 tetapi sering tidak relevan, dan hasil yang tidak relevan mulai sekitar 0,69.
 6. **Pilihan jalur** hanya berjalan bila himpunan yang diizinkan berisi lebih dari satu jalur. Alatnya `search_policy` dan `submit_route`. Prompt `decide-route-v1` meminta model tetap di jalur bawaan kecuali ketentuan secara tegas mewajibkan lainnya.
 7. **Guard.** Jalur harus di dalam himpunan, ref harus berasal dari hasil pencarian pada percakapan yang sama, dan pindah dari jalur bawaan butuh alasan tertulis serta minimal satu kutipan (`guard_route`). Jawaban yang ditolak dicatat di audit, lalu jalur bawaan dipakai.
-8. **Anggaran** 4 panggilan model dan 3 eksekusi alat, tanpa model cadangan. Bila LLM tidak tersedia atau anggaran habis, jalur bawaan dipakai dengan catatan; BR-27 tidak terpicu.
+8. **Anggaran** 4 panggilan model dan 3 eksekusi alat, tanpa model cadangan. Saat tersisa satu eksekusi alat, `allowed_function_names` hanya memuat `submit_route`, karena pada run pertama model tetap mencari sampai anggaran habis walaupun prompt menyebut batasnya. Bila LLM tidak tersedia atau anggaran habis, jalur bawaan dipakai dengan catatan; BR-27 tidak terpicu.
 9. **Email vendor tetap tanpa teks LLM.** Pertimbangan dan kutipan hanya masuk audit dan paket bukti.
 
 ## Konsekuensi

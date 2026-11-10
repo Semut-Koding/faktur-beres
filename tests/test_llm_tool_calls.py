@@ -302,6 +302,26 @@ def test_the_tool_budget_stops_the_conversation() -> None:
     assert result.tool_runs == 1
 
 
+def test_the_last_tool_run_may_only_be_the_finishing_tool() -> None:
+    llm, generate, _ = client(
+        {
+            PRIMARY: [
+                turn(("find", {"number": "A"})),
+                turn(("find", {"number": "B"})),
+                turn(("submit", {"number": None})),
+            ]
+        }
+    )
+    budget = ToolBudget(model_calls=6, tool_runs=3, finish_tool="submit")
+    result = llm.run_tools(request(), TOOLS, Session, budget)
+    assert result.status is ToolRunStatus.FINISHED
+    allowed = [
+        s.config.tool_config.function_calling_config.allowed_function_names  # type: ignore[union-attr]
+        for s in generate.sent
+    ]
+    assert allowed == [["find", "submit"], ["find", "submit"], ["submit"]]
+
+
 def test_a_turn_without_a_function_call_is_invalid_output() -> None:
     llm, _, _ = client({PRIMARY: [reply("teks"), reply("teks")]})
     with pytest.raises(LlmInvalidOutput):

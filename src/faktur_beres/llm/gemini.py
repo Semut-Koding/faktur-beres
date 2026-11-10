@@ -255,9 +255,10 @@ def generation_config(
     )
 
 
-def tool_settings(request: LlmRequest) -> dict[str, object]:
+def tool_settings(request: LlmRequest, allowed: Sequence[str]) -> dict[str, object]:
     """The generation settings of a function-calling turn; they are part of its key."""
     return {
+        "allowed_function_names": list(allowed),
         "api_version": API_VERSION,
         "thinking_level": request.thinking_level.value,
         "max_output_tokens": request.max_output_tokens,
@@ -275,7 +276,7 @@ def function_declaration(tool: ToolSpec) -> types.FunctionDeclaration:
 
 
 def tool_config(
-    request: LlmRequest, tools: Sequence[ToolSpec], timeout_ms: int
+    request: LlmRequest, tools: Sequence[ToolSpec], allowed: Sequence[str], timeout_ms: int
 ) -> types.GenerateContentConfig:
     return types.GenerateContentConfig(
         http_options=types.HttpOptions(timeout=timeout_ms),
@@ -286,7 +287,7 @@ def tool_config(
         tool_config=types.ToolConfig(
             function_calling_config=types.FunctionCallingConfig(
                 mode=types.FunctionCallingConfigMode.ANY,
-                allowed_function_names=[t.name for t in tools],
+                allowed_function_names=list(allowed),
             )
         ),
         automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
@@ -465,6 +466,13 @@ class _ToolUsage:
         if self.model_calls >= self.budget.model_calls:
             raise _BudgetSpent
         self.model_calls += 1
+
+    def allowed_now(self, names: Sequence[str]) -> list[str]:
+        """Every tool, or only the finishing one when a single tool run is left."""
+        finish = self.budget.finish_tool
+        if finish is not None and self.tool_runs >= self.budget.tool_runs - 1:
+            return [finish]
+        return list(names)
 
     def take_tool_run(self) -> None:
         if self.tool_runs >= self.budget.tool_runs:
@@ -819,10 +827,13 @@ class GeminiClient:
     ) -> bool:
         """True when a tool ended it, False when this model became unavailable."""
         specs = {tool.name: tool for tool in tools}
-        config = tool_config(request, tools, self._timeout_ms(model, request))
-        settings = tool_settings(request)
+        names = [tool.name for tool in tools]
+        timeout = self._timeout_ms(model, request)
         history: list[types.Content] = [request_content(request)]
         while True:
+            allowed = usage.allowed_now(names)
+            config = tool_config(request, tools, allowed, timeout)
+            settings = tool_settings(request, allowed)
             dumped = [turn.model_dump(mode="json", exclude_none=True) for turn in history]
             key = tool_turn_key(model, request, tools, dumped, settings)
             exchange = _Exchange[types.Content](
