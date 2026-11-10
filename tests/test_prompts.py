@@ -20,10 +20,17 @@ from faktur_beres.extraction.schema import ExtractedInvoice
 from faktur_beres.tools.injection_review import ReviewAnswer
 from faktur_beres.tools.line_mapping import MappingAnswer
 from faktur_beres.tools.po_planner import TOOLS as PLANNER_TOOLS
+from faktur_beres.tools.reply_reading import ReplyAnswer
 
 PACKAGE_DIR = REPO_ROOT / "src" / "faktur_beres"
 FINGERPRINTS = REPO_ROOT / "tests" / "data" / "prompt_fingerprints.json"
-SCHEMAS = [ExtractedInvoice, ReviewAnswer, MappingAnswer, *(t.schema for t in PLANNER_TOOLS)]
+SCHEMAS = [
+    ExtractedInvoice,
+    ReviewAnswer,
+    MappingAnswer,
+    ReplyAnswer,
+    *(t.schema for t in PLANNER_TOOLS),
+]
 
 
 def prompt_dirs() -> list[Path]:
