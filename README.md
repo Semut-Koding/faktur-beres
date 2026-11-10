@@ -4,7 +4,7 @@ AI agent yang menuntaskan *exception* faktur pemasok di proses *accounts payable
 
 Karya Tim **Daftar H-2 Jam** (Politeknik Negeri Subang) untuk **GTNIC 2026, kategori AI Agent**.
 
-**Status:** M3 selesai (9 November 2026): stack lokal dan data Odoo (M0), 40 skenario uji berlabel dengan berkas faktur dan balasan vendor di [`eval/`](eval/README.md) (M1), lapisan alat agent dengan aturan bisnis deterministik dan evaluasi orakel 40/40 (M2), dan ekstraksi (M3): klien Gemini dengan retry, throttle, cache, dan audit; parser UBL; pembacaan ulang BR-04; deteksi injeksi dua lapis; dan set uji ketahanan. Run segar ekstraksi: akurasi field kritis 99,9% pada 40 faktur, UBL 100%. Berikutnya M4 (graph agent, email, RAG, dan API). Rencana lengkap ada di [RENCANA-TEKNIS §6](docs/RENCANA-TEKNIS.md#6-milestone).
+**Status:** M4a selesai (10 November 2026): stack lokal dan data Odoo (M0), 40 skenario uji berlabel (M1), lapisan alat agent dan aturan deterministik (M2), ekstraksi (M3), serta graph LangGraph dengan basis data aplikasi, perencana dan pemetaan baris LLM di dalam pagar, dan aksi jalur A, B, dan C dengan keputusan approver lewat CLI (M4a). Evaluasi graph mode LLM segar: 40/40 lulus saat pertama berhenti, 27/27 status akhir, dan set ketahanan 13/13; 13 skenario lain menunggu balasan vendor di M4b. Berikutnya M4b (email masuk, balasan vendor, RAG, dan API). Rencana lengkap ada di [RENCANA-TEKNIS §6](docs/RENCANA-TEKNIS.md#6-milestone).
 
 ## Prasyarat
 - Linux dengan **Podman 6 rootless** dan **podman-compose ≥ 1.6** sebagai penyedia `podman compose`. Docker Compose v2 juga bisa dipakai.
