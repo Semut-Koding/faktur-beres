@@ -15,7 +15,7 @@ Prompt yang sudah disimpan tidak diubah. Koreksi atau tambahan ditulis sebagai p
 | [`M1.md`](M1.md) | Catatan tinjauan M0 dan generator faktur uji 40 skenario | Selesai |
 | [`M2.md`](M2.md) | Catatan tinjauan M1 dan lapisan alat: grup Odoo agent, aturan deterministik, `odoo_tools`, evaluasi orakel | Selesai |
 | [`M3.md`](M3.md) | Catatan tinjauan M2, ekstraksi Gemini, parser UBL, injeksi dua lapis, set uji ketahanan | Selesai |
-| [`M4a.md`](M4a.md) | Catatan tinjauan M3, graph inti, basis data aplikasi, aksi sampai agent pertama kali berhenti, dan keputusan approver lewat CLI | Berjalan |
+| [`M4a.md`](M4a.md) | Catatan tinjauan M3, graph inti, basis data aplikasi, aksi sampai agent pertama kali berhenti, dan keputusan approver lewat CLI | Selesai |
 
 ## Format laporan
 Laporan ditulis di akhir tugas dalam bahasa Indonesia, dengan bagian berikut secara berurutan:
