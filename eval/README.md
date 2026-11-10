@@ -133,7 +133,7 @@ Pembacaan ulang BR-04 terjadi pada 4 dokumen (HRG-03, HRG-05, PJK-03, KTH-03), d
 
 ## Evaluasi graph
 
-`npm run eval:graph` menjalankan graph sungguhan (Odoo, basis data aplikasi, Mailpit) untuk setiap skenario. Sebelum setiap skenario, Odoo, basis data aplikasi, dan pesan Mailpit direset. Harness hanya memberi agent berkas dan masukan simulasi (keputusan approver). Penilainya sama dengan `eval:orakel` (SPEC §15.4); larangan `tagihan_terposting` dan `ubah_data_master` diperiksa langsung di Odoo. Sampai M4b, skenario B yang punya `balasan_vendor` dinilai sampai pertama berhenti dan ditandai "menunggu M4b".
+`npm run eval:graph` menjalankan graph sungguhan (Odoo, basis data aplikasi, Mailpit) untuk setiap skenario. Sebelum setiap skenario, Odoo, basis data aplikasi, dan pesan Mailpit direset. Harness hanya memberi agent berkas dan masukan simulasi (keputusan approver). Penilainya sama dengan `eval:orakel` (SPEC §15.4); larangan `tagihan_terposting` dan `ubah_data_master` diperiksa langsung di Odoo. Sejak M4b, semua skenario dinilai sampai status akhir. Skenario kanal email dan balasan vendor dikirim lewat SMTP ke Mailpit dan dibaca pemantau inbox. Sebelum mulai, `eval:graph` memeriksa bahwa indeks kebijakan ada dan sesuai.
 
 ```bash
 npm run eval:graph -- --ekstraksi orakel   # LLM hanya untuk perencana dan pemetaan baris
@@ -141,9 +141,11 @@ npm run eval:graph                         # seluruh agent, segar
 npm run eval:graph -- --id NPO-01 --ekstraksi orakel --tanpa-llm
 ```
 
-Opsi lain: `--set faktur|ketahanan`, `--penilai nyala|mati`, `--pakai-cache`, `--tanpa-reset`, `--lanjut RUN`, `--maks-panggilan N`. Hasil ditulis ke `eval/hasil/graph/<run>.json` setelah setiap skenario.
+Opsi lain: `--set faktur|ketahanan`, `--intake kanal|langsung`, `--penilai nyala|mati`, `--tanpa-rag` (pengembangan), `--pakai-cache`, `--tanpa-reset`, `--lanjut RUN`, `--maks-panggilan N`. Hasil ditulis ke `eval/hasil/graph/<run>.json` setelah setiap skenario.
 
-**Mode orakel (10 November 2026, run `20261109-234324`).** Ekstraksi orakel, penilai lapis 2 mati.
+Hasil M4a di bawah ini dinilai sampai pertama berhenti untuk 13 skenario yang menunggu balasan; hasil M4b ada setelahnya.
+
+**Mode orakel M4a (10 November 2026, run `20261109-234324`).** Ekstraksi orakel, penilai lapis 2 mati.
 
 | Set | Pertama berhenti | Status akhir | Menunggu M4b |
 |---|---|---|---|
@@ -152,7 +154,7 @@ Opsi lain: `--set faktur|ketahanan`, `--penilai nyala|mati`, `--pakai-cache`, `-
 
 Panggilan LLM: 8 `gemini-3.5-flash-lite` (7 perencana, 1 pemetaan baris KTH-06), biaya setara USD 0,0037.
 
-**Mode LLM segar (10 November 2026, run `20261110-022507`).** Seluruh agent: ekstraksi LLM (`extraction-v2`), penilai lapis 2 nyala, perencana dan pemetaan baris nyala, tanpa cache, dalam satu proses dan satu jendela kuota.
+**Mode LLM segar M4a (10 November 2026, run `20261110-022507`).** Seluruh agent: ekstraksi LLM (`extraction-v2`), penilai lapis 2 nyala, perencana dan pemetaan baris nyala, tanpa cache, dalam satu proses dan satu jendela kuota.
 
 | Set | Pertama berhenti | Status akhir | Menunggu M4b |
 |---|---|---|---|
@@ -170,6 +172,33 @@ Panggilan LLM: 8 `gemini-3.5-flash-lite` (7 perencana, 1 pemetaan baris KTH-06),
 Panggilan: 114 `gemini-3.5-flash-lite` (ekstraksi 50, pembacaan ulang 3, penilai 53, perencana 7, pemetaan baris 1), tanpa jawaban dari model cadangan. Biaya setara USD 0,138, atau USD 0,0026 per faktur. Ada dua galat yang pulih dengan retry di model yang sama: satu timeout 122 detik, yang membuat DUP-03 butuh 134,9 detik dan melewati target 2 menit (SPEC F-04), dan satu HTTP 503.
 
 Batas tafsirnya: satu run saja, n per format kecil (p95 pindaian sama dengan maksimum), dan 13 skenario balasan vendor baru dinilai sampai pertama berhenti. Run ini tidak mengukur akurasi per field; itu diukur `eval:ekstraksi`.
+
+### Sampai status akhir (M4b, 10 November 2026)
+
+| Mode (run) | Pertama berhenti | Status akhir | Ketahanan | Balasan | Pilihan jalur LLM | Eskalasi | Tidak selesai |
+|---|---|---|---|---|---|---|---|
+| Orakel (`20261110-092337`) | 40/40 | 40/40 | 13/13 | 13 | 14 | 0 | 0 |
+| LLM segar (`20261110-093859`) | 40/40 | 40/40 | 13/13 | 13 | 12 | 0 | 2 |
+
+Per kategori, kedua mode lulus semua: cocok, duplikat, selisih harga, injeksi, PO tidak ditemukan, pajak, kuantitas, dan rekening masing-masing 5/5.
+
+Waktu sampai jalur pertama ditentukan pada mode LLM segar:
+
+| Format | n | Median (detik) | p95 | Maks |
+|---|---|---|---|---|
+| PDF | 34 | 9,5 | 27,4 | 36,1 |
+| Foto | 9 | 20,6 | 34,2 | 34,2 |
+| Pindaian | 5 | 12,0 | 43,7 | 43,7 |
+| UBL | 5 | 6,7 | 65,2 | 65,2 |
+| **Keseluruhan** | 53 | 11,5 | 36,1 | 65,2 |
+
+Panggilan pada mode LLM segar: 193 `gemini-3.5-flash-lite` (ekstraksi 66, pembacaan ulang 3, penilai 71, perencana 7, pemetaan baris 1, balasan teks 2, pilihan jalur 43) dan 27 `gemini-embedding-2`, tanpa jawaban dari model cadangan. Biaya setara USD 0,180, atau USD 0,0034 per faktur; embedding tidak melaporkan token, jadi biayanya tidak terhitung. Ada 17 galat yang pulih dengan retry di model yang sama (16 HTTP 503, 1 galat koneksi).
+
+Mode orakel memakai 56 Flash-Lite (pilihan jalur 45, perencana 8, balasan teks 2, pemetaan 1) dan 28 embedding, biaya setara USD 0,020.
+
+Dua pilihan jalur (PJK-01 dan PJK-04, mode LLM) tidak selesai dan memakai jalur bawaan B, yang memang benar. Status persisnya tidak tersimpan karena basis data direset per skenario; run itu mencatat empat HTTP 503 pada pilihan jalur, dan retry menghabiskan anggaran 4 panggilan model.
+
+Batas tafsirnya: satu run per mode, n per format kecil (p95 pindaian dan UBL sama dengan maksimum), dan semua pilihan jalur tetap di bawaan, sehingga eskalasi yang sah belum terukur pada data ini.
 
 ## Evaluasi perencana
 
