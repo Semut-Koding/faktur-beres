@@ -24,9 +24,11 @@ from faktur_beres.tools.policy_docs import CHUNK_FORMAT, PolicyChunk, load_chunk
 MAX_K = 5
 MAX_QUOTE = 600
 REASON_HITS = 3
-MAX_REASON_QUOTES = 2
-#: From the scores of the first real index (ADR-0012): below it the article is not on the subject.
-REASON_QUOTE_MIN_SCORE = Decimal("0.60")
+#: From the first real index (10 November 2026, ADR-0012). The best article of every reason is on
+#: the subject and scores at least 0.72; the runners-up score up to 0.80 and are often off the
+#: subject, so only the best one is quoted. Off-subject hits start at about 0.69.
+MAX_REASON_QUOTES = 1
+REASON_QUOTE_MIN_SCORE = Decimal("0.70")
 
 REASON_QUERIES: dict[ReasonCode, str] = {
     ReasonCode.PRICE_VARIANCE: "harga satuan faktur lebih tinggi dari harga pesanan pembelian",
