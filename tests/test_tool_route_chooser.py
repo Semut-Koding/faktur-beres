@@ -9,8 +9,14 @@ from google.genai import types
 from faktur_beres.db.policy_store import PolicyHit
 from faktur_beres.domain.reasons import Route
 from faktur_beres.llm.gemini import GeminiClient
-from faktur_beres.tools.policy_rag import SearchOutcome
-from faktur_beres.tools.route_chooser import BUDGET, RouteContext, RouteOutcome, choose_route
+from faktur_beres.tools.policy_rag import SearchArgs, SearchOutcome
+from faktur_beres.tools.route_chooser import (
+    BUDGET,
+    RouteContext,
+    RouteOutcome,
+    RouteSession,
+    choose_route,
+)
 from llm_fakes import FakeClock, Outcome, ScriptedGenerate, quota_per_day, reply
 
 PRIMARY, STRONG, RESERVE = "a", "b", "c"
@@ -119,3 +125,11 @@ def test_the_input_is_delimited_and_masked() -> None:
     text = str(generate.sent[0].contents)
     assert "<<<DATA n0nc3>>>" in text and "0990427957220000" not in text
     assert "putaran klarifikasi yang sudah dikirim: 1" in text
+
+
+def test_each_search_result_says_how_many_tool_calls_are_left() -> None:
+    session = RouteSession(lambda _q, _k: SearchOutcome((HIT,), ()), (Route.B, Route.C))
+    first = session.call("search_policy", SearchArgs(query="eskalasi"))
+    second = session.call("search_policy", SearchArgs(query="klarifikasi"))
+    assert first.result["sisa_panggilan_alat"] == BUDGET.tool_runs - 1
+    assert second.result["sisa_panggilan_alat"] == BUDGET.tool_runs - 2

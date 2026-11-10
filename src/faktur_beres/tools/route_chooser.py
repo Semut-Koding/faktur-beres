@@ -41,7 +41,7 @@ from faktur_beres.llm.prompts import Prompt, load_prompt
 from faktur_beres.tools.policy_rag import MAX_K, SearchArgs, SearchOutcome
 
 PROMPT_PACKAGE = "faktur_beres.tools"
-PROMPT_VERSION = "decide-route-v1"
+PROMPT_VERSION = "decide-route-v2"
 BUDGET = ToolBudget(model_calls=4, tool_runs=3)
 MAX_JUSTIFICATION = 400
 MAX_QUOTES = 3
@@ -98,8 +98,10 @@ class RouteSession:
         self.choice: RouteChoice | None = None
         self.refusal: str | None = None
         self.quotes: tuple[PolicyHit, ...] = ()
+        self.runs = 0
 
     def call(self, name: str, args: BaseModel) -> ToolReply:
+        self.runs += 1
         if isinstance(args, SearchArgs):
             return self._run_search(args)
         assert isinstance(args, SubmitRouteArgs), name
@@ -115,7 +117,8 @@ class RouteSession:
                 "hasil": [
                     {"ref": h.ref, "judul": h.title, "kutipan": h.quote, "skor": str(h.score)}
                     for h in outcome.hits
-                ]
+                ],
+                "sisa_panggilan_alat": BUDGET.tool_runs - self.runs,
             }
         )
 
