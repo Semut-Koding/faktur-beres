@@ -49,6 +49,8 @@
 >
 > **Generator faktur (M1, 6 November 2026):** lxml 6.1.3 (dependensi utama, juga untuk parser UBL M3); dev: ReportLab 5.1.0, Pillow 13.0.0, pypdfium2 5.14.0 (PDFium 156.0.8076.0). Keluaran `gen:faktur` identik byte per byte untuk versi di `uv.lock` pada platform yang sama (diperiksa `gen:periksa`).
 >
+> **RAG (M4b, 10 November 2026):** pustaka Python `pgvector` 0.5.1 untuk tipe SQLAlchemy; ekstensi `vector` 0.8.7 di basis data aplikasi.
+>
 > **Graph dan basis data (M4a, 10 November 2026):** LangGraph 1.2.20, langgraph-checkpoint 4.3.1, langgraph-checkpoint-postgres 3.2.0, SQLAlchemy 2.1.8, psycopg 3.3.8, psycopg-pool 3.3.3, Alembic 1.20.1. LangGraph 1.0.10 ke atas wajib karena memuat perbaikan deserialisasi checkpoint (CVE-2026-28277).
 >
 > **Lapisan alat (M2, 7 November 2026):** python-stdnum 2.2 pindah ke dependensi utama (dipakai `tax_check` saat runtime); dev: mypy 2.4.1 dengan plugin Pydantic dan types-PyYAML 6.0.12.20261103. `npm run typecheck` menjalankan mypy `--strict` untuk paket `domain`, `tools`, dan `evals`. Modul M0–M1 (`config`, `textui`, `odoo`, `dataset`, `seed`, `generator`, `devtools`) dikecualikan lewat `[[tool.mypy.overrides]]` dengan `ignore_errors` di `pyproject.toml`: tetap dibaca mypy saat diimpor paket baru, tetapi galatnya sendiri tidak dilaporkan.
@@ -86,10 +88,10 @@
 | `faktur_beres.domain` | Model faktur kanonis `InvoiceData`, kode alasan dan jalur, record ERP dan protokol `ErpReader`, helper normalisasi, `PolicyConfig`, aturan deterministik (`rules/`, satu modul per kelompok BR) dan mesin `analyse()`. Kode agent: tidak mengimpor `evals`, `generator`, `dataset`, atau `seed` (tes arsitektur) | M2 |
 | `faktur_beres.llm` | Akses Gemini untuk agent: protokol `StructuredLlm`, `GeminiClient` (keluaran terstruktur, retry, model cadangan, throttle), cache, catatan audit per panggilan dan biaya setara, prompt berversi, `llm:model`. Kode agent dengan aturan yang sama seperti `domain` dan `tools` | M3 |
 | `faktur_beres.extraction` | Jenis berkas dari magic bytes dan batasnya, lapisan teks PDF, parser UBL SPEC §15.6, skema ekstraksi `ExtractedInvoice`, konversi ke `InvoiceData`, validasi dan pembacaan ulang BR-04, `ExtractionOutcome`. Kode agent | M3 |
-| `faktur_beres.tools` | Alat agent: `AgentOdooGateway` (satu-satunya pintu kode agent ke Odoo, key agent, daftar operasi dan field yang diizinkan), `odoo_tools` dan `OdooErpReader`, `match_engine`, `tax_check` (M2); `extract_invoice` dan `injection_review` (M3); `email_tool`, `po_planner`, `line_mapping` (M4a); `policy_rag` (M4b) | M2–M4b |
+| `faktur_beres.tools` | Alat agent: `AgentOdooGateway` (satu-satunya pintu kode agent ke Odoo, key agent, daftar operasi dan field yang diizinkan), `odoo_tools` dan `OdooErpReader`, `match_engine`, `tax_check` (M2); `extract_invoice` dan `injection_review` (M3); `email_tool`, `po_planner`, `line_mapping` (M4a); `inbox`, `reply_reading`, `policy_docs`, `policy_rag`, `route_chooser` (M4b) | M2–M4b |
 | `faktur_beres.db` | Model SQLAlchemy, migrasi Alembic, `Store`, `db:migrate`, `db:reset`. Kode agent | M4a |
-| `faktur_beres.graph` | Node, state, routing, runner, dan CLI LangGraph. Kode agent | M4a |
-| `faktur_beres.api` | FastAPI, SSE, dan pemantau inbox | M4b |
+| `faktur_beres.graph` | Node, state, routing, runner, CLI LangGraph (M4a), dan pemantau inbox (M4b). Kode agent | M4a–M4b |
+| `faktur_beres.api` | FastAPI dan SSE; memakai runner dan pemantau inbox dari `graph` | M4c |
 | `faktur_beres.evals` | Kode evaluasi, satu-satunya yang membaca label dan dataset: konverter label ke `InvoiceData`, pembaca ERP dari dataset, evaluasi orakel (M2); `eval:injeksi`, `eval:ekstraksi`, cek silang orakel set ketahanan, dan penjaga path data yang boleh dikirim ke LLM (M3); harness 40 × 3 dan penilai state akhir (M5) | M2–M5 |
 
 ### 3.3 Penanganan kesalahan dan skala
@@ -178,7 +180,7 @@ Semua dijalankan dari akar repo.
 
 | Tujuan | Perintah | Mulai |
 |---|---|---|
-| Siapkan mesin: cek versi alat, buat `.env` dengan rahasia acak (aman diulang, nilai yang sudah ada tidak diubah), pasang hook pre-commit `guard:secrets` | `npm run setup` | M0 |
+| Siapkan mesin: cek versi alat, buat `.env` dengan rahasia acak (aman diulang, nilai yang sudah ada tidak diubah), pasang hook pre-commit (ruff dan `guard:secrets`, sejak M4b) | `npm run setup` | M0 |
 | Nyalakan, matikan, atau lihat status layanan | `npm run services:up` / `npm run services:down` / `npm run services:status` | M0 |
 | Log layanan | `npm run services:logs -- odoo` | M0 |
 | Inisialisasi Odoo: database, modul, bahasa, perusahaan, pajak, user agent, API key (aman diulang) | `npm run odoo:init` | M0 |
@@ -199,11 +201,14 @@ Semua dijalankan dari akar repo.
 | Evaluasi injeksi dua lapis pada set frasa (`--lapis1` tanpa LLM, `--berkas` untuk set lain, `--pakai-cache`) | `npm run eval:injeksi` | M3 |
 | Evaluasi ekstraksi tiga kelompok (`faktur`, `balasan`, `ketahanan`): akurasi per field dan rantai ekstraksi → aturan, dengan `--set`, `--id`, `--model`, `--banding`, `--tanpa-penilai`, `--maks-panggilan`, `--lanjut`, `--pakai-cache` | `npm run eval:ekstraksi` | M3 |
 | Jalankan API dan dashboard untuk pengembangan | `npm run dev:api` / `npm run dev:web` | M4 / M5 |
+| Baca inbox AP satu kali, atau berulang tiap 10 detik | `npm run agent:inbox` / `npm run agent:inbox -- --terus` | M4b |
+| Buat atau perbarui indeks kebijakan (hanya potongan yang baru atau berubah) dan cari di dalamnya | `npm run rag:indeks` / `npm run rag:cari -- "<kueri>"` | M4b |
+| Permintaan per model sejak reset kuota harian terakhir (15.00 WIB) | `npm run llm:kuota` | M4b |
 | Migrasi basis data aplikasi dan tabel checkpointer | `npm run db:migrate` | M4a |
 | Kosongkan data aplikasi dan checkpoint (menolak database yang namanya tidak berawalan `fakturberes`) | `npm run db:reset` | M4a |
 | Proses satu berkas, lihat status dan jejak, kirim keputusan approver, coba lagi yang `failed` | `npm run agent:proses -- <berkas>`, `agent:status`, `agent:jejak -- <id>`, `agent:putuskan -- <id> setujui\|tolak\|klarifikasi`, `agent:ulang -- <id>` | M4a |
 | Tulis diagram Mermaid graph ke `docs/diagram-graph.md` | `npm run graph:diagram` | M4a |
-| Evaluasi graph sungguhan (`--set`, `--id`, `--ekstraksi orakel\|llm`, `--penilai`, `--tanpa-llm`, `--pakai-cache`, `--tanpa-reset`, `--lanjut`, `--maks-panggilan`) | `npm run eval:graph` | M4a |
+| Evaluasi graph sungguhan (`--set`, `--id`, `--ekstraksi orakel\|llm`, `--intake kanal\|langsung`, `--penilai`, `--tanpa-llm`, `--tanpa-rag`, `--pakai-cache`, `--tanpa-reset`, `--lanjut`, `--maks-panggilan`) | `npm run eval:graph` | M4a |
 | Evaluasi perencana `identify` pada 8 kasus | `npm run eval:perencana` | M4a |
 | Evaluasi 40 skenario × 3 | `npm run eval` | M5 |
 | Tambah dependensi Python | `uv add <paket>` atau `uv add --dev <paket>` | |
@@ -434,6 +439,8 @@ Keputusan pemilik:
 | Hak user agent di M0 masih terlalu luas | **Ditutup (7 Nov 2026):** grup khusus `faktur_beres_agent.group_agent` tanpa hapus dan posting, aturan rekaman hanya untuk draft tagihan vendor buatan agent, pengaman perubahan status, dan `AgentOdooGateway`; diperiksa `odoo:check` dan dibuktikan `test:integrasi` (§4.4) |
 | Kuota model cadangan hanya 20 permintaan per hari | Cadangan hanya untuk gangguan singkat dan paling akhir di rantai; perencana menolaknya; 5xx dan timeout dicoba ulang sekali (ADR-0010) |
 | Waktu proses foto di tier gratis | `GEMINI_TIMEOUT_FALLBACK_SECONDS` terpisah, waktu sampai jalur dicatat per format di `eval:graph` |
+| Pilihan jalur oleh LLM bervariasi antar-run | Kode membatasi himpunan jalur, `guard_route` menolak jawaban di luar pagar, dan jawaban ditolak memakai jalur bawaan (ADR-0012) |
+| Kuota embedding | Indeks hanya meng-embed potongan yang baru atau berubah; kutipan per alasan disimpan saat indeks dibuat; `llm:kuota` menghitung model embedding |
 | Waktu tiga minggu | Milestone kecil, commit kecil, cadangan 27–28 November |
 
 ---
