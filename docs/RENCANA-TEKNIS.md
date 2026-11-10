@@ -160,7 +160,7 @@ faktur-beres/            # nama folder repo (lihat README)
 │  ├─ injeksi/dev.yaml   # set frasa injeksi untuk pengembangan BR-15 (M3, ditulis tangan)
 │  ├─ README.md          # penjelasan folder (ditulis tangan)
 │  └─ hasil/             # hasil evaluasi orakel (M2), injeksi dan ekstraksi (M3), graph dan perencana (M4a), dan penuh (M5), tidak di-commit
-├─ web/                  # dashboard React + Vite (M5), workspace npm
+├─ dashboard/            # dashboard React + Vite + TypeScript (M5), paket npm sendiri
 ├─ infra/
 │  ├─ odoo/odoo.conf     # konfigurasi Odoo lokal (tanpa rahasia)
 │  ├─ odoo/addons/       # addon faktur_beres_agent: grup dan hak user agent (M2), tanpa logika agent
@@ -201,7 +201,9 @@ Semua dijalankan dari akar repo.
 | Tes smoke Gemini (`pytest -m llm`, satu panggilan per model; dilewati tanpa `GEMINI_API_KEY`) | `npm run test:llm` | M3 |
 | Evaluasi injeksi dua lapis pada set frasa (`--lapis1` tanpa LLM, `--berkas` untuk set lain, `--pakai-cache`) | `npm run eval:injeksi` | M3 |
 | Evaluasi ekstraksi tiga kelompok (`faktur`, `balasan`, `ketahanan`): akurasi per field dan rantai ekstraksi → aturan, dengan `--set`, `--id`, `--model`, `--banding`, `--tanpa-penilai`, `--maks-panggilan`, `--lanjut`, `--pakai-cache` | `npm run eval:ekstraksi` | M3 |
-| Jalankan API dan dashboard untuk pengembangan | `npm run dev:api` / `npm run dev:web` | M4 / M5 |
+| Jalankan API (menyajikan juga dashboard hasil build) di `127.0.0.1:28000` | `npm run api` | M4c |
+| Dashboard: pasang dependensi, server pengembangan (`127.0.0.1:25173`), build, dan pemeriksaan (`tsc` dan build; bagian dari `npm run check`) | `npm run dashboard:install` / `dashboard:dev` / `dashboard:build` / `dashboard:check` | M5 |
+| Alat presenter: balasan vendor tiruan lewat SMTP Mailpit untuk faktur jalur B | `npm run demo:balas -- <FB-id> [berkas] [--teks "..."]` | M5 |
 | Baca inbox AP satu kali, atau berulang tiap 10 detik | `npm run agent:inbox` / `npm run agent:inbox -- --terus` | M4b |
 | Buat atau perbarui indeks kebijakan (hanya potongan yang baru atau berubah) dan cari di dalamnya | `npm run rag:indeks` / `npm run rag:cari -- "<kueri>"` | M4b |
 | Permintaan per model sejak reset kuota harian terakhir (15.00 WIB) | `npm run llm:kuota` | M4b |
@@ -308,7 +310,7 @@ Aturan:
 - **Angka:** klien JSON-2 mengirim `Decimal` bulat sebagai bilangan bulat JSON dan `Decimal` lain sebagai string (field float Odoo mengonversinya sendiri), lalu gateway membaca bilangan pecahan dari JSON sebagai `Decimal` (`parse_float`). Kode agent tidak pernah memegang `float`.
 
 ### 4.5 Demo publik (M6)
-Dashboard di Vercel. API, Odoo, dan basis data di server yang ditentukan di M6, dengan data seed yang direset berkala dan akses dibatasi (kode akses atau batas laju). Keputusannya dicatat sebagai ADR baru.
+Dikerjakan 10 November 2026 dengan lingkup darurat. Dashboard hasil build disajikan API dari origin yang sama (tanpa CORS), jadi Vercel tidak dipakai. API, dashboard, Odoo, basis data, dan Mailpit berjalan di satu VPS (Ubuntu Server 26.04, RAM 2 GB) di belakang Caddy dengan TLS otomatis: `fakturberes.farhanginting.my.id` (publik), serta `odoo.` dan `mail.` di balik basic auth. Akses dibatasi kode akses per peran, batas laju unggah 10 per jam per IP, dan firewall 22/80/443. Reset demo dijalankan manual. Skrip dan urutannya ada di [infra/deploy/README.md](../infra/deploy/README.md). ADR untuk keputusan hosting ini belum ditulis dan menyusul setelah lomba.
 
 ---
 
@@ -337,9 +339,10 @@ Dashboard di Vercel. API, Odoo, dan basis data di server yang ditentukan di M6, 
 | **M3 Ekstraksi** ✅ selesai 9 Nov 2026 | Perbaikan dari tinjauan M2; klien Gemini (`faktur_beres.llm`: model per peran, retry, model cadangan, throttle, cache, audit, biaya setara); jenis berkas dan lapisan teks PDF; parser UBL; skema ekstraksi Gemini yang dinormalisasi ke `InvoiceData` dengan helper M2; validasi dan pembacaan ulang maksimal 2 kali (BR-04); injeksi dua lapis (pola kuat dan lemah, penilai LLM); **set uji ketahanan bergaya dunia nyata**; `eval:ekstraksi` dan `eval:injeksi` | UBL 100% sama dengan label; akurasi per field pada 40 faktur, 11 lampiran balasan, dan set ketahanan dilaporkan terpisah, beserta rantai ekstraksi → aturan dibanding orakel; `eval:orakel` tetap 40/40; pola kuat tanpa positif palsu di set dev; model dipilih lewat uji banding (ADR-0008) | 11–12 Nov |
 | **M4a Graph inti, basis data, dan aksi** ✅ selesai 10 Nov 2026 | Label versi 2; klien LLM (peran cadangan, batas waktu per tujuan, function calling multi-giliran); ekstraksi v2; migrasi Alembic pertama (`invoices`, `invoice_lines`, `match_results`, `actions`, `approvals`, `audit_log`); node LangGraph dan checkpointer PostgreSQL; perencana `identify` dan pemetaan baris oleh LLM di dalam pagar; aksi jalur A, B keluar (`email_tool`), dan C (interrupt, keputusan approver lewat CLI); `eval:graph` dan `eval:perencana` | `eval:graph` mode orakel: 40/40 pemeriksaan pertama berhenti, 27/27 status akhir, 13 B "menunggu M4b", ketahanan 13/13; graph dengan LLM dimatikan setara `analyse()` untuk 40 + 13; mode LLM dilaporkan; `alembic check` bersih; ADR-0009 dan ADR-0010 | 10–12 Nov |
 | **M4b Email masuk, balasan vendor, dan RAG** ✅ selesai 10 Nov 2026 | Perbaikan dari tinjauan M4a; pemantau inbox (F-02); balasan vendor yang melanjutkan thread (F-06, BR-20); RAG kebijakan (`policy_rag`, BR-28); pilihan jalur oleh LLM di dalam himpunan yang diizinkan, dengan kutipan kebijakan (BR-17, BR-21) | `eval:graph` mode orakel dengan kanal email dan balasan lewat Mailpit sungguhan: 40/40 pertama berhenti, 40/40 status akhir, ketahanan 13/13; mode LLM dilaporkan; ADR-0009 dan ADR-0010 Diterima; ADR-0011 dan ADR-0012 Diusulkan | 10–12 Nov |
-| **M4c API dan tindak lanjut** | FastAPI + SSE dan API keputusan approver; pengingat dan daftar perhatian BR-19; rekap harian (BR-26); `vendor_memory` | Ditetapkan di prompt M4c | 13–14 Nov |
-| **M5 Dashboard dan evaluasi** | Dashboard (SPEC §10), harness 40 × 3, akurasi per field di `eval:graph`, laporan metrik | Metrik terisi; target tercapai atau selisihnya dijelaskan | 15–19 Nov |
-| **M6 Publik dan finalisasi** | Deploy publik, pengetatan guardrail, README demo, bahan video dan proposal | Tautan live dan repo publik; daftar periksa lomba lengkap | 20–26 Nov |
+| **M4c API dan tindak lanjut** (sebagian, 10 Nov 2026) | Selesai (M4c.1): FastAPI + SSE, baca publik tersamar (BR-24), unggah dan keputusan approver di balik kode akses, kunci per faktur. Ditunda: pengingat dan daftar perhatian BR-19, rekap harian (BR-26), `vendor_memory` | Ditetapkan di prompt darurat 10 November | 13–14 Nov |
+| **M5 Dashboard dan evaluasi** (sebagian, 10 Nov 2026) | Selesai (M5.1): dashboard antrean, detail, jejak, persetujuan, unggah, metrik. Ditunda: harness 40 × 3, akurasi per field di `eval:graph`, laporan metrik | Metrik terisi; target tercapai atau selisihnya dijelaskan | 15–19 Nov |
+| **M6 Publik dan finalisasi** (sebagian, 10 Nov 2026) | Selesai (M6.1): deploy VPS, README demo. Ditunda: pengetatan guardrail, ADR hosting | Tautan live dan repo publik; daftar periksa lomba lengkap | 20–26 Nov |
+| **Darurat 10 November** ✅ 10 Nov 2026 | Pemilik menetapkan pengumpulan malam 10 November. Dikerjakan dalam satu malam: API (`faktur_beres.api`), dashboard (`dashboard/`), deploy VPS dengan HTTPS (`infra/deploy/`), data demo, dan README demo. **Ditunda ke setelah lomba:** BR-19 (pengingat), BR-26 (rekap), `vendor_memory`; harness 40 × 3 dan set eskalasi; penerimaan ADR-0011 dan ADR-0012; perbaikan anggaran retry pilihan jalur; ADR hosting demo | `npm run check` lulus; tautan live menjawab lewat HTTPS; hanya port 22, 80, dan 443 terbuka | 10 Nov |
 | Cadangan | Perbaikan | | 27–28 Nov |
 | Pengumpulan | | | 29 Nov (batas 30 Nov) |
 
