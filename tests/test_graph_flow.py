@@ -1,5 +1,6 @@
 """M4a.5 and M4a.7: the graph's behaviour, without any service (fake store, Odoo and mail)."""
 
+import re
 from collections.abc import Callable
 from functools import cache
 from io import BytesIO
@@ -264,6 +265,43 @@ def test_route_c_stops_with_the_evidence_pack_and_no_action(tmp_path: Path) -> N
 
 
 @pytest.mark.aturan("BR-22")
+def _strings(node: Any, key: str = "") -> list[tuple[str, str]]:
+    if isinstance(node, dict):
+        return [pair for k, v in node.items() for pair in _strings(v, str(k))]
+    if isinstance(node, list):
+        return [pair for item in node for pair in _strings(item, key)]
+    return [(key, node)] if isinstance(node, str) else []
+
+
+def _full_numbers(sid: str) -> set[str]:
+    ds, truth = load_dataset(), LABELS[sid].kebenaran_dokumen
+    raw = [truth.penjual.npwp, truth.pembeli.npwp, truth.rekening.nomor if truth.rekening else None]
+    raw += [ds.company.npwp]
+    for vendor in ds.vendors:
+        if vendor.key == LABELS[sid].vendor:
+            raw += [vendor.npwp, vendor.bank_account.number]
+    return {re.sub(r"\D", "", value) for value in raw if value}
+
+
+@pytest.mark.aturan("BR-24")
+@pytest.mark.parametrize("sid", ["REK-01", "REK-05", "PJK-05"])
+def test_the_evidence_pack_never_holds_a_full_npwp_or_account(tmp_path: Path, sid: str) -> None:
+    h, invoice_id = start(tmp_path, sid)
+    assert h.runner.run(invoice_id).status is InvoiceStatus.AWAITING_APPROVAL
+    approval = h.store.current_approval(invoice_id)
+    assert approval is not None
+    numbers = _full_numbers(sid)
+    assert numbers
+    for pack in (approval.evidence, state_of(h, invoice_id)["approval_request"]):
+        for key, text in _strings(pack):
+            if key in ("sha256", "checksum"):
+                continue
+            digits = re.sub(r"[\s.\-/]", "", text)
+            assert not any(number in digits for number in numbers), key
+    alasan = [item["message"] for item in approval.evidence["alasan"]]
+    assert alasan  # the conclusions of the rules stay
+
+
 def test_approving_makes_one_draft_even_when_sent_twice(tmp_path: Path) -> None:
     h, invoice_id = start(tmp_path, "COC-04")
     h.runner.run(invoice_id)

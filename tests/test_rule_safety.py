@@ -11,6 +11,7 @@ from faktur_beres.domain.rules.safety import (
     content_version,
     idempotency_key,
     mask_account,
+    mask_evidence_pack,
     mask_npwp,
     mask_params,
     mask_text,
@@ -156,3 +157,51 @@ def test_a_star_counts_as_a_hidden_digit() -> None:
 def test_masking_twice_keeps_the_visible_digits() -> None:
     once = mask_params({"npwp": "0990427957220000", "rekening": "5450717927"})
     assert mask_params(once) == {"npwp": "0990********0000", "rekening": "******7927"}
+
+
+@pytest.mark.aturan("BR-24")
+def test_evidence_pack_masks_by_field_and_where_the_number_recurs() -> None:
+    pack = {
+        "faktur": {
+            "seller": {"npwp": "0990.4279.5722.0000"},
+            "bank_account": {"number": "137-00-1234567-8"},
+            "notes": ["Transfer ke 137-00-1234567-8 ya", "NPWP 0990427957220000"],
+            "total": "26107200",
+            "nsfp": "04002600007215293",
+        },
+        "alasan": [
+            {
+                "message": "Rekening berbeda.",
+                "evidence": {
+                    "kind": "bank_account",
+                    "printed_number": "137-00-1234567-8",
+                    "printed_digits": "1370012345678",
+                    "registered_digits": ["5450717927"],
+                },
+            },
+            {
+                "evidence": {
+                    "kind": "tax_id",
+                    "field": "npwp_penjual",
+                    "printed": "0990427957220000",
+                    "digits": "0990427957220000",
+                    "expected": None,
+                }
+            },
+            {"evidence": {"kind": "tax_id", "field": "nsfp", "printed": "04002600007215293"}},
+        ],
+        "berkas": {"sha256": "0" * 64},
+    }
+    masked = mask_evidence_pack(pack)
+    faktur = masked["faktur"]
+    assert faktur["seller"]["npwp"] == "0990********0000"
+    assert faktur["bank_account"]["number"] == "*********5678"
+    assert faktur["total"] == "26107200" and faktur["nsfp"] == "04002600007215293"
+    assert "1234567" not in " ".join(faktur["notes"]) and "4279" not in " ".join(faktur["notes"])
+    bank = masked["alasan"][0]["evidence"]
+    assert bank["registered_digits"] == ["******7927"]
+    assert bank["printed_digits"] == "*********5678"
+    assert masked["alasan"][1]["evidence"]["digits"] == "0990********0000"
+    assert masked["alasan"][2]["evidence"]["printed"] == "04002600007215293"
+    assert masked["berkas"]["sha256"] == "0" * 64
+    assert mask_evidence_pack(masked) == masked

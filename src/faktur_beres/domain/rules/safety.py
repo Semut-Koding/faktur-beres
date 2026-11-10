@@ -13,7 +13,7 @@
 import hashlib
 import json
 import re
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Any, Literal
@@ -142,6 +142,107 @@ def mask_params(value: Any, key: str | None = None) -> Any:
     if isinstance(value, str):
         return _mask_by_key(key, value)
     return value
+
+
+_PACK_NPWP = frozenset({"npwp", "npwp_digits", "vendor_npwp_digits"})
+_PACK_ACCOUNT = frozenset({"printed_number", "printed_digits", "registered_digits"})
+_PACK_TAX_ID = ("printed", "digits", "expected")
+_PACK_FREE_TEXT = frozenset(
+    {"message", "quote", "description", "notes", "catatan", "problems", "explanation"}
+)
+_MIN_SECRET_DIGITS = 8
+
+
+def _is_npwp_evidence(node: Mapping[str, Any]) -> bool:
+    return node.get("kind") == "tax_id" and str(node.get("field", "")).startswith("npwp")
+
+
+def _pack_secrets(value: Any, key: str | None = None) -> tuple[set[str], set[str]]:
+    """The digits of every NPWP and account number the pack holds in a named field."""
+    npwps: set[str] = set()
+    accounts: set[str] = set()
+
+    def add(target: set[str], raw: Any) -> None:
+        for item in raw if isinstance(raw, list | tuple) else [raw]:
+            digits = re.sub(r"\D", "", item) if isinstance(item, str) else ""
+            if len(digits) >= _MIN_SECRET_DIGITS:
+                target.add(digits)
+
+    def walk(node: Any, name: str | None) -> None:
+        if isinstance(node, Mapping):
+            if _is_npwp_evidence(node):
+                for field in _PACK_TAX_ID:
+                    add(npwps, node.get(field))
+            for child, item in node.items():
+                if child in _PACK_NPWP:
+                    add(npwps, item)
+                elif child in _PACK_ACCOUNT or (name == "bank_account" and child == "number"):
+                    add(accounts, item)
+                else:
+                    walk(item, str(child))
+        elif isinstance(node, list | tuple):
+            for item in node:
+                walk(item, name)
+
+    walk(value, key)
+    return npwps, accounts
+
+
+def _digit_pattern(digits: str) -> re.Pattern[str]:
+    return re.compile(r"(?<!\d)" + r"[\s.\-/]*".join(digits) + r"(?!\d)")
+
+
+def _hider(mask: Callable[[str], str]) -> Callable[[re.Match[str]], str]:
+    def replace(match: re.Match[str]) -> str:
+        return mask(match.group(0))
+
+    return replace
+
+
+def mask_evidence_pack(pack: Mapping[str, Any]) -> dict[str, Any]:
+    """BR-24 for the approval evidence: by field name, then the same numbers wherever they recur.
+
+    Masking only by pattern is not enough, because a printed account such as ``137-00-1234567-8``
+    does not look like one. The conclusions of the rules stay whole; hashes are left alone.
+    """
+    npwps, accounts = _pack_secrets(pack)
+    rules = [(_digit_pattern(d), mask_npwp) for d in sorted(npwps, key=len, reverse=True)]
+    rules += [(_digit_pattern(d), mask_account) for d in sorted(accounts, key=len, reverse=True)]
+
+    def scrub(text: str) -> str:
+        for pattern, mask in rules:
+            text = pattern.sub(_hider(mask), text)
+        return text
+
+    def walk(node: Any, name: str | None) -> Any:
+        if isinstance(node, Mapping):
+            tax_id = _is_npwp_evidence(node)
+            result: dict[str, Any] = {}
+            for child, item in node.items():
+                field = str(child)
+                if field in _HASH_KEYS:
+                    result[field] = item
+                elif field in _PACK_NPWP or (tax_id and field in _PACK_TAX_ID):
+                    result[field] = _masked(item, mask_npwp)
+                elif field in _PACK_ACCOUNT or (name == "bank_account" and field == "number"):
+                    result[field] = _masked(item, mask_account)
+                else:
+                    result[field] = walk(item, field)
+            return result
+        if isinstance(node, list | tuple):
+            return [walk(item, name) for item in node]
+        if isinstance(node, str):
+            cleaned = scrub(node)
+            return mask_text(cleaned) if name in _PACK_FREE_TEXT else cleaned
+        return node
+
+    return walk(pack, None)  # type: ignore[no-any-return]
+
+
+def _masked(value: Any, mask: Any) -> Any:
+    if isinstance(value, list | tuple):
+        return [mask(item) if isinstance(item, str) else item for item in value]
+    return mask(value) if isinstance(value, str) else value
 
 
 # -- BR-25 ----------------------------------------------------------------------------------------

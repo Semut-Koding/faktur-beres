@@ -44,7 +44,11 @@ from faktur_beres.domain.reasons import InvoiceStatus, ReasonCode, Route
 from faktur_beres.domain.rules.injection import InjectionReview, document_fragments
 from faktur_beres.domain.rules.purchase_order import PoStatus
 from faktur_beres.domain.rules.routing import initial_status
-from faktur_beres.domain.rules.safety import content_version, idempotency_key
+from faktur_beres.domain.rules.safety import (
+    content_version,
+    idempotency_key,
+    mask_evidence_pack,
+)
 from faktur_beres.domain.rules.vendor import VendorStatus
 from faktur_beres.extraction.outcome import ExtractionOutcome, ExtractionStatus
 from faktur_beres.graph.audit import AuditedReader
@@ -654,6 +658,7 @@ class Nodes:
             "usulan": proposed,
             "pilihan": options,
         }
+        pack = mask_evidence_pack(pack)
         deps.store.update_reasons(invoice_id, reasons, route=Route.C)
         deps.store.open_approval(
             invoice_id,
