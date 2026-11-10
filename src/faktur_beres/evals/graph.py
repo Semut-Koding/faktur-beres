@@ -470,6 +470,15 @@ def percentile_95(values: Sequence[float]) -> float:
     return sorted(values)[math.ceil(len(values) * 0.95) - 1]
 
 
+def timing_row(values: Sequence[float]) -> dict[str, float]:
+    return {
+        "n": len(values),
+        "median_detik": round(statistics.median(values), 1),
+        "p95_detik": round(percentile_95(values), 1),
+        "maks_detik": round(max(values), 1),
+    }
+
+
 def summarize(results: Sequence[Result]) -> dict[str, Any]:
     def group(key: str) -> dict[str, dict[str, int]]:
         table: dict[str, dict[str, int]] = {}
@@ -491,15 +500,10 @@ def summarize(results: Sequence[Result]) -> dict[str, Any]:
     for result in results:
         if result.seconds_to_route is not None:
             per_format.setdefault(result.format, []).append(result.seconds_to_route)
-    timing = {
-        name: {
-            "n": len(values),
-            "median_detik": round(statistics.median(values), 1),
-            "p95_detik": round(percentile_95(values), 1),
-            "maks_detik": round(max(values), 1),
-        }
-        for name, values in sorted(per_format.items())
-    }
+    timing = {name: timing_row(values) for name, values in sorted(per_format.items())}
+    everything = [value for values in per_format.values() for value in values]
+    if everything:
+        timing["keseluruhan"] = timing_row(everything)
     models: Counter[str] = Counter()
     purposes: Counter[str] = Counter()
     for result in results:
