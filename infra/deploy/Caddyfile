@@ -1,0 +1,48 @@
+# Caddy di VPS Faktur Beres: TLS otomatis (Let's Encrypt) untuk tiga host.
+# Dipasang oleh caddy-pasang.sh, yang mengganti __DOMAIN__, __BASIC_USER__, dan __BASIC_HASH__.
+# Layanan di belakangnya hanya mendengarkan di 127.0.0.1.
+# Ubuntu 26.04 membawa Caddy 2.6, yang mengenal direktif `basicauth`; ejaan `basic_auth` baru ada
+# sejak Caddy 2.8.
+
+(aman) {
+	encode zstd gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		-Server
+	}
+}
+
+# Dashboard dan API. Baca publik; aksi butuh kode akses (Authorization: Bearer).
+__DOMAIN__ {
+	import aman
+	request_body {
+		max_size 16MB
+	}
+	reverse_proxy 127.0.0.1:28000 {
+		# SSE (/api/stream) diteruskan tanpa penyangga.
+		flush_interval -1
+	}
+}
+
+# Odoo: di balik basic auth; login Odoo sendiri tetap berlaku sesudahnya.
+odoo.__DOMAIN__ {
+	import aman
+	basicauth {
+		__BASIC_USER__ __BASIC_HASH__
+	}
+	reverse_proxy 127.0.0.1:28069 {
+		header_up -Authorization
+	}
+}
+
+# Mailpit (kotak surat sandbox): di balik basic auth. Port SMTP tidak dibuka ke luar.
+mail.__DOMAIN__ {
+	import aman
+	basicauth {
+		__BASIC_USER__ __BASIC_HASH__
+	}
+	reverse_proxy 127.0.0.1:28025 {
+		header_up -Authorization
+	}
+}

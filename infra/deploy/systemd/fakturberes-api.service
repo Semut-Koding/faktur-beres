@@ -1,0 +1,18 @@
+# Layanan user: API dan dashboard Faktur Beres di 127.0.0.1:28000, dengan pemantau inbox
+# (INBOX_INTERVAL_DETIK di .env). Caddy meneruskan HTTPS ke sini.
+[Unit]
+Description=Faktur Beres: API dan dashboard (uvicorn)
+After=fakturberes-layanan.service
+Wants=fakturberes-layanan.service
+
+[Service]
+WorkingDirectory=%h/faktur-beres
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=%h/.local/bin/uv run --no-sync python -m faktur_beres.api
+Restart=on-failure
+RestartSec=5
+MemoryHigh=600M
+MemoryMax=900M
+
+[Install]
+WantedBy=default.target

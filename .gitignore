@@ -36,3 +36,6 @@ eval/hasil/
 .idea/
 .vscode/
 *.swp
+
+# Penyetelan compose khusus VPS (disalin dari infra/deploy saat deploy)
+/compose.override.yaml

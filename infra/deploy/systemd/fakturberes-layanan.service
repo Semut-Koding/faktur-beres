@@ -1,0 +1,17 @@
+# Layanan user: menyalakan kontainer fakturberes (Odoo, PostgreSQL, Mailpit) saat VPS menyala.
+[Unit]
+Description=Faktur Beres: kontainer (Odoo, PostgreSQL, Mailpit)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=%h/faktur-beres
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+ExecStart=/usr/bin/bash infra/scripts/services-up.sh
+ExecStop=/usr/bin/bash infra/scripts/services-down.sh
+TimeoutStartSec=600
+
+[Install]
+WantedBy=default.target

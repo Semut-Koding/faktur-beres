@@ -1,0 +1,16 @@
+# Penyetelan untuk VPS RAM 2 GB. vps-pasang.sh menyalinnya ke akar repo di VPS, tempat penyedia
+# compose memuatnya bersama compose.yaml. Tidak dipakai di laptop.
+services:
+  odoo:
+    # workers = 0 sudah di odoo.conf. Batas memori membuat Odoo mendaur ulang dirinya sebelum
+    # menekan layanan lain; proxy-mode karena Odoo berada di belakang Caddy (HTTPS).
+    command:
+      - odoo
+      - --proxy-mode
+      - --limit-memory-soft=734003200
+      - --limit-memory-hard=1073741824
+      - --db_maxconn=16
+  odoo-db:
+    command: ["postgres", "-c", "shared_buffers=64MB", "-c", "max_connections=40", "-c", "work_mem=4MB"]
+  app-db:
+    command: ["postgres", "-c", "shared_buffers=64MB", "-c", "max_connections=40", "-c", "work_mem=4MB"]
